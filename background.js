@@ -1,0 +1,269 @@
+// Default settings
+const DEFAULT_SETTINGS = {
+  botToken: '',
+  chatId: '',
+  addScreenshot: true,
+  imageCompression: true,
+  showLinkPreview: true,
+  iconColor: 'blue',
+  tagImage: '#image',
+  tagLink: '#link',
+  tagQuote: '#quote'
+};
+
+// Update extension icon
+function updateIcon(color) {
+  chrome.action.setIcon({
+    path: {
+      16: `icons/icon-${color}-16.png`,
+      48: `icons/icon-${color}-48.png`,
+      128: `icons/icon-${color}-128.png`
+    }
+  });
+}
+
+// Listen for settings changes
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.iconColor) {
+    updateIcon(changes.iconColor.newValue);
+  }
+});
+
+// Set icon on startup
+chrome.storage.local.get({ iconColor: 'blue' }, (result) => {
+  updateIcon(result.iconColor);
+});
+
+// Create context menus on install
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: 'sendImage',
+    title: 'Send image to Telegram',
+    contexts: ['image']
+  });
+
+  chrome.contextMenus.create({
+    id: 'sendQuote',
+    title: 'Send quote to Telegram',
+    contexts: ['selection']
+  });
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  const settings = await getSettings();
+
+  if (!settings.botToken || !settings.chatId) {
+    chrome.runtime.openOptionsPage();
+    return;
+  }
+
+  if (info.menuItemId === 'sendImage') {
+    await sendImage(info.srcUrl, tab.url, settings);
+  } else if (info.menuItemId === 'sendQuote') {
+    await sendQuote(info.selectionText, tab.url, settings);
+  }
+});
+
+// Handle toolbar icon click
+chrome.action.onClicked.addListener(async (tab) => {
+  const settings = await getSettings();
+
+  if (!settings.botToken || !settings.chatId) {
+    chrome.runtime.openOptionsPage();
+    return;
+  }
+
+  await sendScreenshot(tab, settings);
+});
+
+// Get settings from storage
+async function getSettings() {
+  const result = await chrome.storage.local.get(DEFAULT_SETTINGS);
+  return { ...DEFAULT_SETTINGS, ...result };
+}
+
+// Format URL for display
+function formatUrl(url) {
+  let clean = url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
+
+  if (clean.length <= 35) {
+    return { text: clean, isLink: false, fullUrl: url };
+  }
+
+  const domain = clean.split('/')[0];
+  return { text: domain, isLink: true, fullUrl: url };
+}
+
+// Build caption with URL
+function buildCaption(url, tag, extraText = '') {
+  const formatted = formatUrl(url);
+  let caption = '';
+
+  if (extraText) {
+    caption += `"${extraText.slice(0, 3900)}"\n\n`;
+  }
+
+  if (formatted.isLink) {
+    caption += `${tag} | <a href="${formatted.fullUrl}">${formatted.text}</a>`;
+  } else {
+    caption += `${tag} | ${formatted.text}`;
+  }
+
+  return caption;
+}
+
+// Show toast notification on page
+async function showToast(tabId, success, message) {
+  try {
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ['content.css']
+    });
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    });
+
+    await chrome.tabs.sendMessage(tabId, {
+      action: 'showToast',
+      success,
+      message
+    });
+  } catch (e) {
+    console.error('Failed to show toast:', e);
+  }
+}
+
+// Send screenshot of current tab
+async function sendScreenshot(tab, settings) {
+  try {
+    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+
+    if (!settings.addScreenshot) {
+      // Send just the link without screenshot
+      await sendMessage(tab.url, settings);
+      await showToast(tab.id, true, 'Sent!');
+      return;
+    }
+
+    const blob = await fetch(dataUrl).then(r => r.blob());
+    const caption = buildCaption(tab.url, settings.tagLink);
+
+    await sendPhoto(blob, caption, settings);
+    await showToast(tab.id, true, 'Sent!');
+  } catch (e) {
+    console.error('Screenshot error:', e);
+    await showToast(tab.id, false, 'Error');
+  }
+}
+
+// Send image from context menu
+async function sendImage(imageUrl, pageUrl, settings) {
+  const tabId = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+
+  try {
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    const caption = buildCaption(pageUrl, settings.tagImage);
+
+    if (settings.imageCompression) {
+      await sendPhoto(blob, caption, settings);
+    } else {
+      await sendDocument(blob, caption, settings, imageUrl);
+    }
+
+    if (tabId) await showToast(tabId, true, 'Sent!');
+  } catch (e) {
+    console.error('Image error:', e);
+    if (tabId) await showToast(tabId, false, 'Error');
+  }
+}
+
+// Send quote from context menu
+async function sendQuote(text, pageUrl, settings) {
+  const tabId = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+
+  try {
+    const caption = buildCaption(pageUrl, settings.tagQuote, text);
+    await sendTextMessage(caption, settings);
+
+    if (tabId) await showToast(tabId, true, 'Sent!');
+  } catch (e) {
+    console.error('Quote error:', e);
+    if (tabId) await showToast(tabId, false, 'Error');
+  }
+}
+
+// Send just a message (link without screenshot)
+async function sendMessage(url, settings) {
+  const caption = buildCaption(url, settings.tagLink);
+  await sendTextMessage(caption, settings);
+}
+
+// Telegram API: send text message
+async function sendTextMessage(text, settings) {
+  const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: settings.chatId,
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: !settings.showLinkPreview
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.description || 'Telegram API error');
+  }
+
+  return response.json();
+}
+
+// Telegram API: send photo
+async function sendPhoto(blob, caption, settings) {
+  const formData = new FormData();
+  formData.append('chat_id', settings.chatId);
+  formData.append('photo', blob, 'screenshot.png');
+  formData.append('caption', caption);
+  formData.append('parse_mode', 'HTML');
+
+  const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendPhoto`, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.description || 'Telegram API error');
+  }
+
+  return response.json();
+}
+
+// Telegram API: send document (uncompressed)
+async function sendDocument(blob, caption, settings, originalUrl) {
+  const ext = originalUrl.split('.').pop()?.split('?')[0] || 'png';
+  const filename = `image.${ext}`;
+
+  const formData = new FormData();
+  formData.append('chat_id', settings.chatId);
+  formData.append('document', blob, filename);
+  formData.append('caption', caption);
+  formData.append('parse_mode', 'HTML');
+
+  const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendDocument`, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.description || 'Telegram API error');
+  }
+
+  return response.json();
+}
