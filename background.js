@@ -43,6 +43,12 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 
   chrome.contextMenus.create({
+    id: 'sendImageFromPage',
+    title: 'Send image to Telegram',
+    contexts: ['page', 'frame', 'link']
+  });
+
+  chrome.contextMenus.create({
     id: 'sendQuote',
     title: 'Send quote to Telegram',
     contexts: ['selection']
@@ -60,6 +66,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (info.menuItemId === 'sendImage') {
     await sendImage(info.srcUrl, tab.url, settings);
+  } else if (info.menuItemId === 'sendImageFromPage') {
+    await sendImageFromPage(tab, settings);
   } else if (info.menuItemId === 'sendQuote') {
     await sendQuote(info.selectionText, tab.url, settings);
   }
@@ -161,10 +169,13 @@ async function sendScreenshot(tab, settings) {
 
 // Send image from context menu
 async function sendImage(imageUrl, pageUrl, settings) {
-  const tabId = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+  const tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  const tabId = tab?.id;
 
   try {
     const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Failed to fetch image');
+
     const blob = await response.blob();
     const caption = buildCaption(pageUrl, settings.tagImage);
 
@@ -178,6 +189,96 @@ async function sendImage(imageUrl, pageUrl, settings) {
   } catch (e) {
     console.error('Image error:', e);
     if (tabId) await showToast(tabId, false, 'Error');
+  }
+}
+
+// Send image or video found under cursor (for sites like Instagram)
+async function sendImageFromPage(tab, settings) {
+  const tabId = tab.id;
+
+  try {
+    // Find image or video under cursor via content script
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const lastRightClicked = window.__tgSaverLastRightClicked;
+        if (!lastRightClicked) return { type: null };
+
+        // Check for video first
+        let video = lastRightClicked.closest('video') ||
+                    lastRightClicked.querySelector('video') ||
+                    lastRightClicked.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+
+        if (!video) {
+          let parent = lastRightClicked.parentElement;
+          for (let i = 0; i < 5 && parent; i++) {
+            video = parent.querySelector('video');
+            if (video) break;
+            parent = parent.parentElement;
+          }
+        }
+
+        if (video) {
+          return { type: 'video', src: video.src || video.currentSrc };
+        }
+
+        // Check for image
+        let img = lastRightClicked.closest('img') ||
+                  lastRightClicked.querySelector('img') ||
+                  lastRightClicked.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
+
+        if (!img) {
+          let parent = lastRightClicked.parentElement;
+          for (let i = 0; i < 5 && parent; i++) {
+            img = parent.querySelector('img');
+            if (img) break;
+            parent = parent.parentElement;
+          }
+        }
+
+        if (img) {
+          return { type: 'image', src: img.src };
+        }
+
+        return { type: null };
+      }
+    });
+
+    const media = results[0]?.result;
+
+    if (!media || !media.type) {
+      await showToast(tabId, false, 'No media found');
+      return;
+    }
+
+    if (media.type === 'video') {
+      // For video: take screenshot and send with video tag
+      await sendVideoAsScreenshot(tab, settings);
+    } else {
+      // For image: send as usual
+      await sendImage(media.src, tab.url, settings);
+    }
+  } catch (e) {
+    console.error('sendImageFromPage error:', e);
+    await showToast(tabId, false, 'Error');
+  }
+}
+
+// Send video as screenshot with #video tag
+async function sendVideoAsScreenshot(tab, settings) {
+  try {
+    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+    const blob = await fetch(dataUrl).then(r => r.blob());
+
+    // Use #video tag instead of #image
+    const videoTag = '#video';
+    const caption = buildCaption(tab.url, videoTag);
+
+    await sendPhoto(blob, caption, settings);
+    await showToast(tab.id, true, 'Sent!');
+  } catch (e) {
+    console.error('Video screenshot error:', e);
+    await showToast(tab.id, false, 'Error');
   }
 }
 

@@ -1,3 +1,8 @@
+// Track right-clicked element for image detection
+document.addEventListener('contextmenu', (e) => {
+  window.__tgSaverLastRightClicked = e.target;
+}, true);
+
 // Listen for toast messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'showToast') {
