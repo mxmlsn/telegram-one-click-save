@@ -3,14 +3,23 @@ document.addEventListener('contextmenu', (e) => {
   window.__tgSaverLastRightClicked = e.target;
 }, true);
 
-// Toast state
-let toastTimeout = null;
-let toastSendCallback = null;
+// ============ TOAST SYSTEM ============
 
-// Listen for toast messages from background
+// Single state object - stored on window to persist across any re-injections
+window.__TG_ToastState = window.__TG_ToastState || {
+  intervalId: null,
+  timeLeft: 4000,
+  isPaused: false,
+  requestId: null,
+  isCancelled: false
+};
+
+const ToastState = window.__TG_ToastState;
+
+// Listen for messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'showToast') {
-    showToast(message.state, message.message);
+    showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
     showTagSelectionToast(message.customTags, message.requestId);
     sendResponse({ received: true });
@@ -18,37 +27,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-function showToast(state, message) {
+function showSimpleToast(state, message) {
   let toast = document.getElementById('tg-saver-toast');
 
   if (state === 'pending') {
-    // Create new toast in pending state
     if (toast) toast.remove();
-    clearToastTimeout();
+    killTimer();
 
     toast = document.createElement('div');
     toast.id = 'tg-saver-toast';
     toast.className = 'tg-saver-toast';
     toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">${message}</span>`;
-
     document.body.appendChild(toast);
 
-    requestAnimationFrame(() => {
-      toast.classList.add('tg-saver-visible');
-    });
+    requestAnimationFrame(() => toast.classList.add('tg-saver-visible'));
   } else if (state === 'success' && toast) {
-    // Transition existing toast to success
-    clearToastTimeout();
+    killTimer();
     toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
     toast.classList.add('tg-saver-success');
     toast.classList.remove('tg-saver-with-tags');
 
-    // Remove after delay
     setTimeout(() => {
       toast.classList.remove('tg-saver-visible');
-      setTimeout(() => {
-        toast.remove();
-      }, 200);
+      setTimeout(() => toast.remove(), 200);
     }, 1200);
   }
 }
@@ -56,82 +57,151 @@ function showToast(state, message) {
 function showTagSelectionToast(customTags, requestId) {
   let toast = document.getElementById('tg-saver-toast');
   if (toast) toast.remove();
-  clearToastTimeout();
+  killTimer();
 
-  toast = document.createElement('div');
-  toast.id = 'tg-saver-toast';
-  toast.className = 'tg-saver-toast tg-saver-with-tags';
+  // Reset state
+  ToastState.requestId = requestId;
+  ToastState.isCancelled = false;
+  ToastState.isPaused = false;
 
-  // Build tag buttons HTML - preserve original grid layout from settings
-  let tagsHtml = '';
-  let useTwoColumns = false;
-  if (customTags) {
-    const nonEmptyTags = customTags
-      .map((tag, index) => ({ ...tag, index }))
-      .filter(tag => tag.name && tag.name.trim().length > 0);
+  chrome.storage.local.get({ timerDuration: 4 }, (result) => {
+    ToastState.timeLeft = result.timerDuration * 1000;
 
-    // Check if any non-empty tag is in the right column (odd index)
-    useTwoColumns = nonEmptyTags.some(tag => tag.index % 2 === 1);
+    toast = document.createElement('div');
+    toast.id = 'tg-saver-toast';
+    toast.className = 'tg-saver-toast tg-saver-with-tags';
+    toast.dataset.requestId = requestId;
 
-    tagsHtml = nonEmptyTags
-      .map(tag => `
-        <button class="tg-saver-tag-btn" data-index="${tag.index}" data-name="${tag.name}">
+    // Build tags HTML
+    let tagsHtml = '';
+    let useTwoColumns = false;
+    if (customTags) {
+      const nonEmptyTags = customTags
+        .map((tag, index) => ({ ...tag, index }))
+        .filter(tag => tag.name && tag.name.trim().length > 0);
+
+      useTwoColumns = nonEmptyTags.some(tag => tag.index % 2 === 1);
+
+      tagsHtml = nonEmptyTags.map(tag => `
+        <button class="tg-saver-tag-btn" data-index="${tag.index}">
           <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
           <span>${tag.name}</span>
         </button>
       `).join('');
-  }
+    }
 
-  const columnsClass = useTwoColumns ? '' : ' tg-saver-single-column';
+    const columnsClass = useTwoColumns ? '' : ' tg-saver-single-column';
 
-  toast.innerHTML = `
-    <div class="tg-saver-toast-content">
-      <div class="tg-saver-toast-header">
-        <span class="tg-saver-icon">↑</span>
-        <span class="tg-saver-text">Select tag</span>
+    toast.innerHTML = `
+      <div class="tg-saver-toast-content">
+        <div class="tg-saver-toast-header">
+          <span class="tg-saver-icon">↑</span>
+          <span class="tg-saver-text">Select tag</span>
+          <button class="tg-saver-cancel-btn" title="Cancel send">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="tg-saver-tags-container${columnsClass}">
+          ${tagsHtml}
+          <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
+            <span>Skip</span>
+          </button>
+        </div>
       </div>
-      <div class="tg-saver-tags-container${columnsClass}">
-        ${tagsHtml}
-        <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
-          <span>Skip</span>
-        </button>
+      <div class="tg-saver-progress-bar">
+        <div class="tg-saver-progress-fill"></div>
       </div>
-    </div>
-    <div class="tg-saver-progress-bar">
-      <div class="tg-saver-progress-fill"></div>
-    </div>
-  `;
+    `;
 
-  document.body.appendChild(toast);
+    document.body.appendChild(toast);
 
-  // Add click handlers for tag buttons
-  toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    // Cancel button
+    toast.querySelector('.tg-saver-cancel-btn').addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const index = parseInt(btn.dataset.index);
-      const selectedTag = index >= 0 ? customTags[index] : null;
-      sendTagSelection(requestId, selectedTag);
+      cancelSend();
     });
-  });
 
-  requestAnimationFrame(() => {
-    toast.classList.add('tg-saver-visible');
-    // Start progress bar animation
-    const progressFill = toast.querySelector('.tg-saver-progress-fill');
-    if (progressFill) {
-      progressFill.style.animation = 'tg-saver-progress 4s linear forwards';
-    }
-  });
+    // Tag buttons - MANUAL CLICK - always sends
+    toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(btn.dataset.index);
+        const selectedTag = index >= 0 ? customTags[index] : null;
+        btn.classList.add('tg-saver-tag-pending');
+        doSend(requestId, selectedTag);
+      });
+    });
 
-  // Auto-send without tag after 4 seconds
-  toastTimeout = setTimeout(() => {
-    sendTagSelection(requestId, null);
-  }, 4000);
+    // HOVER - set pause flag
+    toast.addEventListener('mouseenter', () => {
+      ToastState.isPaused = true;
+      const fill = toast.querySelector('.tg-saver-progress-fill');
+      if (fill) fill.style.animationPlayState = 'paused';
+    });
+
+    toast.addEventListener('mouseleave', () => {
+      ToastState.isPaused = false;
+      const fill = toast.querySelector('.tg-saver-progress-fill');
+      if (fill) fill.style.animationPlayState = 'running';
+    });
+
+    requestAnimationFrame(() => {
+      toast.classList.add('tg-saver-visible');
+      const fill = toast.querySelector('.tg-saver-progress-fill');
+      if (fill) {
+        fill.style.animation = `tg-saver-progress ${ToastState.timeLeft}ms linear forwards`;
+      }
+    });
+
+    // Start countdown
+    startCountdown(requestId);
+  });
 }
 
-function sendTagSelection(requestId, selectedTag) {
-  clearToastTimeout();
+function startCountdown(requestId) {
+  const TICK = 50;
+
+  ToastState.intervalId = setInterval(() => {
+    // PAUSED = do nothing, don't decrement
+    if (ToastState.isPaused) {
+      return;
+    }
+
+    // Cancelled = stop
+    if (ToastState.isCancelled) {
+      killTimer();
+      return;
+    }
+
+    // Decrement
+    ToastState.timeLeft -= TICK;
+
+    // Time's up
+    if (ToastState.timeLeft <= 0) {
+      killTimer();
+
+      // Final check - if somehow paused at last moment
+      if (ToastState.isPaused) {
+        return;
+      }
+
+      doSend(requestId, null);
+    }
+  }, TICK);
+}
+
+function doSend(requestId, selectedTag) {
+  if (ToastState.isCancelled) {
+    return;
+  }
+
+  killTimer();
+
   chrome.runtime.sendMessage({
     action: 'tagSelected',
     requestId: requestId,
@@ -139,26 +209,43 @@ function sendTagSelection(requestId, selectedTag) {
   });
 }
 
-function clearToastTimeout() {
-  if (toastTimeout) {
-    clearTimeout(toastTimeout);
-    toastTimeout = null;
+function cancelSend() {
+  ToastState.isCancelled = true;
+  killTimer();
+
+  const toast = document.getElementById('tg-saver-toast');
+  if (toast) {
+    toast.classList.remove('tg-saver-visible');
+    setTimeout(() => toast.remove(), 200);
+  }
+
+  if (ToastState.requestId) {
+    chrome.runtime.sendMessage({
+      action: 'cancelSend',
+      requestId: ToastState.requestId
+    });
   }
 }
 
-// Selection icon functionality
+function killTimer() {
+  if (ToastState.intervalId) {
+    clearInterval(ToastState.intervalId);
+    ToastState.intervalId = null;
+  }
+}
+
+// ============ SELECTION ICON ============
+
 let selectionIcon = null;
 let showSelectionIcon = true;
-let savedSelectionText = ''; // Store selected text when icon appears
+let savedSelectionText = '';
 
-// Get settings on load
 chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
   if (response) {
     showSelectionIcon = response.showSelectionIcon;
   }
 });
 
-// Listen for settings changes
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.showSelectionIcon) {
     showSelectionIcon = changes.showSelectionIcon.newValue;
@@ -169,7 +256,6 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-// Create selection icon element
 function createSelectionIcon() {
   if (selectionIcon) return selectionIcon;
 
@@ -186,7 +272,6 @@ function createSelectionIcon() {
     e.preventDefault();
     e.stopPropagation();
 
-    // Use saved text since selection may be lost on click
     if (savedSelectionText) {
       chrome.runtime.sendMessage({
         action: 'sendQuoteFromSelection',
@@ -204,12 +289,9 @@ function createSelectionIcon() {
 function showSelectionIconAt(x, y, text) {
   if (!showSelectionIcon) return;
 
-  // Save the selected text
   savedSelectionText = text;
-
   const icon = createSelectionIcon();
 
-  // Position icon above the selection end
   icon.style.left = `${x}px`;
   icon.style.top = `${y - 40}px`;
 
@@ -224,20 +306,16 @@ function hideSelectionIcon() {
   }
 }
 
-// Handle text selection
 document.addEventListener('mouseup', (e) => {
-  // Ignore if clicking on the icon itself
   if (e.target.closest('#tg-saver-selection-icon')) return;
 
   const selection = window.getSelection();
   const selectedText = selection.toString().trim();
 
   if (selectedText.length > 0) {
-    // Get position of selection end
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
 
-    // Show icon at the end of selection, pass text
     showSelectionIconAt(
       rect.right + window.scrollX,
       rect.top + window.scrollY,
@@ -248,14 +326,12 @@ document.addEventListener('mouseup', (e) => {
   }
 });
 
-// Hide icon when clicking elsewhere
 document.addEventListener('mousedown', (e) => {
   if (!e.target.closest('#tg-saver-selection-icon')) {
     hideSelectionIcon();
   }
 });
 
-// Hide icon on scroll
 document.addEventListener('scroll', () => {
   hideSelectionIcon();
 }, true);

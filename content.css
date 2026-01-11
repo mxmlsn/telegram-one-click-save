@@ -61,6 +61,30 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+  position: relative;
+}
+
+.tg-saver-cancel-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+  border-radius: 4px;
+}
+
+.tg-saver-cancel-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tg-saver-cancel-btn:active {
+  transform: scale(0.95);
 }
 
 .tg-saver-tags-container {
@@ -97,6 +121,21 @@
 
 .tg-saver-tag-btn:active {
   transform: scale(0.95);
+}
+
+.tg-saver-tag-btn.tg-saver-tag-pending {
+  cursor: wait;
+  pointer-events: none;
+  animation: tg-saver-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tg-saver-pulse {
+  0%, 100% {
+    background: rgba(156, 163, 175, 0.2);
+  }
+  50% {
+    background: rgba(156, 163, 175, 0.5);
+  }
 }
 
 .tg-saver-tag-dot {

@@ -730,3 +730,77 @@ input:checked+.slider:before {
   height: 16px;
   stroke-width: 3;
 }
+
+/* Timer Duration Slider */
+.timer-field {
+  margin-top: 12px;
+}
+
+.timer-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.timer-field #timerValue {
+  font-weight: 600;
+  color: #0088cc;
+}
+
+.optimal-label {
+  color: #22c55e;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.timer-field input[type="range"] {
+  width: 100%;
+  height: 6px;
+  background: #ddd;
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 8px 0;
+}
+
+.timer-field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #0088cc;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 136, 204, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.timer-field input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.timer-field input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #0088cc;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 136, 204, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.timer-field input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.15);
+}
+
+.timer-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+  margin-top: -4px;
+}

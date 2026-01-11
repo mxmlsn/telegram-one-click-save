@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   tagQuote: '#quote',
   enableQuickTags: true,
   sendWithColor: true,
+  timerDuration: 4,
   isConnected: false,
   // Fixed 8 tags
   customTags: [
@@ -47,6 +48,9 @@ const savedIndicator = document.getElementById('savedIndicator');
 // Custom tags elements
 const customTagsList = document.getElementById('customTagsList');
 const sendWithColorInput = document.getElementById('sendWithColor');
+const timerDurationInput = document.getElementById('timerDuration');
+const timerValueDisplay = document.getElementById('timerValue');
+const optimalLabel = document.querySelector('.optimal-label');
 
 
 // Custom tags state
@@ -120,6 +124,24 @@ document.querySelectorAll('input[name="iconColor"]').forEach(radio => {
   });
 });
 
+// Timer duration slider
+timerDurationInput.addEventListener('input', (e) => {
+  const value = parseInt(e.target.value);
+  timerValueDisplay.textContent = value;
+
+  // Show "(optimal)" only for value 4
+  if (value === 4) {
+    optimalLabel.style.display = 'inline';
+  } else {
+    optimalLabel.style.display = 'none';
+  }
+});
+
+timerDurationInput.addEventListener('change', (e) => {
+  const value = parseInt(e.target.value);
+  saveSetting('timerDuration', value);
+});
+
 async function loadSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
 
@@ -135,6 +157,12 @@ async function loadSettings() {
   tagQuoteInput.value = settings.tagQuote.replace(/^#/, '');
   enableQuickTagsInput.checked = settings.enableQuickTags !== false; // Default true
   sendWithColorInput.checked = settings.sendWithColor !== false; // Default true
+
+  // Set timer duration
+  const timerDuration = settings.timerDuration || 4;
+  timerDurationInput.value = timerDuration;
+  timerValueDisplay.textContent = timerDuration;
+  optimalLabel.style.display = timerDuration === 4 ? 'inline' : 'none';
 
   // Set radio buttons
   const compressionValue = settings.imageCompression ? 'true' : 'false';

@@ -223,6 +223,16 @@
                 Send with color (🟢 #tag)
               </label>
             </div>
+            <div class="field timer-field">
+              <label>
+                Timer Duration: <span id="timerValue">4</span>s <span class="optimal-label">(optimal)</span>
+              </label>
+              <input type="range" id="timerDuration" min="3" max="9" value="4" step="1">
+              <div class="timer-labels">
+                <span>3s</span>
+                <span>9s</span>
+              </div>
+            </div>
             <p class="settings-hint">Drag to reorder. Empty tags are hidden.</p>
             <div id="customTagsList" class="custom-tags-list"></div>
           </div>

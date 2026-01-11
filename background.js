@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   tagQuote: '#quote',
   enableQuickTags: true,
   sendWithColor: true,
+  timerDuration: 4, // Timer duration in seconds (3-9)
   // Fixed 8 tags default structure
   customTags: [
     { name: '', color: '#377CDE', id: 'blue' },
@@ -107,6 +108,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Pending requests waiting for tag selection
 const pendingRequests = new Map();
+const cancelledRequests = new Set();
 
 // Handle messages from content script (selection icon)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -128,10 +130,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true; // async response
   } else if (message.action === 'tagSelected') {
+    // Check if this request was cancelled
+    if (cancelledRequests.has(message.requestId)) {
+      cancelledRequests.delete(message.requestId);
+      pendingRequests.delete(message.requestId);
+      return;
+    }
+
     const pending = pendingRequests.get(message.requestId);
     if (pending) {
       pendingRequests.delete(message.requestId);
       pending.resolve(message.selectedTag);
+    }
+  } else if (message.action === 'cancelSend') {
+    // Mark request as cancelled
+    cancelledRequests.add(message.requestId);
+    const pending = pendingRequests.get(message.requestId);
+    if (pending) {
+      pendingRequests.delete(message.requestId);
+      pending.resolve('__CANCELLED__'); // Special marker for cancelled requests
     }
   }
 });
@@ -211,16 +228,8 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
 // Show toast notification on page
 async function showToast(tabId, state, message) {
   try {
-    await chrome.scripting.insertCSS({
-      target: { tabId },
-      files: ['content.css']
-    });
-
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content.js']
-    });
-
+    // Content script is already loaded via manifest.json
+    // Just send the message
     await chrome.tabs.sendMessage(tabId, {
       action: 'showToast',
       state,
@@ -236,27 +245,18 @@ async function showTagSelection(tabId, customTags) {
   const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
   try {
-    await chrome.scripting.insertCSS({
-      target: { tabId },
-      files: ['content.css']
-    });
-
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content.js']
-    });
-
+    // Content script is already loaded via manifest.json
     // Create promise that will be resolved when tag is selected
     const tagPromise = new Promise((resolve) => {
       pendingRequests.set(requestId, { resolve });
 
-      // Timeout fallback (5 seconds to be safe, content script has 4s)
+      // Timeout fallback (30 seconds - user may be hovering)
       setTimeout(() => {
         if (pendingRequests.has(requestId)) {
           pendingRequests.delete(requestId);
           resolve(null);
         }
-      }, 5000);
+      }, 30000);
     });
 
     await chrome.tabs.sendMessage(tabId, {
@@ -278,6 +278,10 @@ async function sendScreenshot(tab, settings) {
   let selectedTag = null;
   if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tab.id, settings.customTags);
+    // Check if cancelled
+    if (selectedTag === '__CANCELLED__') {
+      return;
+    }
   } else {
     await showToast(tab.id, 'pending', 'Sending...');
   }
@@ -308,6 +312,10 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
   // Show tag selection if custom tags exist and not already selected
   if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
+    // Check if cancelled
+    if (selectedTag === '__CANCELLED__') {
+      return;
+    }
   } else if (tabId && !selectedTag) {
     await showToast(tabId, 'pending', 'Sending...');
   }
@@ -349,6 +357,10 @@ async function sendImageFromPage(tab, settings) {
   let selectedTag = null;
   if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
+    // Check if cancelled
+    if (selectedTag === '__CANCELLED__') {
+      return;
+    }
   }
 
   // Find image or video under cursor via content script
@@ -431,6 +443,10 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
   // Show tag selection if custom tags exist and not already selected
   if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tab.id, settings.customTags);
+    // Check if cancelled
+    if (selectedTag === '__CANCELLED__') {
+      return;
+    }
   } else if (!selectedTag) {
     await showToast(tab.id, 'pending', 'Sending...');
   }
@@ -511,6 +527,10 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
   let selectedTag = null;
   if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
+    // Check if cancelled
+    if (selectedTag === '__CANCELLED__') {
+      return;
+    }
   } else if (tabId) {
     await showToast(tabId, 'pending', 'Sending...');
   }
