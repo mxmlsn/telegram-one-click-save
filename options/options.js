@@ -5,7 +5,9 @@ const DEFAULT_SETTINGS = {
   imageCompression: true,
   showLinkPreview: true,
   showSelectionIcon: true,
+  quoteMonospace: true,
   iconColor: 'blue',
+  useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#quote',
@@ -18,10 +20,13 @@ const chatIdInput = document.getElementById('chatId');
 const addScreenshotInput = document.getElementById('addScreenshot');
 const showLinkPreviewInput = document.getElementById('showLinkPreview');
 const showSelectionIconInput = document.getElementById('showSelectionIcon');
+const quoteMonospaceInput = document.getElementById('quoteMonospace');
+const useHashtagsInput = document.getElementById('useHashtags');
 const tagImageInput = document.getElementById('tagImage');
 const tagLinkInput = document.getElementById('tagLink');
 const tagQuoteInput = document.getElementById('tagQuote');
 const saveBtn = document.getElementById('saveBtn');
+const resetBtn = document.getElementById('resetBtn');
 const statusEl = document.getElementById('status');
 
 // Load settings on page open
@@ -29,6 +34,9 @@ document.addEventListener('DOMContentLoaded', loadSettings);
 
 // Save settings on button click
 saveBtn.addEventListener('click', saveSettings);
+
+// Reset settings on button click
+resetBtn.addEventListener('click', resetSettings);
 
 async function loadSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
@@ -38,6 +46,8 @@ async function loadSettings() {
   addScreenshotInput.checked = settings.addScreenshot;
   showLinkPreviewInput.checked = settings.showLinkPreview;
   showSelectionIconInput.checked = settings.showSelectionIcon;
+  quoteMonospaceInput.checked = settings.quoteMonospace;
+  useHashtagsInput.checked = settings.useHashtags;
   tagImageInput.value = settings.tagImage;
   tagLinkInput.value = settings.tagLink;
   tagQuoteInput.value = settings.tagQuote;
@@ -87,7 +97,9 @@ async function saveSettings() {
     imageCompression: document.querySelector('input[name="imageCompression"]:checked').value === 'true',
     showLinkPreview: showLinkPreviewInput.checked,
     showSelectionIcon: showSelectionIconInput.checked,
+    quoteMonospace: quoteMonospaceInput.checked,
     iconColor: document.querySelector('input[name="iconColor"]:checked').value,
+    useHashtags: useHashtagsInput.checked,
     tagImage: tagImageInput.value || '#image',
     tagLink: tagLinkInput.value || '#link',
     tagQuote: tagQuoteInput.value || '#quote',
@@ -126,4 +138,20 @@ async function testConnection(botToken, chatId) {
 function showStatus(message, success) {
   statusEl.textContent = message;
   statusEl.className = success === true ? 'success' : success === false ? 'error' : '';
+}
+
+async function resetSettings() {
+  // Keep bot credentials, reset everything else
+  const currentSettings = await chrome.storage.local.get(['botToken', 'chatId', 'isConnected']);
+
+  const resetData = {
+    ...DEFAULT_SETTINGS,
+    botToken: currentSettings.botToken || '',
+    chatId: currentSettings.chatId || '',
+    isConnected: currentSettings.isConnected || false
+  };
+
+  await chrome.storage.local.set(resetData);
+  await loadSettings();
+  showStatus('Settings reset to default', true);
 }

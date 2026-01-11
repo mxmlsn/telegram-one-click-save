@@ -7,9 +7,11 @@ const DEFAULT_SETTINGS = {
   showLinkPreview: true,
   showSelectionIcon: true,
   iconColor: 'blue',
+  useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',
-  tagQuote: '#quote'
+  tagQuote: '#quote',
+  quoteMonospace: true
 };
 
 // Update extension icon
@@ -35,18 +37,12 @@ chrome.storage.local.get({ iconColor: 'blue' }, (result) => {
   updateIcon(result.iconColor);
 });
 
-// Create context menus on install
+// Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: 'sendToTelegram',
-    title: 'Send to Telegram',
-    contexts: ['page', 'frame', 'link', 'image']
-  });
-
-  chrome.contextMenus.create({
-    id: 'sendQuote',
-    title: 'Send quote to Telegram',
-    contexts: ['selection']
+    id: 'pocketIt',
+    title: 'Pocket it',
+    contexts: ['page', 'frame', 'link', 'image', 'selection']
   });
 });
 
@@ -59,16 +55,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  if (info.menuItemId === 'sendToTelegram') {
-    // If clicked on image element directly, use srcUrl
-    if (info.srcUrl) {
+  if (info.menuItemId === 'pocketIt') {
+    // If text is selected, send as quote
+    if (info.selectionText) {
+      await sendQuote(info.selectionText, tab.url, settings);
+    } else if (info.srcUrl) {
+      // If clicked on image element directly, use srcUrl
       await sendImage(info.srcUrl, tab.url, settings);
     } else {
       // Otherwise try to detect media under cursor or send link
       await sendImageFromPage(tab, settings);
     }
-  } else if (info.menuItemId === 'sendQuote') {
-    await sendQuote(info.selectionText, tab.url, settings);
   }
 });
 
@@ -125,18 +122,29 @@ function formatUrl(url) {
 }
 
 // Build caption with URL
-function buildCaption(url, tag, extraText = '') {
+function buildCaption(url, tag, extraText = '', settings = {}) {
   const formatted = formatUrl(url);
+  const useHashtags = settings.useHashtags !== false;
+  const quoteMonospace = settings.quoteMonospace !== false;
   let caption = '';
 
   if (extraText) {
-    caption += `<code>${extraText.slice(0, 3900)}</code>\n\n`;
+    if (quoteMonospace) {
+      caption += `<code>${extraText.slice(0, 3900)}</code>\n\n`;
+    } else {
+      caption += `${extraText.slice(0, 3900)}\n\n`;
+    }
+  } else {
+    // Add empty braille space + newline before tag for visual separation
+    caption += '⠀\n';
   }
 
+  const tagPart = useHashtags ? `${tag} | ` : '';
+
   if (formatted.isLink) {
-    caption += `${tag} | <a href="${formatted.fullUrl}">${formatted.text}</a>`;
+    caption += `${tagPart}<a href="${formatted.fullUrl}">${formatted.text}</a>`;
   } else {
-    caption += `${tag} | ${formatted.text}`;
+    caption += `${tagPart}${formatted.text}`;
   }
 
   return caption;
@@ -179,7 +187,7 @@ async function sendScreenshot(tab, settings) {
   }
 
   const blob = await fetch(dataUrl).then(r => r.blob());
-  const caption = buildCaption(tab.url, settings.tagLink);
+  const caption = buildCaption(tab.url, settings.tagLink, '', settings);
 
   await sendPhoto(blob, caption, settings);
   await showToast(tab.id, 'success', 'Sent!');
@@ -211,7 +219,7 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null) {
     blob = await fetch(dataUrl).then(r => r.blob());
   }
 
-  const caption = buildCaption(pageUrl, settings.tagImage);
+  const caption = buildCaption(pageUrl, settings.tagImage, '', settings);
 
   if (settings.imageCompression || useScreenshot) {
     await sendPhoto(blob, caption, settings);
@@ -309,7 +317,7 @@ async function sendVideoAsScreenshot(tab, settings) {
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
   const blob = await fetch(dataUrl).then(r => r.blob());
 
-  const caption = buildCaption(tab.url, settings.tagImage);
+  const caption = buildCaption(tab.url, settings.tagImage, '', settings);
 
   await sendPhoto(blob, caption, settings);
   await showToast(tab.id, 'success', 'Sent!');
@@ -325,7 +333,7 @@ async function sendQuote(text, pageUrl, settings) {
 async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
   if (tabId) await showToast(tabId, 'pending', 'Sending...');
 
-  const caption = buildCaption(pageUrl, settings.tagQuote, text);
+  const caption = buildCaption(pageUrl, settings.tagQuote, text, settings);
   await sendTextMessage(caption, settings);
 
   if (tabId) await showToast(tabId, 'success', 'Sent!');
@@ -333,7 +341,7 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
 
 // Send just a message (link without screenshot)
 async function sendMessage(url, settings) {
-  const caption = buildCaption(url, settings.tagLink);
+  const caption = buildCaption(url, settings.tagLink, '', settings);
   await sendTextMessage(caption, settings);
 }
 

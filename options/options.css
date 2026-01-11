@@ -314,6 +314,23 @@ button.primary:disabled {
   cursor: not-allowed;
 }
 
+button.secondary {
+  background: transparent;
+  color: #888;
+  border: 1px solid #ddd;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+button.secondary:hover {
+  border-color: #bbb;
+  color: #666;
+}
+
 #status {
   font-size: 14px;
 }
