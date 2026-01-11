@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Toast Preview</title>
+  <style>
+    @font-face {
+      font-family: 'MartianMono';
+      src: url('MartianMono-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'MartianMono', monospace;
+    }
+
+    /* Toast styles */
+    .tg-saver-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      border-radius: 28px;
+      font-family: 'MartianMono', monospace;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 1.4;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      background: rgba(51, 51, 51, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: white;
+      overflow: hidden;
+      width: 168px;
+      min-width: 168px;
+      max-width: 168px;
+    }
+
+    .tg-saver-toast-content {
+      padding: 17px 10px 10px 10px;
+    }
+
+    .tg-saver-toast-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 0 0 10px 0;
+      padding: 0 9px 0 9px;
+    }
+
+    .tg-saver-toast-title {
+      font-family: 'MartianMono', monospace;
+      font-size: 20px;
+      font-weight: 400;
+      color: white;
+      line-height: 1;
+    }
+
+    .tg-saver-cancel-btn {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      cursor: pointer;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .tg-saver-cancel-btn svg {
+      width: 21px;
+      height: 21px;
+    }
+
+    .tg-saver-cancel-btn:hover {
+      color: white;
+    }
+
+    .tg-saver-tags-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .tg-saver-tag-btn {
+      display: flex;
+      align-items: center;
+      width: 148px;
+      height: 37px;
+      padding: 0;
+      background: rgba(45, 45, 45, 0.41);
+      border: none;
+      border-radius: 9999px;
+      color: white;
+      font-family: 'MartianMono', monospace;
+      font-size: 13px;
+      font-weight: 400;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tg-saver-tag-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .tg-saver-tag-btn:active {
+      transform: scale(0.95);
+    }
+
+    .tg-saver-tag-dot {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin: 6px 0 6px 6px;
+    }
+
+    .tg-saver-tag-name {
+      margin-left: 9.5px;
+      font-family: 'MartianMono', monospace;
+      font-size: 13px;
+      font-weight: 400;
+      color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tg-saver-skip-btn {
+      justify-content: center;
+      background: rgba(45, 45, 45, 0.41);
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .tg-saver-skip-btn:hover {
+      background: rgba(45, 45, 45, 0.6);
+      color: white;
+    }
+
+    .tg-saver-skip-btn .tg-saver-timer-loader {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(109, 109, 109, 0.9);
+      width: 100%;
+      transform-origin: left;
+      pointer-events: none;
+      border-radius: 0;
+      animation: tg-saver-timer-shrink 4s linear forwards;
+      animation-play-state: running;
+    }
+
+    .tg-saver-skip-btn-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    @keyframes tg-saver-timer-shrink {
+      from {
+        transform: scaleX(1);
+      }
+      to {
+        transform: scaleX(0);
+      }
+    }
+
+    /* Controls */
+    .controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+
+    .controls button {
+      font-family: 'MartianMono', monospace;
+      font-size: 12px;
+      padding: 8px 16px;
+      background: rgba(51, 51, 51, 0.9);
+      backdrop-filter: blur(8px);
+      color: white;
+      border: none;
+      border-radius: 9999px;
+      cursor: pointer;
+    }
+
+    .controls button:hover {
+      background: rgba(51, 51, 51, 1);
+    }
+  </style>
+</head>
+<body>
+  <div class="tg-saver-toast">
+    <div class="tg-saver-toast-content">
+      <div class="tg-saver-toast-header">
+        <span class="tg-saver-toast-title">Tags?</span>
+        <button class="tg-saver-cancel-btn" title="Cancel send">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="tg-saver-tags-container">
+        <button class="tg-saver-tag-btn" data-index="0">
+          <span class="tg-saver-tag-dot" style="background: #ef4444"></span>
+          <span class="tg-saver-tag-name">work</span>
+        </button>
+        <button class="tg-saver-tag-btn" data-index="1">
+          <span class="tg-saver-tag-dot" style="background: #22c55e"></span>
+          <span class="tg-saver-tag-name">personal</span>
+        </button>
+        <button class="tg-saver-tag-btn" data-index="2">
+          <span class="tg-saver-tag-dot" style="background: #3b82f6"></span>
+          <span class="tg-saver-tag-name">read</span>
+        </button>
+        <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
+          <div class="tg-saver-timer-loader"></div>
+          <span class="tg-saver-skip-btn-text">no tag</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button onclick="restartTimer()">Restart Timer</button>
+    <button onclick="pauseTimer()">Pause</button>
+    <button onclick="playTimer()">Play</button>
+  </div>
+
+  <script>
+    function restartTimer() {
+      const loader = document.querySelector('.tg-saver-timer-loader');
+      loader.style.animation = 'none';
+      loader.offsetHeight;
+      loader.style.animation = 'tg-saver-timer-shrink 4s linear forwards';
+      loader.style.animationPlayState = 'running';
+    }
+
+    function pauseTimer() {
+      const loader = document.querySelector('.tg-saver-timer-loader');
+      loader.style.animationPlayState = 'paused';
+    }
+
+    function playTimer() {
+      const loader = document.querySelector('.tg-saver-timer-loader');
+      loader.style.animationPlayState = 'running';
+    }
+  </script>
+</body>
+</html>

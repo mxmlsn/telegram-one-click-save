@@ -1,3 +1,10 @@
+@font-face {
+  font-family: 'MartianMono';
+  src: url('chrome-extension://__MSG_@@extension_id__/MartianMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
 .tg-saver-toast {
   /* Reset all inherited styles */
   all: initial;
@@ -11,12 +18,12 @@
   /* Layout */
   display: flex !important;
   flex-direction: column !important;
-  border-radius: 12px !important;
+  border-radius: 28px !important;
 
-  /* Typography - explicitly set everything */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+  /* Typography - MartianMono font */
+  font-family: 'MartianMono', monospace !important;
   font-size: 14px !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
   line-height: 1.4 !important;
   letter-spacing: normal !important;
   text-transform: none !important;
@@ -26,7 +33,9 @@
   /* Visual */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
   opacity: 0 !important;
-  background: #9ca3af !important;
+  background: rgba(51, 51, 51, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
   color: white !important;
   border: none !important;
 
@@ -35,9 +44,9 @@
 
   /* Size */
   overflow: hidden !important;
-  width: 167px !important;
-  min-width: 167px !important;
-  max-width: 167px !important;
+  width: 168px !important;
+  min-width: 168px !important;
+  max-width: 168px !important;
   box-sizing: border-box !important;
 
   /* Reset margins and padding */
@@ -72,9 +81,9 @@
 
 .tg-saver-text {
   white-space: nowrap !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
+  font-family: 'MartianMono', monospace !important;
   font-size: 14px !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
   line-height: 1.4 !important;
   color: inherit !important;
   margin: 0 !important;
@@ -86,11 +95,13 @@
 /* Toast with tags */
 .tg-saver-toast.tg-saver-with-tags {
   padding: 0 !important;
-  background: #2d2d2d !important;
+  background: rgba(51, 51, 51, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
 }
 
 .tg-saver-toast-content {
-  padding: 12px 16px !important;
+  padding: 17px 10px 10px 10px !important;
   margin: 0 !important;
   box-sizing: border-box !important;
 }
@@ -98,34 +109,47 @@
 .tg-saver-toast-header {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  justify-content: space-between !important;
   margin: 0 0 10px 0 !important;
-  padding: 0 !important;
+  padding: 0 9px 0 9px !important;
   position: relative !important;
   box-sizing: border-box !important;
 }
 
+.tg-saver-toast-title {
+  font-family: 'MartianMono', monospace !important;
+  font-size: 20px !important;
+  font-weight: 400 !important;
+  color: white !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+
 .tg-saver-cancel-btn {
   all: initial;
-  margin-left: auto !important;
   background: none !important;
   border: none !important;
   color: rgba(255, 255, 255, 0.6) !important;
   cursor: pointer !important;
-  padding: 4px !important;
+  padding: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   transition: color 0.15s ease !important;
-  border-radius: 4px !important;
   box-sizing: border-box !important;
   font-family: inherit !important;
   outline: none !important;
+  flex-shrink: 0 !important;
+}
+
+.tg-saver-cancel-btn svg {
+  width: 21px !important;
+  height: 21px !important;
 }
 
 .tg-saver-cancel-btn:hover {
   color: white !important;
-  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 .tg-saver-cancel-btn:active {
@@ -135,6 +159,7 @@
 .tg-saver-tags-container {
   display: flex !important;
   flex-direction: column !important;
+  align-items: center !important;
   gap: 8px !important;
   width: 100% !important;
   margin: 0 !important;
@@ -147,25 +172,27 @@
   all: initial;
   display: flex !important;
   align-items: center !important;
-  gap: 5px !important;
-  padding: 6px 10px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+  width: 148px !important;
+  height: 37px !important;
+  padding: 0 !important;
+  background: rgba(45, 45, 45, 0.41) !important;
   border: none !important;
-  border-radius: 14px !important;
+  border-radius: 9999px !important;
   color: white !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  line-height: 1.4 !important;
+  font-family: 'MartianMono', monospace !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
   cursor: pointer !important;
   transition: background 0.15s ease, transform 0.1s ease !important;
-  width: 100% !important;
   box-sizing: border-box !important;
   text-transform: none !important;
   letter-spacing: normal !important;
   text-decoration: none !important;
   text-align: left !important;
   outline: none !important;
+  position: relative !important;
+  overflow: hidden !important;
 }
 
 .tg-saver-tag-btn:hover {
@@ -192,58 +219,62 @@
 }
 
 .tg-saver-tag-dot {
-  width: 12px !important;
-  height: 12px !important;
+  width: 25px !important;
+  height: 25px !important;
   border-radius: 50% !important;
   flex-shrink: 0 !important;
-  margin: 0 !important;
+  margin: 6px 0 6px 6px !important;
   padding: 0 !important;
   border: none !important;
   box-sizing: border-box !important;
+}
+
+.tg-saver-tag-name {
+  margin-left: 9.5px !important;
+  font-family: 'MartianMono', monospace !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  color: white !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .tg-saver-skip-btn {
   justify-content: center !important;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: rgba(45, 45, 45, 0.41) !important;
   color: rgba(255, 255, 255, 0.6) !important;
+  margin-bottom: 0 !important;
 }
 
 .tg-saver-skip-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(45, 45, 45, 0.6) !important;
   color: white !important;
 }
 
-/* Progress bar */
-.tg-saver-progress-bar {
-  height: 3px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
+/* Timer loader inside no-tag button */
+.tg-saver-skip-btn .tg-saver-timer-loader {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  background: rgba(109, 109, 109, 0.9) !important;
   width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  box-sizing: border-box !important;
-  overflow: hidden !important;
-}
-
-.tg-saver-progress-fill {
-  all: initial;
-  display: block !important;
-  height: 100% !important;
-  background: #0088cc !important;
-  width: 100%;
   transform-origin: left !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  box-sizing: border-box !important;
-  position: relative !important;
+  pointer-events: none !important;
+  border-radius: 0 !important;
 }
 
-@keyframes tg-saver-progress {
+.tg-saver-skip-btn-text {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Timer loader animation */
+@keyframes tg-saver-timer-shrink {
   from {
     transform: scaleX(1);
   }
-
   to {
     transform: scaleX(0);
   }

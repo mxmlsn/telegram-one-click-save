@@ -36,5 +36,11 @@
   "host_permissions": [
     "https://api.telegram.org/*",
     "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["MartianMono-Regular.ttf"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

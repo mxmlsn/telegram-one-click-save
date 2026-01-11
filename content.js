@@ -82,7 +82,7 @@ function showTagSelectionToast(customTags, requestId) {
       tagsHtml = nonEmptyTags.map(tag => `
         <button class="tg-saver-tag-btn" data-index="${tag.index}">
           <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
-          <span>${tag.name}</span>
+          <span class="tg-saver-tag-name">${tag.name}</span>
         </button>
       `).join('');
     }
@@ -90,8 +90,7 @@ function showTagSelectionToast(customTags, requestId) {
     toast.innerHTML = `
       <div class="tg-saver-toast-content">
         <div class="tg-saver-toast-header">
-          <span class="tg-saver-icon">↑</span>
-          <span class="tg-saver-text">Select tag</span>
+          <span class="tg-saver-toast-title">Tags?</span>
           <button class="tg-saver-cancel-btn" title="Cancel send">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -102,12 +101,10 @@ function showTagSelectionToast(customTags, requestId) {
         <div class="tg-saver-tags-container">
           ${tagsHtml}
           <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
-            <span>No tags</span>
+            <div class="tg-saver-timer-loader"></div>
+            <span class="tg-saver-skip-btn-text">no tag</span>
           </button>
         </div>
-      </div>
-      <div class="tg-saver-progress-bar">
-        <div class="tg-saver-progress-fill"></div>
       </div>
     `;
 
@@ -147,21 +144,21 @@ function showTagSelectionToast(customTags, requestId) {
     // HOVER - set pause flag
     toast.addEventListener('mouseenter', () => {
       ToastState.isPaused = true;
-      const fill = toast.querySelector('.tg-saver-progress-fill');
-      if (fill) fill.style.animationPlayState = 'paused';
+      const loader = toast.querySelector('.tg-saver-timer-loader');
+      if (loader) loader.style.animationPlayState = 'paused';
     });
 
     toast.addEventListener('mouseleave', () => {
       ToastState.isPaused = false;
-      const fill = toast.querySelector('.tg-saver-progress-fill');
-      if (fill) fill.style.animationPlayState = 'running';
+      const loader = toast.querySelector('.tg-saver-timer-loader');
+      if (loader) loader.style.animationPlayState = 'running';
     });
 
     requestAnimationFrame(() => {
       toast.classList.add('tg-saver-visible');
-      const fill = toast.querySelector('.tg-saver-progress-fill');
-      if (fill) {
-        fill.style.animation = `tg-saver-progress ${ToastState.timeLeft}ms linear forwards`;
+      const loader = toast.querySelector('.tg-saver-timer-loader');
+      if (loader) {
+        loader.style.animation = `tg-saver-timer-shrink ${ToastState.timeLeft}ms linear forwards`;
       }
     });
 
