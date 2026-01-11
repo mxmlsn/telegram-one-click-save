@@ -225,25 +225,31 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null) {
 // Send image or video found under cursor (for sites like Instagram)
 async function sendImageFromPage(tab, settings) {
   const tabId = tab.id;
+  const isInstagram = tab.url.includes('instagram.com');
 
   // Find image or video under cursor via content script
   const results = await chrome.scripting.executeScript({
     target: { tabId },
-    func: () => {
+    func: (isInstagram) => {
       const lastRightClicked = window.__tgSaverLastRightClicked;
       if (!lastRightClicked) return { type: null };
 
       // Check for video first
       let video = lastRightClicked.closest('video') ||
-                  lastRightClicked.querySelector('video') ||
-                  lastRightClicked.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+                  lastRightClicked.querySelector('video');
 
-      if (!video) {
-        let parent = lastRightClicked.parentElement;
-        for (let i = 0; i < 5 && parent; i++) {
-          video = parent.querySelector('video');
-          if (video) break;
-          parent = parent.parentElement;
+      // For Instagram: use aggressive search in parent elements
+      if (isInstagram) {
+        if (!video) {
+          video = lastRightClicked.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+        }
+        if (!video) {
+          let parent = lastRightClicked.parentElement;
+          for (let i = 0; i < 5 && parent; i++) {
+            video = parent.querySelector('video');
+            if (video) break;
+            parent = parent.parentElement;
+          }
         }
       }
 
@@ -251,17 +257,22 @@ async function sendImageFromPage(tab, settings) {
         return { type: 'video', src: video.src || video.currentSrc };
       }
 
-      // Check for image
+      // Check for image - strict mode for non-Instagram
       let img = lastRightClicked.closest('img') ||
-                lastRightClicked.querySelector('img') ||
-                lastRightClicked.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
+                lastRightClicked.querySelector('img');
 
-      if (!img) {
-        let parent = lastRightClicked.parentElement;
-        for (let i = 0; i < 5 && parent; i++) {
-          img = parent.querySelector('img');
-          if (img) break;
-          parent = parent.parentElement;
+      // For Instagram: use aggressive search in parent elements
+      if (isInstagram) {
+        if (!img) {
+          img = lastRightClicked.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
+        }
+        if (!img) {
+          let parent = lastRightClicked.parentElement;
+          for (let i = 0; i < 5 && parent; i++) {
+            img = parent.querySelector('img');
+            if (img) break;
+            parent = parent.parentElement;
+          }
         }
       }
 
@@ -270,7 +281,8 @@ async function sendImageFromPage(tab, settings) {
       }
 
       return { type: null };
-    }
+    },
+    args: [isInstagram]
   });
 
   const media = results[0]?.result;
