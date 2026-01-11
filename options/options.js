@@ -75,6 +75,11 @@ saveBtn.addEventListener('click', saveCredentials);
 resetBtn.addEventListener('click', resetSettings);
 
 
+// Quick tags settings container
+const quickTagsSettings = document.getElementById('quickTagsSettings');
+// Hashtags settings container
+const hashtagsSettings = document.getElementById('hashtagsSettings');
+
 // Auto-save listeners
 const autoSaveInputs = [
   { el: addScreenshotInput, key: 'addScreenshot', type: 'checkbox' },
@@ -93,6 +98,16 @@ autoSaveInputs.forEach(item => {
   if (item.type === 'checkbox') {
     item.el.addEventListener('change', () => {
       saveSetting(item.key, item.el.checked);
+
+      // Toggle quick tags settings visibility
+      if (item.key === 'enableQuickTags') {
+        toggleQuickTagsSettings(item.el.checked);
+      }
+
+      // Toggle hashtags settings visibility
+      if (item.key === 'useHashtags') {
+        toggleHashtagsSettings(item.el.checked);
+      }
     });
   } else {
     // For text inputs (tags)
@@ -104,16 +119,34 @@ autoSaveInputs.forEach(item => {
       saveSetting(item.key, val);
     });
 
-    // Validation (No spaces) for type tags too
+    // Validation (No spaces, no leading digits) for type tags too
     item.el.addEventListener('keydown', (e) => {
       if (e.key === ' ') {
         e.preventDefault();
         showInputError(item.el);
       }
+      // Prevent digit as first character
+      if (item.el.value.length === 0 && /^\d$/.test(e.key)) {
+        e.preventDefault();
+        showInputError(item.el);
+      }
     });
     item.el.addEventListener('input', (e) => {
+      let hasError = false;
+
+      // Remove spaces
       if (e.target.value.includes(' ')) {
         e.target.value = e.target.value.replace(/\s/g, '');
+        hasError = true;
+      }
+
+      // Check if starts with digit and remove it
+      if (/^\d/.test(e.target.value)) {
+        e.target.value = e.target.value.replace(/^\d+/, '');
+        hasError = true;
+      }
+
+      if (hasError) {
         showInputError(item.el);
       }
     });
@@ -208,6 +241,12 @@ async function loadSettings() {
   // Ensure we have the structure of 8 tags even if loading old data
   customTags = mergeCustomTags(settings.customTags || []);
   renderCustomTags();
+
+  // Toggle quick tags settings visibility based on enableQuickTags
+  toggleQuickTagsSettings(settings.enableQuickTags !== false);
+
+  // Toggle hashtags settings visibility based on useHashtags
+  toggleHashtagsSettings(settings.useHashtags !== false);
 }
 
 function mergeCustomTags(savedTags) {
@@ -390,6 +429,7 @@ function renderCustomTags() {
     tagEl.dataset.index = index;
 
     tagEl.innerHTML = `
+      <span class="drag-handle">⠿</span>
       <span class="tag-color-dot" style="background: ${tag.color}"></span>
       <input type="text" class="tag-input" value="${tag.name}" placeholder="Tag name" maxlength="12">
     `;
@@ -402,17 +442,35 @@ function renderCustomTags() {
       saveCustomTagsOnly();
     });
 
-    // Validations (No spaces)
+    // Validations (No spaces, no leading digits)
     input.addEventListener('keydown', (e) => {
       if (e.key === ' ') {
+        e.preventDefault();
+        showInputError(input);
+      }
+      // Prevent digit as first character
+      if (input.value.length === 0 && /^\d$/.test(e.key)) {
         e.preventDefault();
         showInputError(input);
       }
     });
 
     input.addEventListener('input', (e) => {
+      let hasError = false;
+
+      // Remove spaces
       if (e.target.value.includes(' ')) {
         e.target.value = e.target.value.replace(/\s/g, '');
+        hasError = true;
+      }
+
+      // Check if starts with digit and remove it
+      if (/^\d/.test(e.target.value)) {
+        e.target.value = e.target.value.replace(/^\d+/, '');
+        hasError = true;
+      }
+
+      if (hasError) {
         showInputError(input);
       }
     });
@@ -439,17 +497,35 @@ function handleDragStart(e, el) {
 }
 
 function handleDragOver(e, el) {
-  e.preventDefault(); // Necessary for drop to work
+  e.preventDefault();
+
+  if (!dragSrcEl || dragSrcEl === el) return;
+
+  // Remove all 'over' classes
+  document.querySelectorAll('.custom-tag-item').forEach(item => {
+    item.classList.remove('over');
+  });
+
+  // Determine if we should insert before or after based on mouse Y position
+  const rect = el.getBoundingClientRect();
+  const midpoint = rect.top + rect.height / 2;
+
+  // Add visual indicator
+  el.classList.add('over');
+
   e.dataTransfer.dropEffect = 'move';
   return false;
 }
 
 function handleDragEnter(e, el) {
-  el.classList.add('over');
+  // Handled in dragover for smoother experience
 }
 
 function handleDragLeave(e, el) {
-  el.classList.remove('over');
+  // Only remove if we're actually leaving (not entering a child)
+  if (!el.contains(e.relatedTarget)) {
+    el.classList.remove('over');
+  }
 }
 
 function handleDrop(e, el) {
@@ -467,9 +543,27 @@ function handleDrop(e, el) {
 
     if (isNaN(srcIndex) || isNaN(targetIndex)) return false;
 
+    // Calculate insert position based on mouse position
+    const rect = el.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    const insertBefore = e.clientY < midpoint;
+
     // Reorder array
     const item = customTags.splice(srcIndex, 1)[0];
-    customTags.splice(targetIndex, 0, item);
+
+    // Adjust target index if dragging from above
+    let finalIndex = targetIndex;
+    if (srcIndex < targetIndex && insertBefore) {
+      finalIndex = targetIndex - 1;
+    } else if (srcIndex > targetIndex && !insertBefore) {
+      finalIndex = targetIndex + 1;
+    } else if (insertBefore) {
+      finalIndex = targetIndex;
+    } else {
+      finalIndex = targetIndex;
+    }
+
+    customTags.splice(finalIndex, 0, item);
 
     saveCustomTagsOnly().then(() => {
       renderCustomTags();
@@ -497,4 +591,16 @@ function updateAddTagState() { }
 async function saveCustomTagsOnly() {
   await chrome.storage.local.set({ customTags });
   showSavedIndicator();
+}
+
+function toggleQuickTagsSettings(enabled) {
+  if (quickTagsSettings) {
+    quickTagsSettings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+function toggleHashtagsSettings(enabled) {
+  if (hashtagsSettings) {
+    hashtagsSettings.style.display = enabled ? 'block' : 'none';
+  }
 }

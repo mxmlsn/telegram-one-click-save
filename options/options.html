@@ -107,15 +107,6 @@
             <div class="field checkbox-field">
               <label>
                 <label class="switch">
-                  <input type="checkbox" id="showLinkPreview" checked>
-                  <span class="slider"></span>
-                </label>
-                Show link preview in messages
-              </label>
-            </div>
-            <div class="field checkbox-field">
-              <label>
-                <label class="switch">
                   <input type="checkbox" id="showSelectionIcon" checked>
                   <span class="slider"></span>
                 </label>
@@ -129,6 +120,15 @@
                   <span class="slider"></span>
                 </label>
                 Monospace font for quotes
+              </label>
+            </div>
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="showLinkPreview" checked>
+                  <span class="slider"></span>
+                </label>
+                Show link preview in messages
               </label>
             </div>
           </div>
@@ -176,27 +176,29 @@
                 Use hashtags
               </label>
             </div>
-            <div class="field">
-              <div class="tags-grid">
-                <div class="tag-field">
-                  <span>Image</span>
-                  <div class="hashtag-input">
-                    <span class="prefix">#</span>
-                    <input type="text" id="tagImage" value="image">
+            <div id="hashtagsSettings">
+              <div class="field">
+                <div class="tags-grid">
+                  <div class="tag-field">
+                    <span>Image</span>
+                    <div class="hashtag-input">
+                      <span class="prefix">#</span>
+                      <input type="text" id="tagImage" value="image">
+                    </div>
                   </div>
-                </div>
-                <div class="tag-field">
-                  <span>Link</span>
-                  <div class="hashtag-input">
-                    <span class="prefix">#</span>
-                    <input type="text" id="tagLink" value="link">
+                  <div class="tag-field">
+                    <span>Link</span>
+                    <div class="hashtag-input">
+                      <span class="prefix">#</span>
+                      <input type="text" id="tagLink" value="link">
+                    </div>
                   </div>
-                </div>
-                <div class="tag-field">
-                  <span>Quote</span>
-                  <div class="hashtag-input">
-                    <span class="prefix">#</span>
-                    <input type="text" id="tagQuote" value="quote">
+                  <div class="tag-field">
+                    <span>Quote</span>
+                    <div class="hashtag-input">
+                      <span class="prefix">#</span>
+                      <input type="text" id="tagQuote" value="quote">
+                    </div>
                   </div>
                 </div>
               </div>
@@ -214,36 +216,38 @@
                 Enable Quick Tags
               </label>
             </div>
-            <div class="field checkbox-field">
-              <label>
-                <label class="switch">
-                  <input type="checkbox" id="sendWithColor" checked>
-                  <span class="slider"></span>
+            <div id="quickTagsSettings">
+              <div class="field checkbox-field">
+                <label>
+                  <label class="switch">
+                    <input type="checkbox" id="sendWithColor" checked>
+                    <span class="slider"></span>
+                  </label>
+                  Send with color (🟢 #tag)
                 </label>
-                Send with color (🟢 #tag)
-              </label>
-            </div>
-            <div class="field emoji-pack-selector">
-              <label class="emoji-pack-label">Emoji Pack</label>
-              <div class="emoji-pack-tabs">
-                <button class="emoji-tab" data-pack="standard">🔴 Standard</button>
-                <button class="emoji-tab" data-pack="hearts">❤️ Hearts</button>
-                <button class="emoji-tab" data-pack="cute">🍄 Cute</button>
-                <button class="emoji-tab" data-pack="random">📌 Random</button>
               </div>
-            </div>
-            <div class="field timer-field">
-              <label>
-                Timer Duration: <span id="timerValue">4</span>s <span class="optimal-label">(optimal)</span>
-              </label>
-              <input type="range" id="timerDuration" min="3" max="9" value="4" step="1">
-              <div class="timer-labels">
-                <span>3s</span>
-                <span>9s</span>
+              <div class="field emoji-pack-selector">
+                <label class="emoji-pack-label">Emoji Pack</label>
+                <div class="emoji-pack-tabs">
+                  <button class="emoji-tab" data-pack="standard">🔴 Standard</button>
+                  <button class="emoji-tab" data-pack="hearts">❤️ Hearts</button>
+                  <button class="emoji-tab" data-pack="cute">🍄 Cute</button>
+                  <button class="emoji-tab" data-pack="random">📌 Random</button>
+                </div>
               </div>
+              <div class="field timer-field">
+                <label>
+                  Timer Duration: <span id="timerValue">4</span>s <span class="optimal-label">(optimal)</span>
+                </label>
+                <input type="range" id="timerDuration" min="2" max="8" value="4" step="1">
+                <div class="timer-labels">
+                  <span>2s</span>
+                  <span>8s</span>
+                </div>
+              </div>
+              <p class="settings-hint">Drag to reorder. Empty tags are hidden.</p>
+              <div id="customTagsList" class="custom-tags-list"></div>
             </div>
-            <p class="settings-hint">Drag to reorder. Empty tags are hidden.</p>
-            <div id="customTagsList" class="custom-tags-list"></div>
           </div>
 
           <div class="settings-group">

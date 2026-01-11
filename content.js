@@ -102,7 +102,7 @@ function showTagSelectionToast(customTags, requestId) {
         <div class="tg-saver-tags-container">
           ${tagsHtml}
           <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
-            <span>Skip</span>
+            <span>No tags</span>
           </button>
         </div>
       </div>
@@ -127,7 +127,19 @@ function showTagSelectionToast(customTags, requestId) {
         e.stopPropagation();
         const index = parseInt(btn.dataset.index);
         const selectedTag = index >= 0 ? customTags[index] : null;
-        btn.classList.add('tg-saver-tag-pending');
+
+        killTimer();
+
+        // Show gray "sending" state immediately
+        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending...</span>`;
+        toast.classList.remove('tg-saver-with-tags');
+
+        // Fade out smoothly
+        setTimeout(() => {
+          toast.classList.remove('tg-saver-visible');
+          setTimeout(() => toast.remove(), 200);
+        }, 300);
+
         doSend(requestId, selectedTag);
       });
     });
@@ -183,6 +195,19 @@ function startCountdown(requestId) {
       // Final check - if somehow paused at last moment
       if (ToastState.isPaused) {
         return;
+      }
+
+      // Show gray "sending" state immediately
+      const toast = document.getElementById('tg-saver-toast');
+      if (toast) {
+        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending...</span>`;
+        toast.classList.remove('tg-saver-with-tags');
+
+        // Fade out smoothly
+        setTimeout(() => {
+          toast.classList.remove('tg-saver-visible');
+          setTimeout(() => toast.remove(), 200);
+        }, 300);
       }
 
       doSend(requestId, null);
@@ -329,4 +354,16 @@ document.addEventListener('mousedown', (e) => {
 
 document.addEventListener('scroll', () => {
   hideSelectionIcon();
+}, true);
+
+// ESC key to cancel send
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    const toast = document.getElementById('tg-saver-toast');
+    if (toast && toast.classList.contains('tg-saver-with-tags')) {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelSend();
+    }
+  }
 }, true);
