@@ -427,3 +427,123 @@ button.secondary:hover {
 #status.error {
   color: #ef4444;
 }
+
+/* Settings hint */
+.settings-hint {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+/* Custom tags list */
+.custom-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  min-height: 32px;
+}
+
+.custom-tag-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f5f5f5;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.tag-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tag-name {
+  color: #333;
+}
+
+.remove-tag-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  margin-left: 2px;
+}
+
+.remove-tag-btn:hover {
+  color: #ef4444;
+}
+
+/* Add tag form */
+.add-tag-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag-color-picker {
+  width: 32px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  background: white;
+}
+
+.tag-color-picker::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.tag-color-picker::-webkit-color-swatch {
+  border-radius: 4px;
+  border: none;
+}
+
+.tag-name-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.tag-name-input:focus {
+  outline: none;
+  border-color: #0088cc;
+}
+
+.tag-name-input:disabled {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.add-tag-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #0088cc;
+  color: white;
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.add-tag-btn:hover {
+  background: #0077b3;
+}
+
+.add-tag-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}

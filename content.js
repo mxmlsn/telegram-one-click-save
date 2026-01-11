@@ -3,10 +3,18 @@ document.addEventListener('contextmenu', (e) => {
   window.__tgSaverLastRightClicked = e.target;
 }, true);
 
+// Toast state
+let toastTimeout = null;
+let toastSendCallback = null;
+
 // Listen for toast messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'showToast') {
     showToast(message.state, message.message);
+  } else if (message.action === 'showTagSelection') {
+    showTagSelectionToast(message.customTags, message.requestId);
+    sendResponse({ received: true });
+    return true;
   }
 });
 
@@ -16,6 +24,7 @@ function showToast(state, message) {
   if (state === 'pending') {
     // Create new toast in pending state
     if (toast) toast.remove();
+    clearToastTimeout();
 
     toast = document.createElement('div');
     toast.id = 'tg-saver-toast';
@@ -29,8 +38,10 @@ function showToast(state, message) {
     });
   } else if (state === 'success' && toast) {
     // Transition existing toast to success
+    clearToastTimeout();
     toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
     toast.classList.add('tg-saver-success');
+    toast.classList.remove('tg-saver-with-tags');
 
     // Remove after delay
     setTimeout(() => {
@@ -39,6 +50,88 @@ function showToast(state, message) {
         toast.remove();
       }, 200);
     }, 1200);
+  }
+}
+
+function showTagSelectionToast(customTags, requestId) {
+  let toast = document.getElementById('tg-saver-toast');
+  if (toast) toast.remove();
+  clearToastTimeout();
+
+  toast = document.createElement('div');
+  toast.id = 'tg-saver-toast';
+  toast.className = 'tg-saver-toast tg-saver-with-tags';
+
+  // Build tag buttons HTML
+  let tagsHtml = '';
+  if (customTags && customTags.length > 0) {
+    tagsHtml = customTags.map((tag, index) => `
+      <button class="tg-saver-tag-btn" data-index="${index}" data-name="${tag.name}">
+        <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
+        <span>${tag.name}</span>
+      </button>
+    `).join('');
+  }
+
+  toast.innerHTML = `
+    <div class="tg-saver-toast-content">
+      <div class="tg-saver-toast-header">
+        <span class="tg-saver-icon">↑</span>
+        <span class="tg-saver-text">Select tag</span>
+      </div>
+      <div class="tg-saver-tags-container">
+        ${tagsHtml}
+        <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
+          <span>Skip</span>
+        </button>
+      </div>
+    </div>
+    <div class="tg-saver-progress-bar">
+      <div class="tg-saver-progress-fill"></div>
+    </div>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Add click handlers for tag buttons
+  toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const index = parseInt(btn.dataset.index);
+      const selectedTag = index >= 0 ? customTags[index] : null;
+      sendTagSelection(requestId, selectedTag);
+    });
+  });
+
+  requestAnimationFrame(() => {
+    toast.classList.add('tg-saver-visible');
+    // Start progress bar animation
+    const progressFill = toast.querySelector('.tg-saver-progress-fill');
+    if (progressFill) {
+      progressFill.style.animation = 'tg-saver-progress 4s linear forwards';
+    }
+  });
+
+  // Auto-send without tag after 4 seconds
+  toastTimeout = setTimeout(() => {
+    sendTagSelection(requestId, null);
+  }, 4000);
+}
+
+function sendTagSelection(requestId, selectedTag) {
+  clearToastTimeout();
+  chrome.runtime.sendMessage({
+    action: 'tagSelected',
+    requestId: requestId,
+    selectedTag: selectedTag
+  });
+}
+
+function clearToastTimeout() {
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
   }
 }
 

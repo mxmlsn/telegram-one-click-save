@@ -11,7 +11,8 @@ const DEFAULT_SETTINGS = {
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#quote',
-  quoteMonospace: true
+  quoteMonospace: true,
+  customTags: [] // Array of {name: string, color: string}
 };
 
 // Update extension icon
@@ -81,6 +82,9 @@ chrome.action.onClicked.addListener(async (tab) => {
   await sendScreenshot(tab, settings);
 });
 
+// Pending requests waiting for tag selection
+const pendingRequests = new Map();
+
 // Handle messages from content script (selection icon)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'sendQuoteFromSelection') {
@@ -100,6 +104,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ showSelectionIcon: settings.showSelectionIcon });
     });
     return true; // async response
+  } else if (message.action === 'tagSelected') {
+    const pending = pendingRequests.get(message.requestId);
+    if (pending) {
+      pendingRequests.delete(message.requestId);
+      pending.resolve(message.selectedTag);
+    }
   }
 });
 
@@ -122,7 +132,7 @@ function formatUrl(url) {
 }
 
 // Build caption with URL
-function buildCaption(url, tag, extraText = '', settings = {}) {
+function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = null) {
   const formatted = formatUrl(url);
   const useHashtags = settings.useHashtags !== false;
   const quoteMonospace = settings.quoteMonospace !== false;
@@ -139,13 +149,27 @@ function buildCaption(url, tag, extraText = '', settings = {}) {
     caption += '⠀\n';
   }
 
-  const tagPart = useHashtags ? `${tag} | ` : '';
+  // Build tag parts: selectedTag | typeTag | url
+  let parts = [];
 
-  if (formatted.isLink) {
-    caption += `${tagPart}<a href="${formatted.fullUrl}">${formatted.text}</a>`;
-  } else {
-    caption += `${tagPart}${formatted.text}`;
+  // Add selected custom tag if present
+  if (selectedTag && selectedTag.name) {
+    parts.push(`#${selectedTag.name}`);
   }
+
+  // Add type tag if hashtags enabled
+  if (useHashtags) {
+    parts.push(tag);
+  }
+
+  // Add URL
+  if (formatted.isLink) {
+    parts.push(`<a href="${formatted.fullUrl}">${formatted.text}</a>`);
+  } else {
+    parts.push(formatted.text);
+  }
+
+  caption += parts.join(' | ');
 
   return caption;
 }
@@ -173,34 +197,86 @@ async function showToast(tabId, state, message) {
   }
 }
 
+// Show tag selection toast and wait for response
+async function showTagSelection(tabId, customTags) {
+  const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+  try {
+    await chrome.scripting.insertCSS({
+      target: { tabId },
+      files: ['content.css']
+    });
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    });
+
+    // Create promise that will be resolved when tag is selected
+    const tagPromise = new Promise((resolve) => {
+      pendingRequests.set(requestId, { resolve });
+
+      // Timeout fallback (5 seconds to be safe, content script has 4s)
+      setTimeout(() => {
+        if (pendingRequests.has(requestId)) {
+          pendingRequests.delete(requestId);
+          resolve(null);
+        }
+      }, 5000);
+    });
+
+    await chrome.tabs.sendMessage(tabId, {
+      action: 'showTagSelection',
+      customTags: customTags,
+      requestId: requestId
+    });
+
+    return await tagPromise;
+  } catch (e) {
+    console.error('Failed to show tag selection:', e);
+    return null;
+  }
+}
+
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
-  await showToast(tab.id, 'pending', 'Sending...');
+  // Show tag selection if custom tags exist
+  let selectedTag = null;
+  if (settings.customTags && settings.customTags.length > 0) {
+    selectedTag = await showTagSelection(tab.id, settings.customTags);
+  } else {
+    await showToast(tab.id, 'pending', 'Sending...');
+  }
 
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
 
   if (!settings.addScreenshot) {
     // Send just the link without screenshot
-    await sendMessage(tab.url, settings);
+    await sendMessage(tab.url, settings, selectedTag);
     await showToast(tab.id, 'success', 'Sent!');
     return;
   }
 
   const blob = await fetch(dataUrl).then(r => r.blob());
-  const caption = buildCaption(tab.url, settings.tagLink, '', settings);
+  const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
   await sendPhoto(blob, caption, settings);
   await showToast(tab.id, 'success', 'Sent!');
 }
 
 // Send image from context menu
-async function sendImage(imageUrl, pageUrl, settings, tabId = null) {
+async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag = null) {
   if (!tabId) {
     const tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     tabId = tab?.id;
   }
 
-  if (tabId) await showToast(tabId, 'pending', 'Sending...');
+  // Show tag selection if custom tags exist and not already selected
+  if (selectedTag === null && settings.customTags && settings.customTags.length > 0 && tabId) {
+    selectedTag = await showTagSelection(tabId, settings.customTags);
+  } else if (tabId && !selectedTag) {
+    await showToast(tabId, 'pending', 'Sending...');
+  }
 
   let blob;
   let useScreenshot = false;
@@ -219,7 +295,7 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null) {
     blob = await fetch(dataUrl).then(r => r.blob());
   }
 
-  const caption = buildCaption(pageUrl, settings.tagImage, '', settings);
+  const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
 
   if (settings.imageCompression || useScreenshot) {
     await sendPhoto(blob, caption, settings);
@@ -234,6 +310,12 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null) {
 async function sendImageFromPage(tab, settings) {
   const tabId = tab.id;
   const isInstagram = tab.url.includes('instagram.com');
+
+  // Show tag selection first if custom tags exist
+  let selectedTag = null;
+  if (settings.customTags && settings.customTags.length > 0) {
+    selectedTag = await showTagSelection(tabId, settings.customTags);
+  }
 
   // Find image or video under cursor via content script
   const results = await chrome.scripting.executeScript({
@@ -297,30 +379,90 @@ async function sendImageFromPage(tab, settings) {
 
   if (!media || !media.type) {
     // No media found - send screenshot + link
-    await sendScreenshot(tab, settings);
+    await sendScreenshotWithTag(tab, settings, selectedTag);
     return;
   }
 
   if (media.type === 'video') {
     // For video: take screenshot and send with image tag
-    await sendVideoAsScreenshot(tab, settings);
+    await sendVideoAsScreenshot(tab, settings, selectedTag);
   } else {
-    // For image: send as usual
-    await sendImage(media.src, tab.url, settings, tabId);
+    // For image: send as usual, pass selectedTag to avoid showing selection again
+    await sendImageWithTag(media.src, tab.url, settings, tabId, selectedTag);
   }
 }
 
 // Send video as screenshot with #image tag
-async function sendVideoAsScreenshot(tab, settings) {
-  await showToast(tab.id, 'pending', 'Sending...');
+async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
+  // Show tag selection if custom tags exist and not already selected
+  if (selectedTag === null && settings.customTags && settings.customTags.length > 0) {
+    selectedTag = await showTagSelection(tab.id, settings.customTags);
+  } else if (!selectedTag) {
+    await showToast(tab.id, 'pending', 'Sending...');
+  }
 
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
   const blob = await fetch(dataUrl).then(r => r.blob());
 
-  const caption = buildCaption(tab.url, settings.tagImage, '', settings);
+  const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
 
   await sendPhoto(blob, caption, settings);
   await showToast(tab.id, 'success', 'Sent!');
+}
+
+// Send screenshot with pre-selected tag (for sendImageFromPage flow)
+async function sendScreenshotWithTag(tab, settings, selectedTag) {
+  if (!selectedTag) {
+    await showToast(tab.id, 'pending', 'Sending...');
+  }
+
+  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+
+  if (!settings.addScreenshot) {
+    await sendMessage(tab.url, settings, selectedTag);
+    await showToast(tab.id, 'success', 'Sent!');
+    return;
+  }
+
+  const blob = await fetch(dataUrl).then(r => r.blob());
+  const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
+
+  await sendPhoto(blob, caption, settings);
+  await showToast(tab.id, 'success', 'Sent!');
+}
+
+// Send image with pre-selected tag (for sendImageFromPage flow)
+async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag) {
+  if (!selectedTag) {
+    await showToast(tabId, 'pending', 'Sending...');
+  }
+
+  let blob;
+  let useScreenshot = false;
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error('Failed to fetch image');
+    blob = await response.blob();
+  } catch (e) {
+    console.error('Image fetch error, using screenshot fallback:', e);
+    useScreenshot = true;
+  }
+
+  if (useScreenshot && tabId) {
+    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+    blob = await fetch(dataUrl).then(r => r.blob());
+  }
+
+  const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+
+  if (settings.imageCompression || useScreenshot) {
+    await sendPhoto(blob, caption, settings);
+  } else {
+    await sendDocument(blob, caption, settings, imageUrl);
+  }
+
+  if (tabId) await showToast(tabId, 'success', 'Sent!');
 }
 
 // Send quote from context menu
@@ -331,17 +473,23 @@ async function sendQuote(text, pageUrl, settings) {
 
 // Send quote with explicit tabId (for selection icon)
 async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
-  if (tabId) await showToast(tabId, 'pending', 'Sending...');
+  // Show tag selection if custom tags exist
+  let selectedTag = null;
+  if (settings.customTags && settings.customTags.length > 0 && tabId) {
+    selectedTag = await showTagSelection(tabId, settings.customTags);
+  } else if (tabId) {
+    await showToast(tabId, 'pending', 'Sending...');
+  }
 
-  const caption = buildCaption(pageUrl, settings.tagQuote, text, settings);
+  const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
   await sendTextMessage(caption, settings);
 
   if (tabId) await showToast(tabId, 'success', 'Sent!');
 }
 
 // Send just a message (link without screenshot)
-async function sendMessage(url, settings) {
-  const caption = buildCaption(url, settings.tagLink, '', settings);
+async function sendMessage(url, settings, selectedTag = null) {
+  const caption = buildCaption(url, settings.tagLink, '', settings, selectedTag);
   await sendTextMessage(caption, settings);
 }
 

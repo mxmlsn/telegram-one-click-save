@@ -4,10 +4,8 @@
   right: 20px;
   z-index: 2147483647;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
-  border-radius: 8px;
+  flex-direction: column;
+  border-radius: 12px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -16,6 +14,14 @@
   background: #9ca3af;
   color: white;
   transition: opacity 0.2s ease, background-color 0.4s ease;
+  overflow: hidden;
+}
+
+.tg-saver-toast:not(.tg-saver-with-tags) {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
 }
 
 .tg-saver-toast.tg-saver-visible {
@@ -32,6 +38,93 @@
 
 .tg-saver-text {
   white-space: nowrap;
+}
+
+/* Toast with tags */
+.tg-saver-toast.tg-saver-with-tags {
+  padding: 0;
+  background: #2d2d2d;
+  min-width: 200px;
+}
+
+.tg-saver-toast-content {
+  padding: 12px 16px;
+}
+
+.tg-saver-toast-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.tg-saver-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tg-saver-tag-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 14px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.tg-saver-tag-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tg-saver-tag-btn:active {
+  transform: scale(0.95);
+}
+
+.tg-saver-tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tg-saver-skip-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tg-saver-skip-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Progress bar */
+.tg-saver-progress-bar {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  width: 100%;
+}
+
+.tg-saver-progress-fill {
+  height: 100%;
+  background: #0088cc;
+  width: 100%;
+  transform-origin: left;
+}
+
+@keyframes tg-saver-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
 }
 
 /* Selection icon */

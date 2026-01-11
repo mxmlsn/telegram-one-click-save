@@ -11,7 +11,8 @@ const DEFAULT_SETTINGS = {
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#quote',
-  isConnected: false
+  isConnected: false,
+  customTags: [] // Array of {name: string, color: string}
 };
 
 // DOM elements
@@ -29,6 +30,15 @@ const saveBtn = document.getElementById('saveBtn');
 const resetBtn = document.getElementById('resetBtn');
 const statusEl = document.getElementById('status');
 
+// Custom tags elements
+const customTagsList = document.getElementById('customTagsList');
+const newTagColor = document.getElementById('newTagColor');
+const newTagName = document.getElementById('newTagName');
+const addTagBtn = document.getElementById('addTagBtn');
+
+// Custom tags state
+let customTags = [];
+
 // Load settings on page open
 document.addEventListener('DOMContentLoaded', loadSettings);
 
@@ -37,6 +47,12 @@ saveBtn.addEventListener('click', saveSettings);
 
 // Reset settings on button click
 resetBtn.addEventListener('click', resetSettings);
+
+// Add custom tag
+addTagBtn.addEventListener('click', addCustomTag);
+newTagName.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') addCustomTag();
+});
 
 async function loadSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
@@ -58,6 +74,10 @@ async function loadSettings() {
 
   const iconColor = settings.iconColor || 'blue';
   document.querySelector(`input[name="iconColor"][value="${iconColor}"]`).checked = true;
+
+  // Load custom tags
+  customTags = settings.customTags || [];
+  renderCustomTags();
 }
 
 async function saveSettings() {
@@ -103,7 +123,8 @@ async function saveSettings() {
     tagImage: tagImageInput.value || '#image',
     tagLink: tagLinkInput.value || '#link',
     tagQuote: tagQuoteInput.value || '#quote',
-    isConnected: true
+    isConnected: true,
+    customTags: customTags
   };
 
   await chrome.storage.local.set(settings);
@@ -201,3 +222,67 @@ carouselDots.addEventListener('click', (e) => {
 
 // Initialize carousel
 updateCarousel();
+
+// Custom tags functions
+function renderCustomTags() {
+  customTagsList.innerHTML = '';
+
+  customTags.forEach((tag, index) => {
+    const tagEl = document.createElement('div');
+    tagEl.className = 'custom-tag-item';
+    tagEl.innerHTML = `
+      <span class="tag-color-dot" style="background: ${tag.color}"></span>
+      <span class="tag-name">${tag.name}</span>
+      <button type="button" class="remove-tag-btn" data-index="${index}">&times;</button>
+    `;
+    customTagsList.appendChild(tagEl);
+  });
+
+  // Add click handlers for remove buttons
+  customTagsList.querySelectorAll('.remove-tag-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.dataset.index);
+      removeCustomTag(index);
+    });
+  });
+
+  // Update add button state
+  updateAddTagState();
+}
+
+function addCustomTag() {
+  const name = newTagName.value.trim();
+  const color = newTagColor.value;
+
+  if (!name) return;
+  if (customTags.length >= 9) {
+    showStatus('Maximum 9 tags allowed', false);
+    return;
+  }
+
+  customTags.push({ name, color });
+  renderCustomTags();
+
+  // Clear input
+  newTagName.value = '';
+
+  // Auto-save
+  saveCustomTagsOnly();
+}
+
+function removeCustomTag(index) {
+  customTags.splice(index, 1);
+  renderCustomTags();
+  saveCustomTagsOnly();
+}
+
+function updateAddTagState() {
+  const isMaxReached = customTags.length >= 9;
+  addTagBtn.disabled = isMaxReached;
+  newTagName.disabled = isMaxReached;
+  newTagColor.disabled = isMaxReached;
+}
+
+async function saveCustomTagsOnly() {
+  await chrome.storage.local.set({ customTags });
+}

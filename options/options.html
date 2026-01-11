@@ -169,6 +169,17 @@
           </div>
 
           <div class="settings-group">
+            <h3>Quick Tags</h3>
+            <p class="settings-hint">Add up to 9 tags to quickly select when saving. They appear in the notification.</p>
+            <div id="customTagsList" class="custom-tags-list"></div>
+            <div class="add-tag-form" id="addTagForm">
+              <input type="color" id="newTagColor" value="#0088cc" class="tag-color-picker">
+              <input type="text" id="newTagName" placeholder="Tag name" maxlength="20" class="tag-name-input">
+              <button type="button" id="addTagBtn" class="add-tag-btn">+</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
             <button id="resetBtn" class="secondary">Reset to default</button>
           </div>
         </section>
