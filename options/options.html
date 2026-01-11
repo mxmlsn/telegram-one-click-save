@@ -9,6 +9,12 @@
 <body>
   <div class="container">
     <h1>Telegram Instant Saver</h1>
+    <div id="savedIndicator" class="saved-indicator">
+      <svg class="saved-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      Saved
+    </div>
 
     <div class="two-columns">
       <!-- Left column: Setup -->
@@ -86,25 +92,37 @@
             <h3>Behavior</h3>
             <div class="field checkbox-field">
               <label>
-                <input type="checkbox" id="addScreenshot" checked>
+                <label class="switch">
+                  <input type="checkbox" id="addScreenshot" checked>
+                  <span class="slider"></span>
+                </label>
                 Add page screenshot to link
               </label>
             </div>
             <div class="field checkbox-field">
               <label>
-                <input type="checkbox" id="showLinkPreview" checked>
+                <label class="switch">
+                  <input type="checkbox" id="showLinkPreview" checked>
+                  <span class="slider"></span>
+                </label>
                 Show link preview in messages
               </label>
             </div>
             <div class="field checkbox-field">
               <label>
-                <input type="checkbox" id="showSelectionIcon" checked>
+                <label class="switch">
+                  <input type="checkbox" id="showSelectionIcon" checked>
+                  <span class="slider"></span>
+                </label>
                 Show icon near selected text
               </label>
             </div>
             <div class="field checkbox-field">
               <label>
-                <input type="checkbox" id="quoteMonospace" checked>
+                <label class="switch">
+                  <input type="checkbox" id="quoteMonospace" checked>
+                  <span class="slider"></span>
+                </label>
                 Monospace font for quotes
               </label>
             </div>
@@ -146,7 +164,10 @@
             <h3>Tags</h3>
             <div class="field checkbox-field">
               <label>
-                <input type="checkbox" id="useHashtags" checked>
+                <label class="switch">
+                  <input type="checkbox" id="useHashtags" checked>
+                  <span class="slider"></span>
+                </label>
                 Use hashtags
               </label>
             </div>
@@ -170,6 +191,15 @@
 
           <div class="settings-group">
             <h3>Quick Tags</h3>
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="enableQuickTags" checked>
+                  <span class="slider"></span>
+                </label>
+                Enable Quick Tags
+              </label>
+            </div>
             <p class="settings-hint">Add up to 9 tags to quickly select when saving. They appear in the notification.</p>
             <div id="customTagsList" class="custom-tags-list"></div>
             <div class="add-tag-form" id="addTagForm">

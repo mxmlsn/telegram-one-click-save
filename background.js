@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   tagLink: '#link',
   tagQuote: '#quote',
   quoteMonospace: true,
+  enableQuickTags: true,
   customTags: [] // Array of {name: string, color: string}
 };
 
@@ -240,9 +241,9 @@ async function showTagSelection(tabId, customTags) {
 
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
-  // Show tag selection if custom tags exist
+  // Show tag selection if custom tags exist and enabled
   let selectedTag = null;
-  if (settings.customTags && settings.customTags.length > 0) {
+  if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tab.id, settings.customTags);
   } else {
     await showToast(tab.id, 'pending', 'Sending...');
@@ -272,7 +273,7 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
   }
 
   // Show tag selection if custom tags exist and not already selected
-  if (selectedTag === null && settings.customTags && settings.customTags.length > 0 && tabId) {
+  if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
   } else if (tabId && !selectedTag) {
     await showToast(tabId, 'pending', 'Sending...');
@@ -311,9 +312,9 @@ async function sendImageFromPage(tab, settings) {
   const tabId = tab.id;
   const isInstagram = tab.url.includes('instagram.com');
 
-  // Show tag selection first if custom tags exist
+  // Show tag selection first if custom tags exist and enabled
   let selectedTag = null;
-  if (settings.customTags && settings.customTags.length > 0) {
+  if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
   }
 
@@ -326,7 +327,7 @@ async function sendImageFromPage(tab, settings) {
 
       // Check for video first
       let video = lastRightClicked.closest('video') ||
-                  lastRightClicked.querySelector('video');
+        lastRightClicked.querySelector('video');
 
       // For Instagram: use aggressive search in parent elements
       if (isInstagram) {
@@ -349,7 +350,7 @@ async function sendImageFromPage(tab, settings) {
 
       // Check for image - strict mode for non-Instagram
       let img = lastRightClicked.closest('img') ||
-                lastRightClicked.querySelector('img');
+        lastRightClicked.querySelector('img');
 
       // For Instagram: use aggressive search in parent elements
       if (isInstagram) {
@@ -395,7 +396,7 @@ async function sendImageFromPage(tab, settings) {
 // Send video as screenshot with #image tag
 async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
   // Show tag selection if custom tags exist and not already selected
-  if (selectedTag === null && settings.customTags && settings.customTags.length > 0) {
+  if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tab.id, settings.customTags);
   } else if (!selectedTag) {
     await showToast(tab.id, 'pending', 'Sending...');
@@ -475,7 +476,7 @@ async function sendQuote(text, pageUrl, settings) {
 async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
   // Show tag selection if custom tags exist
   let selectedTag = null;
-  if (settings.customTags && settings.customTags.length > 0 && tabId) {
+  if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
   } else if (tabId) {
     await showToast(tabId, 'pending', 'Sending...');

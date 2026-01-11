@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#quote',
+  enableQuickTags: true,
   isConnected: false,
   customTags: [] // Array of {name: string, color: string}
 };
@@ -26,9 +27,11 @@ const useHashtagsInput = document.getElementById('useHashtags');
 const tagImageInput = document.getElementById('tagImage');
 const tagLinkInput = document.getElementById('tagLink');
 const tagQuoteInput = document.getElementById('tagQuote');
-const saveBtn = document.getElementById('saveBtn');
+const enableQuickTagsInput = document.getElementById('enableQuickTags');
+const saveBtn = document.getElementById('saveBtn'); // Now only for "Save & Connect"
 const resetBtn = document.getElementById('resetBtn');
 const statusEl = document.getElementById('status');
+const savedIndicator = document.getElementById('savedIndicator');
 
 // Custom tags elements
 const customTagsList = document.getElementById('customTagsList');
@@ -42,16 +45,57 @@ let customTags = [];
 // Load settings on page open
 document.addEventListener('DOMContentLoaded', loadSettings);
 
-// Save settings on button click
-saveBtn.addEventListener('click', saveSettings);
+// Save & Connect button (only for credentials)
+saveBtn.addEventListener('click', saveCredentials);
 
 // Reset settings on button click
 resetBtn.addEventListener('click', resetSettings);
 
 // Add custom tag
-addTagBtn.addEventListener('click', addCustomTag);
+addTagBtn.addEventListener('click', () => {
+  addCustomTag();
+  // We'll autosave customTags inside addCustomTag -> saveCustomTagsOnly
+});
 newTagName.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') addCustomTag();
+});
+
+// Auto-save listeners
+const autoSaveInputs = [
+  { el: addScreenshotInput, key: 'addScreenshot', type: 'checkbox' },
+  { el: showLinkPreviewInput, key: 'showLinkPreview', type: 'checkbox' },
+  { el: showSelectionIconInput, key: 'showSelectionIcon', type: 'checkbox' },
+  { el: quoteMonospaceInput, key: 'quoteMonospace', type: 'checkbox' },
+  { el: useHashtagsInput, key: 'useHashtags', type: 'checkbox' },
+  { el: enableQuickTagsInput, key: 'enableQuickTags', type: 'checkbox' },
+  { el: tagImageInput, key: 'tagImage', type: 'text' },
+  { el: tagLinkInput, key: 'tagLink', type: 'text' },
+  { el: tagQuoteInput, key: 'tagQuote', type: 'text' }
+];
+
+autoSaveInputs.forEach(item => {
+  if (item.type === 'checkbox') {
+    item.el.addEventListener('change', () => {
+      saveSetting(item.key, item.el.checked);
+    });
+  } else {
+    item.el.addEventListener('blur', () => {
+      saveSetting(item.key, item.el.value);
+    });
+  }
+});
+
+// Radio buttons listeners
+document.querySelectorAll('input[name="imageCompression"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    saveSetting('imageCompression', e.target.value === 'true');
+  });
+});
+
+document.querySelectorAll('input[name="iconColor"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    saveSetting('iconColor', e.target.value);
+  });
 });
 
 async function loadSettings() {
@@ -67,6 +111,7 @@ async function loadSettings() {
   tagImageInput.value = settings.tagImage;
   tagLinkInput.value = settings.tagLink;
   tagQuoteInput.value = settings.tagQuote;
+  enableQuickTagsInput.checked = settings.enableQuickTags !== false; // Default true
 
   // Set radio buttons
   const compressionValue = settings.imageCompression ? 'true' : 'false';
@@ -80,7 +125,19 @@ async function loadSettings() {
   renderCustomTags();
 }
 
-async function saveSettings() {
+async function saveSetting(key, value) {
+  await chrome.storage.local.set({ [key]: value });
+  showSavedIndicator();
+}
+
+function showSavedIndicator() {
+  savedIndicator.classList.add('visible');
+  setTimeout(() => {
+    savedIndicator.classList.remove('visible');
+  }, 2000);
+}
+
+async function saveCredentials() {
   const botToken = botTokenInput.value.trim();
   const chatId = chatIdInput.value.trim();
 
@@ -94,10 +151,10 @@ async function saveSettings() {
   // Get current settings to check if this is first connection
   const currentSettings = await chrome.storage.local.get(DEFAULT_SETTINGS);
   const isFirstConnection = !currentSettings.isConnected ||
-                            currentSettings.botToken !== botToken ||
-                            currentSettings.chatId !== chatId;
+    currentSettings.botToken !== botToken ||
+    currentSettings.chatId !== chatId;
 
-  // Only test connection if credentials changed
+  // Only test connection if credentials changed or not connected
   if (isFirstConnection) {
     showStatus('Checking connection...', null);
     const testResult = await testConnection(botToken, chatId);
@@ -109,27 +166,13 @@ async function saveSettings() {
     }
   }
 
-  // Save all settings
-  const settings = {
+  await chrome.storage.local.set({
     botToken,
     chatId,
-    addScreenshot: addScreenshotInput.checked,
-    imageCompression: document.querySelector('input[name="imageCompression"]:checked').value === 'true',
-    showLinkPreview: showLinkPreviewInput.checked,
-    showSelectionIcon: showSelectionIconInput.checked,
-    quoteMonospace: quoteMonospaceInput.checked,
-    iconColor: document.querySelector('input[name="iconColor"]:checked').value,
-    useHashtags: useHashtagsInput.checked,
-    tagImage: tagImageInput.value || '#image',
-    tagLink: tagLinkInput.value || '#link',
-    tagQuote: tagQuoteInput.value || '#quote',
-    isConnected: true,
-    customTags: customTags
-  };
+    isConnected: true
+  });
 
-  await chrome.storage.local.set(settings);
-
-  showStatus(isFirstConnection ? 'Connected & saved!' : 'Settings saved!', true);
+  showStatus(isFirstConnection ? 'Connected & saved!' : 'Saved!', true);
   saveBtn.disabled = false;
 }
 
@@ -285,4 +328,5 @@ function updateAddTagState() {
 
 async function saveCustomTagsOnly() {
   await chrome.storage.local.set({ customTags });
+  showSavedIndicator();
 }
