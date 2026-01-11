@@ -10,95 +10,139 @@
   <div class="container">
     <h1>Telegram Instant Saver</h1>
 
-    <section class="section">
-      <h2>Connection</h2>
-      <div class="field">
-        <label for="botToken">Bot Token</label>
-        <input type="password" id="botToken" placeholder="123456789:ABC...">
-        <small>Get it from <a href="https://t.me/BotFather" target="_blank">@BotFather</a></small>
-      </div>
-      <div class="field">
-        <label for="chatId">Chat ID</label>
-        <input type="text" id="chatId" placeholder="-1001234567890">
-        <small>Get it from <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a></small>
-      </div>
-    </section>
+    <div class="two-columns">
+      <!-- Left column: Setup -->
+      <div class="column column-left">
+        <section class="section">
+          <h2>Setup</h2>
 
-    <section class="section">
-      <h2>Screenshot</h2>
-      <div class="field checkbox-field">
-        <label>
-          <input type="checkbox" id="addScreenshot" checked>
-          Add page screenshot to link
-        </label>
-      </div>
-    </section>
+          <div class="steps">
+            <div class="step">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <div class="step-title">Create a bot</div>
+                <div class="step-description">Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send <code>/newbot</code></div>
+                <div class="step-image" data-placeholder="botfather-newbot.png"></div>
+              </div>
+            </div>
 
-    <section class="section">
-      <h2>Link Preview</h2>
-      <div class="field checkbox-field">
-        <label>
-          <input type="checkbox" id="showLinkPreview" checked>
-          Show link preview in messages
-        </label>
-      </div>
-    </section>
+            <div class="step">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <div class="step-title">Copy Bot Token</div>
+                <div class="step-description">BotFather will give you a token. Copy it below:</div>
+                <div class="step-image" data-placeholder="botfather-token.png"></div>
+                <input type="password" id="botToken" placeholder="123456789:ABC...">
+              </div>
+            </div>
 
-    <section class="section">
-      <h2>Image Sending</h2>
-      <div class="field radio-group">
-        <label>
-          <input type="radio" name="imageCompression" value="true" checked>
-          With compression (photo)
-        </label>
-        <label>
-          <input type="radio" name="imageCompression" value="false">
-          Without compression (file)
-        </label>
-      </div>
-    </section>
+            <div class="step">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <div class="step-title">Get your Chat ID</div>
+                <div class="step-description">Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> and it will show your ID</div>
+                <div class="step-image" data-placeholder="userinfobot.png"></div>
+                <input type="text" id="chatId" placeholder="-1001234567890">
+              </div>
+            </div>
 
-    <section class="section">
-      <h2>Icon Color</h2>
-      <div class="field icon-selector">
-        <label class="icon-option">
-          <input type="radio" name="iconColor" value="blue" checked>
-          <img src="../icons/icon-blue-48.png" alt="Blue">
-        </label>
-        <label class="icon-option">
-          <input type="radio" name="iconColor" value="green">
-          <img src="../icons/icon-green-48.png" alt="Green">
-        </label>
-        <label class="icon-option">
-          <input type="radio" name="iconColor" value="purple">
-          <img src="../icons/icon-purple-48.png" alt="Purple">
-        </label>
-      </div>
-    </section>
-
-    <section class="section">
-      <h2>Tags</h2>
-      <div class="field">
-        <div class="tags-grid">
-          <div class="tag-field">
-            <span>Image</span>
-            <input type="text" id="tagImage" value="#image">
+            <div class="step">
+              <div class="step-number">4</div>
+              <div class="step-content">
+                <div class="step-title">Start conversation with your bot</div>
+                <div class="step-description">Find your bot in Telegram and press <strong>Start</strong></div>
+                <div class="step-image" data-placeholder="bot-start.png"></div>
+              </div>
+            </div>
           </div>
-          <div class="tag-field">
-            <span>Link</span>
-            <input type="text" id="tagLink" value="#link">
-          </div>
-          <div class="tag-field">
-            <span>Quote</span>
-            <input type="text" id="tagQuote" value="#quote">
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <div class="actions">
-      <button id="saveBtn" class="primary">Save</button>
-      <span id="status"></span>
+          <div class="actions">
+            <button id="saveBtn" class="primary">Save & Connect</button>
+            <span id="status"></span>
+          </div>
+        </section>
+      </div>
+
+      <!-- Right column: Settings -->
+      <div class="column column-right">
+        <section class="section">
+          <h2>Settings</h2>
+
+          <div class="settings-group">
+            <h3>Behavior</h3>
+            <div class="field checkbox-field">
+              <label>
+                <input type="checkbox" id="addScreenshot" checked>
+                Add page screenshot to link
+              </label>
+            </div>
+            <div class="field checkbox-field">
+              <label>
+                <input type="checkbox" id="showLinkPreview" checked>
+                Show link preview in messages
+              </label>
+            </div>
+            <div class="field checkbox-field">
+              <label>
+                <input type="checkbox" id="showSelectionIcon" checked>
+                Show icon near selected text
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Image Sending</h3>
+            <div class="field radio-group">
+              <label>
+                <input type="radio" name="imageCompression" value="true" checked>
+                With compression (photo)
+              </label>
+              <label>
+                <input type="radio" name="imageCompression" value="false">
+                Without compression (file)
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Icon Color</h3>
+            <div class="field icon-selector">
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="blue" checked>
+                <img src="../icons/icon-blue-48.png" alt="Blue">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="green">
+                <img src="../icons/icon-green-48.png" alt="Green">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="purple">
+                <img src="../icons/icon-purple-48.png" alt="Purple">
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Tags</h3>
+            <div class="field">
+              <div class="tags-grid">
+                <div class="tag-field">
+                  <span>Image</span>
+                  <input type="text" id="tagImage" value="#image">
+                </div>
+                <div class="tag-field">
+                  <span>Link</span>
+                  <input type="text" id="tagLink" value="#link">
+                </div>
+                <div class="tag-field">
+                  <span>Quote</span>
+                  <input type="text" id="tagQuote" value="#quote">
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 

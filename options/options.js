@@ -4,10 +4,12 @@ const DEFAULT_SETTINGS = {
   addScreenshot: true,
   imageCompression: true,
   showLinkPreview: true,
+  showSelectionIcon: true,
   iconColor: 'blue',
   tagImage: '#image',
   tagLink: '#link',
-  tagQuote: '#quote'
+  tagQuote: '#quote',
+  isConnected: false
 };
 
 // DOM elements
@@ -15,6 +17,7 @@ const botTokenInput = document.getElementById('botToken');
 const chatIdInput = document.getElementById('chatId');
 const addScreenshotInput = document.getElementById('addScreenshot');
 const showLinkPreviewInput = document.getElementById('showLinkPreview');
+const showSelectionIconInput = document.getElementById('showSelectionIcon');
 const tagImageInput = document.getElementById('tagImage');
 const tagLinkInput = document.getElementById('tagLink');
 const tagQuoteInput = document.getElementById('tagQuote');
@@ -34,6 +37,7 @@ async function loadSettings() {
   chatIdInput.value = settings.chatId;
   addScreenshotInput.checked = settings.addScreenshot;
   showLinkPreviewInput.checked = settings.showLinkPreview;
+  showSelectionIconInput.checked = settings.showSelectionIcon;
   tagImageInput.value = settings.tagImage;
   tagLinkInput.value = settings.tagLink;
   tagQuoteInput.value = settings.tagQuote;
@@ -56,15 +60,23 @@ async function saveSettings() {
   }
 
   saveBtn.disabled = true;
-  showStatus('Checking connection...', null);
 
-  // Test connection
-  const testResult = await testConnection(botToken, chatId);
+  // Get current settings to check if this is first connection
+  const currentSettings = await chrome.storage.local.get(DEFAULT_SETTINGS);
+  const isFirstConnection = !currentSettings.isConnected ||
+                            currentSettings.botToken !== botToken ||
+                            currentSettings.chatId !== chatId;
 
-  if (!testResult.success) {
-    showStatus(testResult.error, false);
-    saveBtn.disabled = false;
-    return;
+  // Only test connection if credentials changed
+  if (isFirstConnection) {
+    showStatus('Checking connection...', null);
+    const testResult = await testConnection(botToken, chatId);
+
+    if (!testResult.success) {
+      showStatus(testResult.error, false);
+      saveBtn.disabled = false;
+      return;
+    }
   }
 
   // Save all settings
@@ -74,15 +86,17 @@ async function saveSettings() {
     addScreenshot: addScreenshotInput.checked,
     imageCompression: document.querySelector('input[name="imageCompression"]:checked').value === 'true',
     showLinkPreview: showLinkPreviewInput.checked,
+    showSelectionIcon: showSelectionIconInput.checked,
     iconColor: document.querySelector('input[name="iconColor"]:checked').value,
     tagImage: tagImageInput.value || '#image',
     tagLink: tagLinkInput.value || '#link',
-    tagQuote: tagQuoteInput.value || '#quote'
+    tagQuote: tagQuoteInput.value || '#quote',
+    isConnected: true
   };
 
   await chrome.storage.local.set(settings);
 
-  showStatus('Settings saved!', true);
+  showStatus(isFirstConnection ? 'Connected & saved!' : 'Settings saved!', true);
   saveBtn.disabled = false;
 }
 
@@ -93,7 +107,7 @@ async function testConnection(botToken, chatId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: '✓ Telegram Instant Saver connected!'
+        text: 'Telegram Instant Saver connected!'
       })
     });
 

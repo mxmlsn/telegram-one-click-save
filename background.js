@@ -5,6 +5,7 @@ const DEFAULT_SETTINGS = {
   addScreenshot: true,
   imageCompression: true,
   showLinkPreview: true,
+  showSelectionIcon: true,
   iconColor: 'blue',
   tagImage: '#image',
   tagLink: '#link',
@@ -37,15 +38,9 @@ chrome.storage.local.get({ iconColor: 'blue' }, (result) => {
 // Create context menus on install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: 'sendImage',
-    title: 'Send image to Telegram',
-    contexts: ['image']
-  });
-
-  chrome.contextMenus.create({
-    id: 'sendImageFromPage',
-    title: 'Send image to Telegram',
-    contexts: ['page', 'frame', 'link']
+    id: 'sendToTelegram',
+    title: 'Send to Telegram',
+    contexts: ['page', 'frame', 'link', 'image']
   });
 
   chrome.contextMenus.create({
@@ -64,10 +59,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  if (info.menuItemId === 'sendImage') {
-    await sendImage(info.srcUrl, tab.url, settings);
-  } else if (info.menuItemId === 'sendImageFromPage') {
-    await sendImageFromPage(tab, settings);
+  if (info.menuItemId === 'sendToTelegram') {
+    // If clicked on image element directly, use srcUrl
+    if (info.srcUrl) {
+      await sendImage(info.srcUrl, tab.url, settings);
+    } else {
+      // Otherwise try to detect media under cursor or send link
+      await sendImageFromPage(tab, settings);
+    }
   } else if (info.menuItemId === 'sendQuote') {
     await sendQuote(info.selectionText, tab.url, settings);
   }
@@ -83,6 +82,28 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 
   await sendScreenshot(tab, settings);
+});
+
+// Handle messages from content script (selection icon)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'sendQuoteFromSelection') {
+    (async () => {
+      const settings = await getSettings();
+
+      if (!settings.botToken || !settings.chatId) {
+        chrome.runtime.openOptionsPage();
+        return;
+      }
+
+      const tabId = sender.tab?.id;
+      await sendQuoteWithTabId(message.text, sender.tab.url, settings, tabId);
+    })();
+  } else if (message.action === 'getSettings') {
+    getSettings().then(settings => {
+      sendResponse({ showSelectionIcon: settings.showSelectionIcon });
+    });
+    return true; // async response
+  }
 });
 
 // Get settings from storage
@@ -109,7 +130,7 @@ function buildCaption(url, tag, extraText = '') {
   let caption = '';
 
   if (extraText) {
-    caption += `"${extraText.slice(0, 3900)}"\n\n`;
+    caption += `<code>${extraText.slice(0, 3900)}</code>\n\n`;
   }
 
   if (formatted.isLink) {
@@ -122,7 +143,7 @@ function buildCaption(url, tag, extraText = '') {
 }
 
 // Show toast notification on page
-async function showToast(tabId, success, message) {
+async function showToast(tabId, state, message) {
   try {
     await chrome.scripting.insertCSS({
       target: { tabId },
@@ -136,7 +157,7 @@ async function showToast(tabId, success, message) {
 
     await chrome.tabs.sendMessage(tabId, {
       action: 'showToast',
-      success,
+      state,
       message
     });
   } catch (e) {
@@ -146,155 +167,156 @@ async function showToast(tabId, success, message) {
 
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
-  try {
-    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  await showToast(tab.id, 'pending', 'Sending...');
 
-    if (!settings.addScreenshot) {
-      // Send just the link without screenshot
-      await sendMessage(tab.url, settings);
-      await showToast(tab.id, true, 'Sent!');
-      return;
-    }
+  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
 
-    const blob = await fetch(dataUrl).then(r => r.blob());
-    const caption = buildCaption(tab.url, settings.tagLink);
-
-    await sendPhoto(blob, caption, settings);
-    await showToast(tab.id, true, 'Sent!');
-  } catch (e) {
-    console.error('Screenshot error:', e);
-    await showToast(tab.id, false, 'Error');
+  if (!settings.addScreenshot) {
+    // Send just the link without screenshot
+    await sendMessage(tab.url, settings);
+    await showToast(tab.id, 'success', 'Sent!');
+    return;
   }
+
+  const blob = await fetch(dataUrl).then(r => r.blob());
+  const caption = buildCaption(tab.url, settings.tagLink);
+
+  await sendPhoto(blob, caption, settings);
+  await showToast(tab.id, 'success', 'Sent!');
 }
 
 // Send image from context menu
-async function sendImage(imageUrl, pageUrl, settings) {
-  const tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
-  const tabId = tab?.id;
+async function sendImage(imageUrl, pageUrl, settings, tabId = null) {
+  if (!tabId) {
+    const tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+    tabId = tab?.id;
+  }
+
+  if (tabId) await showToast(tabId, 'pending', 'Sending...');
+
+  let blob;
+  let useScreenshot = false;
 
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) throw new Error('Failed to fetch image');
-
-    const blob = await response.blob();
-    const caption = buildCaption(pageUrl, settings.tagImage);
-
-    if (settings.imageCompression) {
-      await sendPhoto(blob, caption, settings);
-    } else {
-      await sendDocument(blob, caption, settings, imageUrl);
-    }
-
-    if (tabId) await showToast(tabId, true, 'Sent!');
+    blob = await response.blob();
   } catch (e) {
-    console.error('Image error:', e);
-    if (tabId) await showToast(tabId, false, 'Error');
+    console.error('Image fetch error, using screenshot fallback:', e);
+    useScreenshot = true;
   }
+
+  if (useScreenshot && tabId) {
+    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+    blob = await fetch(dataUrl).then(r => r.blob());
+  }
+
+  const caption = buildCaption(pageUrl, settings.tagImage);
+
+  if (settings.imageCompression || useScreenshot) {
+    await sendPhoto(blob, caption, settings);
+  } else {
+    await sendDocument(blob, caption, settings, imageUrl);
+  }
+
+  if (tabId) await showToast(tabId, 'success', 'Sent!');
 }
 
 // Send image or video found under cursor (for sites like Instagram)
 async function sendImageFromPage(tab, settings) {
   const tabId = tab.id;
 
-  try {
-    // Find image or video under cursor via content script
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        const lastRightClicked = window.__tgSaverLastRightClicked;
-        if (!lastRightClicked) return { type: null };
+  // Find image or video under cursor via content script
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const lastRightClicked = window.__tgSaverLastRightClicked;
+      if (!lastRightClicked) return { type: null };
 
-        // Check for video first
-        let video = lastRightClicked.closest('video') ||
-                    lastRightClicked.querySelector('video') ||
-                    lastRightClicked.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+      // Check for video first
+      let video = lastRightClicked.closest('video') ||
+                  lastRightClicked.querySelector('video') ||
+                  lastRightClicked.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
 
-        if (!video) {
-          let parent = lastRightClicked.parentElement;
-          for (let i = 0; i < 5 && parent; i++) {
-            video = parent.querySelector('video');
-            if (video) break;
-            parent = parent.parentElement;
-          }
+      if (!video) {
+        let parent = lastRightClicked.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          video = parent.querySelector('video');
+          if (video) break;
+          parent = parent.parentElement;
         }
-
-        if (video) {
-          return { type: 'video', src: video.src || video.currentSrc };
-        }
-
-        // Check for image
-        let img = lastRightClicked.closest('img') ||
-                  lastRightClicked.querySelector('img') ||
-                  lastRightClicked.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
-
-        if (!img) {
-          let parent = lastRightClicked.parentElement;
-          for (let i = 0; i < 5 && parent; i++) {
-            img = parent.querySelector('img');
-            if (img) break;
-            parent = parent.parentElement;
-          }
-        }
-
-        if (img) {
-          return { type: 'image', src: img.src };
-        }
-
-        return { type: null };
       }
-    });
 
-    const media = results[0]?.result;
+      if (video) {
+        return { type: 'video', src: video.src || video.currentSrc };
+      }
 
-    if (!media || !media.type) {
-      await showToast(tabId, false, 'No media found');
-      return;
+      // Check for image
+      let img = lastRightClicked.closest('img') ||
+                lastRightClicked.querySelector('img') ||
+                lastRightClicked.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
+
+      if (!img) {
+        let parent = lastRightClicked.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          img = parent.querySelector('img');
+          if (img) break;
+          parent = parent.parentElement;
+        }
+      }
+
+      if (img) {
+        return { type: 'image', src: img.src };
+      }
+
+      return { type: null };
     }
+  });
 
-    if (media.type === 'video') {
-      // For video: take screenshot and send with video tag
-      await sendVideoAsScreenshot(tab, settings);
-    } else {
-      // For image: send as usual
-      await sendImage(media.src, tab.url, settings);
-    }
-  } catch (e) {
-    console.error('sendImageFromPage error:', e);
-    await showToast(tabId, false, 'Error');
+  const media = results[0]?.result;
+
+  if (!media || !media.type) {
+    // No media found - send screenshot + link
+    await sendScreenshot(tab, settings);
+    return;
+  }
+
+  if (media.type === 'video') {
+    // For video: take screenshot and send with image tag
+    await sendVideoAsScreenshot(tab, settings);
+  } else {
+    // For image: send as usual
+    await sendImage(media.src, tab.url, settings, tabId);
   }
 }
 
-// Send video as screenshot with #video tag
+// Send video as screenshot with #image tag
 async function sendVideoAsScreenshot(tab, settings) {
-  try {
-    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-    const blob = await fetch(dataUrl).then(r => r.blob());
+  await showToast(tab.id, 'pending', 'Sending...');
 
-    // Use #video tag instead of #image
-    const videoTag = '#video';
-    const caption = buildCaption(tab.url, videoTag);
+  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  const blob = await fetch(dataUrl).then(r => r.blob());
 
-    await sendPhoto(blob, caption, settings);
-    await showToast(tab.id, true, 'Sent!');
-  } catch (e) {
-    console.error('Video screenshot error:', e);
-    await showToast(tab.id, false, 'Error');
-  }
+  const caption = buildCaption(tab.url, settings.tagImage);
+
+  await sendPhoto(blob, caption, settings);
+  await showToast(tab.id, 'success', 'Sent!');
 }
 
 // Send quote from context menu
 async function sendQuote(text, pageUrl, settings) {
   const tabId = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+  await sendQuoteWithTabId(text, pageUrl, settings, tabId);
+}
 
-  try {
-    const caption = buildCaption(pageUrl, settings.tagQuote, text);
-    await sendTextMessage(caption, settings);
+// Send quote with explicit tabId (for selection icon)
+async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
+  if (tabId) await showToast(tabId, 'pending', 'Sending...');
 
-    if (tabId) await showToast(tabId, true, 'Sent!');
-  } catch (e) {
-    console.error('Quote error:', e);
-    if (tabId) await showToast(tabId, false, 'Error');
-  }
+  const caption = buildCaption(pageUrl, settings.tagQuote, text);
+  await sendTextMessage(caption, settings);
+
+  if (tabId) await showToast(tabId, 'success', 'Sent!');
 }
 
 // Send just a message (link without screenshot)

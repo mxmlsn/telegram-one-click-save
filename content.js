@@ -6,37 +6,152 @@ document.addEventListener('contextmenu', (e) => {
 // Listen for toast messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'showToast') {
-    showToast(message.success, message.message);
+    showToast(message.state, message.message);
   }
 });
 
-function showToast(success, message) {
-  // Remove existing toast if any
-  const existing = document.getElementById('tg-saver-toast');
-  if (existing) {
-    existing.remove();
+function showToast(state, message) {
+  let toast = document.getElementById('tg-saver-toast');
+
+  if (state === 'pending') {
+    // Create new toast in pending state
+    if (toast) toast.remove();
+
+    toast = document.createElement('div');
+    toast.id = 'tg-saver-toast';
+    toast.className = 'tg-saver-toast';
+    toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">${message}</span>`;
+
+    document.body.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.add('tg-saver-visible');
+    });
+  } else if (state === 'success' && toast) {
+    // Transition existing toast to success
+    toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
+    toast.classList.add('tg-saver-success');
+
+    // Remove after delay
+    setTimeout(() => {
+      toast.classList.remove('tg-saver-visible');
+      setTimeout(() => {
+        toast.remove();
+      }, 200);
+    }, 1200);
   }
+}
 
-  // Create toast element
-  const toast = document.createElement('div');
-  toast.id = 'tg-saver-toast';
-  toast.className = `tg-saver-toast ${success ? 'tg-saver-success' : 'tg-saver-error'}`;
+// Selection icon functionality
+let selectionIcon = null;
+let showSelectionIcon = true;
+let savedSelectionText = ''; // Store selected text when icon appears
 
-  const icon = success ? '✓' : '✗';
-  toast.innerHTML = `<span class="tg-saver-icon">${icon}</span><span class="tg-saver-text">${message}</span>`;
+// Get settings on load
+chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+  if (response) {
+    showSelectionIcon = response.showSelectionIcon;
+  }
+});
 
-  document.body.appendChild(toast);
+// Listen for settings changes
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.showSelectionIcon) {
+    showSelectionIcon = changes.showSelectionIcon.newValue;
+    if (!showSelectionIcon && selectionIcon) {
+      selectionIcon.remove();
+      selectionIcon = null;
+    }
+  }
+});
 
-  // Trigger animation
-  requestAnimationFrame(() => {
-    toast.classList.add('tg-saver-visible');
+// Create selection icon element
+function createSelectionIcon() {
+  if (selectionIcon) return selectionIcon;
+
+  selectionIcon = document.createElement('div');
+  selectionIcon.id = 'tg-saver-selection-icon';
+  selectionIcon.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+    </svg>
+  `;
+  selectionIcon.title = 'Send to Telegram';
+
+  selectionIcon.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Use saved text since selection may be lost on click
+    if (savedSelectionText) {
+      chrome.runtime.sendMessage({
+        action: 'sendQuoteFromSelection',
+        text: savedSelectionText
+      });
+    }
+
+    hideSelectionIcon();
   });
 
-  // Remove after delay
-  setTimeout(() => {
-    toast.classList.remove('tg-saver-visible');
-    setTimeout(() => {
-      toast.remove();
-    }, 300);
-  }, 1500);
+  document.body.appendChild(selectionIcon);
+  return selectionIcon;
 }
+
+function showSelectionIconAt(x, y, text) {
+  if (!showSelectionIcon) return;
+
+  // Save the selected text
+  savedSelectionText = text;
+
+  const icon = createSelectionIcon();
+
+  // Position icon above the selection end
+  icon.style.left = `${x}px`;
+  icon.style.top = `${y - 40}px`;
+
+  requestAnimationFrame(() => {
+    icon.classList.add('tg-saver-selection-visible');
+  });
+}
+
+function hideSelectionIcon() {
+  if (selectionIcon) {
+    selectionIcon.classList.remove('tg-saver-selection-visible');
+  }
+}
+
+// Handle text selection
+document.addEventListener('mouseup', (e) => {
+  // Ignore if clicking on the icon itself
+  if (e.target.closest('#tg-saver-selection-icon')) return;
+
+  const selection = window.getSelection();
+  const selectedText = selection.toString().trim();
+
+  if (selectedText.length > 0) {
+    // Get position of selection end
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+
+    // Show icon at the end of selection, pass text
+    showSelectionIconAt(
+      rect.right + window.scrollX,
+      rect.top + window.scrollY,
+      selectedText
+    );
+  } else {
+    hideSelectionIcon();
+  }
+});
+
+// Hide icon when clicking elsewhere
+document.addEventListener('mousedown', (e) => {
+  if (!e.target.closest('#tg-saver-selection-icon')) {
+    hideSelectionIcon();
+  }
+});
+
+// Hide icon on scroll
+document.addEventListener('scroll', () => {
+  hideSelectionIcon();
+}, true);
