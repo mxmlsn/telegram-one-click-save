@@ -15,6 +15,10 @@
   color: white;
   transition: opacity 0.2s ease, background-color 0.4s ease;
   overflow: hidden;
+  width: 250px;
+  /* Consistent width */
+  min-width: 250px;
+  max-width: 250px;
 }
 
 .tg-saver-toast:not(.tg-saver-with-tags) {
@@ -22,6 +26,8 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
+  justify-content: center;
+  /* Center content in fixed width */
 }
 
 .tg-saver-toast.tg-saver-visible {
@@ -44,7 +50,6 @@
 .tg-saver-toast.tg-saver-with-tags {
   padding: 0;
   background: #2d2d2d;
-  min-width: 200px;
 }
 
 .tg-saver-toast-content {
@@ -59,10 +64,16 @@
 }
 
 .tg-saver-tags-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
 }
+
+.tg-saver-tags-container.tg-saver-single-column {
+  grid-template-columns: 1fr;
+}
+
 
 .tg-saver-tag-btn {
   display: flex;
@@ -77,6 +88,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.1s ease;
+  width: 100%;
 }
 
 .tg-saver-tag-btn:hover {
@@ -88,13 +100,16 @@
 }
 
 .tg-saver-tag-dot {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .tg-saver-skip-btn {
+  grid-column: 1 / -1;
+  /* Full width */
+  justify-content: center;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.6);
 }
@@ -122,6 +137,7 @@
   from {
     width: 100%;
   }
+
   to {
     width: 0%;
   }

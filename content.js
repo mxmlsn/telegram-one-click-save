@@ -62,16 +62,27 @@ function showTagSelectionToast(customTags, requestId) {
   toast.id = 'tg-saver-toast';
   toast.className = 'tg-saver-toast tg-saver-with-tags';
 
-  // Build tag buttons HTML
+  // Build tag buttons HTML - preserve original grid layout from settings
   let tagsHtml = '';
-  if (customTags && customTags.length > 0) {
-    tagsHtml = customTags.map((tag, index) => `
-      <button class="tg-saver-tag-btn" data-index="${index}" data-name="${tag.name}">
-        <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
-        <span>${tag.name}</span>
-      </button>
-    `).join('');
+  let useTwoColumns = false;
+  if (customTags) {
+    const nonEmptyTags = customTags
+      .map((tag, index) => ({ ...tag, index }))
+      .filter(tag => tag.name && tag.name.trim().length > 0);
+
+    // Check if any non-empty tag is in the right column (odd index)
+    useTwoColumns = nonEmptyTags.some(tag => tag.index % 2 === 1);
+
+    tagsHtml = nonEmptyTags
+      .map(tag => `
+        <button class="tg-saver-tag-btn" data-index="${tag.index}" data-name="${tag.name}">
+          <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
+          <span>${tag.name}</span>
+        </button>
+      `).join('');
   }
+
+  const columnsClass = useTwoColumns ? '' : ' tg-saver-single-column';
 
   toast.innerHTML = `
     <div class="tg-saver-toast-content">
@@ -79,7 +90,7 @@ function showTagSelectionToast(customTags, requestId) {
         <span class="tg-saver-icon">↑</span>
         <span class="tg-saver-text">Select tag</span>
       </div>
-      <div class="tg-saver-tags-container">
+      <div class="tg-saver-tags-container${columnsClass}">
         ${tagsHtml}
         <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
           <span>Skip</span>

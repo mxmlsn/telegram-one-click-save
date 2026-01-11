@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Telegram Instant Saver — Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
+
 <body>
   <div class="container">
     <h1>Telegram Instant Saver</h1>
@@ -50,7 +52,9 @@
               <div class="carousel-slides" id="carouselSlides">
                 <div class="carousel-slide" data-step="1">
                   <div class="slide-image" data-placeholder="Step 1"></div>
-                  <div class="slide-text">Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send <code>/newbot</code></div>
+                  <div class="slide-text">Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send
+                    <code>/newbot</code>
+                  </div>
                 </div>
                 <div class="carousel-slide" data-step="2">
                   <div class="slide-image" data-placeholder="Step 2"></div>
@@ -58,7 +62,8 @@
                 </div>
                 <div class="carousel-slide" data-step="3">
                   <div class="slide-image" data-placeholder="Step 3"></div>
-                  <div class="slide-text">Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to get your Chat ID</div>
+                  <div class="slide-text">Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to
+                    get your Chat ID</div>
                 </div>
                 <div class="carousel-slide" data-step="4">
                   <div class="slide-image" data-placeholder="Step 4"></div>
@@ -175,15 +180,24 @@
               <div class="tags-grid">
                 <div class="tag-field">
                   <span>Image</span>
-                  <input type="text" id="tagImage" value="#image">
+                  <div class="hashtag-input">
+                    <span class="prefix">#</span>
+                    <input type="text" id="tagImage" value="image">
+                  </div>
                 </div>
                 <div class="tag-field">
                   <span>Link</span>
-                  <input type="text" id="tagLink" value="#link">
+                  <div class="hashtag-input">
+                    <span class="prefix">#</span>
+                    <input type="text" id="tagLink" value="link">
+                  </div>
                 </div>
                 <div class="tag-field">
                   <span>Quote</span>
-                  <input type="text" id="tagQuote" value="#quote">
+                  <div class="hashtag-input">
+                    <span class="prefix">#</span>
+                    <input type="text" id="tagQuote" value="quote">
+                  </div>
                 </div>
               </div>
             </div>
@@ -200,13 +214,17 @@
                 Enable Quick Tags
               </label>
             </div>
-            <p class="settings-hint">Add up to 9 tags to quickly select when saving. They appear in the notification.</p>
-            <div id="customTagsList" class="custom-tags-list"></div>
-            <div class="add-tag-form" id="addTagForm">
-              <input type="color" id="newTagColor" value="#0088cc" class="tag-color-picker">
-              <input type="text" id="newTagName" placeholder="Tag name" maxlength="20" class="tag-name-input">
-              <button type="button" id="addTagBtn" class="add-tag-btn">+</button>
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="sendWithColor" checked>
+                  <span class="slider"></span>
+                </label>
+                Send with color (🟢 #tag)
+              </label>
             </div>
+            <p class="settings-hint">Drag to reorder. Empty tags are hidden.</p>
+            <div id="customTagsList" class="custom-tags-list"></div>
           </div>
 
           <div class="settings-group">
@@ -219,4 +237,5 @@
 
   <script src="options.js"></script>
 </body>
+
 </html>

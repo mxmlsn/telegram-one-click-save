@@ -11,9 +11,31 @@ const DEFAULT_SETTINGS = {
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#quote',
-  quoteMonospace: true,
   enableQuickTags: true,
-  customTags: [] // Array of {name: string, color: string}
+  sendWithColor: true,
+  // Fixed 8 tags default structure
+  customTags: [
+    { name: '', color: '#377CDE', id: 'blue' },
+    { name: '', color: '#3D3D3B', id: 'black' },
+    { name: '', color: '#4ED345', id: 'green' },
+    { name: '', color: '#BB4FFF', id: 'purple' },
+    { name: '', color: '#DEDEDE', id: 'white' },
+    { name: '', color: '#E64541', id: 'red' },
+    { name: '', color: '#EC9738', id: 'orange' },
+    { name: '', color: '#FFDE42', id: 'yellow' }
+  ]
+};
+
+// Emoji mapping for colors
+const COLOR_EMOJIS = {
+  '#377CDE': '🔵', // Blue
+  '#3D3D3B': '⚫️', // Black
+  '#4ED345': '🟢', // Green
+  '#BB4FFF': '🟣', // Purple
+  '#DEDEDE': '⚪️', // White
+  '#E64541': '🔴', // Red
+  '#EC9738': '🟠', // Orange
+  '#FFDE42': '🟡'  // Yellow
 };
 
 // Update extension icon
@@ -150,12 +172,22 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
     caption += '⠀\n';
   }
 
-  // Build tag parts: selectedTag | typeTag | url
+  // Build tag parts: [emoji] [selectedTag] | [typeTag] | [url]
   let parts = [];
 
   // Add selected custom tag if present
   if (selectedTag && selectedTag.name) {
-    parts.push(`#${selectedTag.name}`);
+    let tagText = `#${selectedTag.name}`;
+
+    // Prepend emoji if enabled
+    if (settings.sendWithColor && selectedTag.color) {
+      const emoji = COLOR_EMOJIS[selectedTag.color];
+      if (emoji) {
+        tagText = `${emoji} ${tagText}`;
+      }
+    }
+
+    parts.push(tagText);
   }
 
   // Add type tag if hashtags enabled
@@ -170,7 +202,8 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
     parts.push(formatted.text);
   }
 
-  caption += parts.join(' | ');
+  // Filter out any empty parts before joining
+  caption += parts.filter(p => p && p.trim()).join(' | ');
 
   return caption;
 }
