@@ -364,28 +364,44 @@ async function sendImageFromPage(tab, settings) {
   }
 
   // Find image or video under cursor via content script
+  // Rule: only detect as image if clicked DIRECTLY on <img> or <video> element
+  // (browser would show "Save image as" in context menu for these)
+  // Exception: Instagram - images are hidden behind overlay divs
   const results = await chrome.scripting.executeScript({
     target: { tabId },
     func: (isInstagram) => {
-      const lastRightClicked = window.__tgSaverLastRightClicked;
-      if (!lastRightClicked) return { type: null };
+      const el = window.__tgSaverLastRightClicked;
+      if (!el) return { type: null };
 
-      // Check for video first
-      let video = lastRightClicked.closest('video') ||
-        lastRightClicked.querySelector('video');
-
-      // For Instagram: use aggressive search in parent elements
-      if (isInstagram) {
-        if (!video) {
-          video = lastRightClicked.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+      // For non-Instagram: STRICT mode
+      // Only detect media if the clicked element IS the media or its direct wrapper
+      if (!isInstagram) {
+        // Check if clicked element is a video
+        if (el.tagName === 'VIDEO') {
+          return { type: 'video', src: el.src || el.currentSrc };
         }
-        if (!video) {
-          let parent = lastRightClicked.parentElement;
-          for (let i = 0; i < 5 && parent; i++) {
-            video = parent.querySelector('video');
-            if (video) break;
-            parent = parent.parentElement;
-          }
+
+        // Check if clicked element is an image
+        if (el.tagName === 'IMG') {
+          return { type: 'image', src: el.src };
+        }
+
+        // Not directly on media - treat as page click (send link/screenshot)
+        return { type: null };
+      }
+
+      // Instagram: aggressive search (images hidden behind overlays)
+      // Check for video first
+      let video = el.closest('video') || el.querySelector('video');
+      if (!video) {
+        video = el.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+      }
+      if (!video) {
+        let parent = el.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          video = parent.querySelector('video');
+          if (video) break;
+          parent = parent.parentElement;
         }
       }
 
@@ -393,22 +409,17 @@ async function sendImageFromPage(tab, settings) {
         return { type: 'video', src: video.src || video.currentSrc };
       }
 
-      // Check for image - strict mode for non-Instagram
-      let img = lastRightClicked.closest('img') ||
-        lastRightClicked.querySelector('img');
-
-      // For Instagram: use aggressive search in parent elements
-      if (isInstagram) {
-        if (!img) {
-          img = lastRightClicked.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
-        }
-        if (!img) {
-          let parent = lastRightClicked.parentElement;
-          for (let i = 0; i < 5 && parent; i++) {
-            img = parent.querySelector('img');
-            if (img) break;
-            parent = parent.parentElement;
-          }
+      // Check for image
+      let img = el.closest('img') || el.querySelector('img');
+      if (!img) {
+        img = el.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
+      }
+      if (!img) {
+        let parent = el.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          img = parent.querySelector('img');
+          if (img) break;
+          parent = parent.parentElement;
         }
       }
 
