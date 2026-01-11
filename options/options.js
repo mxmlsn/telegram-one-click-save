@@ -488,7 +488,10 @@ function renderCustomTags() {
 let dragState = {
   draggedElement: null,
   draggedIndex: -1,
-  currentIndex: -1
+  currentIndex: -1,
+  ghostElement: null,
+  startY: 0,
+  offsetY: 0
 };
 
 function handleDragStart(e, el) {
@@ -496,9 +499,29 @@ function handleDragStart(e, el) {
   dragState.draggedIndex = parseInt(el.dataset.index);
   dragState.currentIndex = dragState.draggedIndex;
 
+  // Calculate offset from top of element
+  const rect = el.getBoundingClientRect();
+  dragState.startY = rect.top;
+  dragState.offsetY = e.clientY - rect.top;
+
   el.classList.add('dragging');
 
-  // Set drag image to be invisible to prevent default ghost image
+  // Create ghost element that follows cursor
+  const ghost = el.cloneNode(true);
+  ghost.id = 'drag-ghost';
+  ghost.style.position = 'fixed';
+  ghost.style.left = `${rect.left}px`;
+  ghost.style.top = `${rect.top}px`;
+  ghost.style.width = `${rect.width}px`;
+  ghost.style.pointerEvents = 'none';
+  ghost.style.zIndex = '10000';
+  ghost.style.opacity = '0.9';
+  ghost.classList.remove('dragging');
+  ghost.classList.add('ghost-dragging');
+  document.body.appendChild(ghost);
+  dragState.ghostElement = ghost;
+
+  // Hide default drag image
   const dragImage = document.createElement('div');
   dragImage.style.opacity = '0';
   dragImage.style.position = 'absolute';
@@ -508,6 +531,15 @@ function handleDragStart(e, el) {
   setTimeout(() => dragImage.remove(), 0);
 
   e.dataTransfer.effectAllowed = 'move';
+
+  // Add mousemove listener to update ghost position
+  document.addEventListener('dragover', updateGhostPosition);
+}
+
+function updateGhostPosition(e) {
+  if (dragState.ghostElement && e.clientY > 0) {
+    dragState.ghostElement.style.top = `${e.clientY - dragState.offsetY}px`;
+  }
 }
 
 function handleDragOver(e, el) {
@@ -534,7 +566,7 @@ function handleDragOver(e, el) {
     // Re-render immediately for live feedback
     renderCustomTags();
 
-    // Re-apply dragging class to the element
+    // Re-apply dragging class to the element at new position
     const newDraggedEl = customTagsList.querySelector(`[data-index="${targetIndex}"]`);
     if (newDraggedEl) {
       newDraggedEl.classList.add('dragging');
@@ -557,6 +589,14 @@ function handleDrop(e) {
 }
 
 function handleDragEnd(e) {
+  // Remove ghost element
+  if (dragState.ghostElement) {
+    dragState.ghostElement.remove();
+  }
+
+  // Remove mousemove listener
+  document.removeEventListener('dragover', updateGhostPosition);
+
   // Clean up
   document.querySelectorAll('.custom-tag-item').forEach(item => {
     item.classList.remove('dragging', 'over');
@@ -565,7 +605,10 @@ function handleDragEnd(e) {
   dragState = {
     draggedElement: null,
     draggedIndex: -1,
-    currentIndex: -1
+    currentIndex: -1,
+    ghostElement: null,
+    startY: 0,
+    offsetY: 0
   };
 }
 
