@@ -476,101 +476,97 @@ function renderCustomTags() {
     });
 
     // Drag events
-    // Using closures to preserve context safely
     tagEl.addEventListener('dragstart', (e) => handleDragStart(e, tagEl));
     tagEl.addEventListener('dragover', (e) => handleDragOver(e, tagEl));
     tagEl.addEventListener('drop', (e) => handleDrop(e, tagEl));
-    tagEl.addEventListener('dragenter', (e) => handleDragEnter(e, tagEl));
-    tagEl.addEventListener('dragleave', (e) => handleDragLeave(e, tagEl));
+    tagEl.addEventListener('dragend', (e) => handleDragEnd(e));
 
     customTagsList.appendChild(tagEl);
   });
 }
 
-let dragSrcEl = null;
+let dragState = {
+  draggedElement: null,
+  draggedIndex: -1,
+  currentIndex: -1
+};
 
 function handleDragStart(e, el) {
-  dragSrcEl = el;
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/html', el.innerHTML);
+  dragState.draggedElement = el;
+  dragState.draggedIndex = parseInt(el.dataset.index);
+  dragState.currentIndex = dragState.draggedIndex;
+
   el.classList.add('dragging');
+
+  // Set drag image to be invisible to prevent default ghost image
+  const dragImage = document.createElement('div');
+  dragImage.style.opacity = '0';
+  dragImage.style.position = 'absolute';
+  dragImage.style.top = '-9999px';
+  document.body.appendChild(dragImage);
+  e.dataTransfer.setDragImage(dragImage, 0, 0);
+  setTimeout(() => dragImage.remove(), 0);
+
+  e.dataTransfer.effectAllowed = 'move';
 }
 
 function handleDragOver(e, el) {
   e.preventDefault();
 
-  if (!dragSrcEl || dragSrcEl === el) return;
+  if (!dragState.draggedElement || dragState.draggedElement === el) return;
 
-  // Remove all 'over' classes
-  document.querySelectorAll('.custom-tag-item').forEach(item => {
-    item.classList.remove('over');
-  });
+  const targetIndex = parseInt(el.dataset.index);
 
-  // Determine if we should insert before or after based on mouse Y position
-  const rect = el.getBoundingClientRect();
-  const midpoint = rect.top + rect.height / 2;
+  // Only reorder if we're hovering over a different element
+  if (targetIndex !== dragState.currentIndex) {
+    // Perform live reorder
+    const draggedItem = customTags[dragState.currentIndex];
 
-  // Add visual indicator
-  el.classList.add('over');
+    // Remove from current position
+    customTags.splice(dragState.currentIndex, 1);
+
+    // Insert at new position
+    customTags.splice(targetIndex, 0, draggedItem);
+
+    // Update current index
+    dragState.currentIndex = targetIndex;
+
+    // Re-render immediately for live feedback
+    renderCustomTags();
+
+    // Re-apply dragging class to the element
+    const newDraggedEl = customTagsList.querySelector(`[data-index="${targetIndex}"]`);
+    if (newDraggedEl) {
+      newDraggedEl.classList.add('dragging');
+      dragState.draggedElement = newDraggedEl;
+    }
+  }
 
   e.dataTransfer.dropEffect = 'move';
   return false;
 }
 
-function handleDragEnter(e, el) {
-  // Handled in dragover for smoother experience
-}
-
-function handleDragLeave(e, el) {
-  // Only remove if we're actually leaving (not entering a child)
-  if (!el.contains(e.relatedTarget)) {
-    el.classList.remove('over');
-  }
-}
-
-function handleDrop(e, el) {
+function handleDrop(e) {
   e.preventDefault();
   e.stopPropagation();
 
-  // Remove visual feedback
-  document.querySelectorAll('.custom-tag-item').forEach(item => {
-    item.classList.remove('over', 'dragging');
-  });
-
-  if (dragSrcEl && dragSrcEl !== el) {
-    const srcIndex = parseInt(dragSrcEl.dataset.index);
-    const targetIndex = parseInt(el.dataset.index);
-
-    if (isNaN(srcIndex) || isNaN(targetIndex)) return false;
-
-    // Calculate insert position based on mouse position
-    const rect = el.getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    const insertBefore = e.clientY < midpoint;
-
-    // Reorder array
-    const item = customTags.splice(srcIndex, 1)[0];
-
-    // Adjust target index if dragging from above
-    let finalIndex = targetIndex;
-    if (srcIndex < targetIndex && insertBefore) {
-      finalIndex = targetIndex - 1;
-    } else if (srcIndex > targetIndex && !insertBefore) {
-      finalIndex = targetIndex + 1;
-    } else if (insertBefore) {
-      finalIndex = targetIndex;
-    } else {
-      finalIndex = targetIndex;
-    }
-
-    customTags.splice(finalIndex, 0, item);
-
-    saveCustomTagsOnly().then(() => {
-      renderCustomTags();
-    });
-  }
+  // Save the new order
+  saveCustomTagsOnly();
 
   return false;
+}
+
+function handleDragEnd(e) {
+  // Clean up
+  document.querySelectorAll('.custom-tag-item').forEach(item => {
+    item.classList.remove('dragging', 'over');
+  });
+
+  dragState = {
+    draggedElement: null,
+    draggedIndex: -1,
+    currentIndex: -1
+  };
 }
 
 function showInputError(input) {
