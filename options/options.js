@@ -504,6 +504,15 @@ function handleDragStart(e, el) {
   dragState.startY = rect.top;
   dragState.offsetY = e.clientY - rect.top;
 
+  // Create empty drag image FIRST (synchronously before anything else)
+  const emptyImg = document.createElement('img');
+  emptyImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  emptyImg.style.position = 'absolute';
+  emptyImg.style.top = '-9999px';
+  document.body.appendChild(emptyImg);
+  e.dataTransfer.setDragImage(emptyImg, 0, 0);
+  setTimeout(() => emptyImg.remove(), 0);
+
   el.classList.add('dragging');
 
   // Create ghost element that follows cursor
@@ -518,17 +527,16 @@ function handleDragStart(e, el) {
   ghost.style.opacity = '0.9';
   ghost.classList.remove('dragging');
   ghost.classList.add('ghost-dragging');
+
+  // Disable input in ghost to prevent any interaction
+  const ghostInput = ghost.querySelector('input');
+  if (ghostInput) {
+    ghostInput.disabled = true;
+    ghostInput.style.pointerEvents = 'none';
+  }
+
   document.body.appendChild(ghost);
   dragState.ghostElement = ghost;
-
-  // Hide default drag image
-  const dragImage = document.createElement('div');
-  dragImage.style.opacity = '0';
-  dragImage.style.position = 'absolute';
-  dragImage.style.top = '-9999px';
-  document.body.appendChild(dragImage);
-  e.dataTransfer.setDragImage(dragImage, 0, 0);
-  setTimeout(() => dragImage.remove(), 0);
 
   e.dataTransfer.effectAllowed = 'move';
 

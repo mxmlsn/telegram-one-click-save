@@ -509,6 +509,12 @@ button.secondary:hover {
   opacity: 0.9;
   transform: rotate(2deg) scale(1.02);
   cursor: grabbing;
+  pointer-events: none;
+}
+
+.custom-tag-item.ghost-dragging input {
+  pointer-events: none;
+  user-select: none;
 }
 
 .drag-handle {
