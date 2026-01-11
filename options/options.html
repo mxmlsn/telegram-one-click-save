@@ -13,52 +13,66 @@
     <div class="two-columns">
       <!-- Left column: Setup -->
       <div class="column column-left">
-        <section class="section">
-          <h2>Setup</h2>
-
-          <div class="steps">
-            <div class="step">
-              <div class="step-number">1</div>
-              <div class="step-content">
-                <div class="step-title">Create a bot</div>
-                <div class="step-description">Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send <code>/newbot</code></div>
-                <div class="step-image" data-placeholder="botfather-newbot.png"></div>
-              </div>
-            </div>
-
-            <div class="step">
-              <div class="step-number">2</div>
-              <div class="step-content">
-                <div class="step-title">Copy Bot Token</div>
-                <div class="step-description">BotFather will give you a token. Copy it below:</div>
-                <div class="step-image" data-placeholder="botfather-token.png"></div>
-                <input type="password" id="botToken" placeholder="123456789:ABC...">
-              </div>
-            </div>
-
-            <div class="step">
-              <div class="step-number">3</div>
-              <div class="step-content">
-                <div class="step-title">Get your Chat ID</div>
-                <div class="step-description">Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> and it will show your ID</div>
-                <div class="step-image" data-placeholder="userinfobot.png"></div>
-                <input type="text" id="chatId" placeholder="-1001234567890">
-              </div>
-            </div>
-
-            <div class="step">
-              <div class="step-number">4</div>
-              <div class="step-content">
-                <div class="step-title">Start conversation with your bot</div>
-                <div class="step-description">Find your bot in Telegram and press <strong>Start</strong></div>
-                <div class="step-image" data-placeholder="bot-start.png"></div>
-              </div>
-            </div>
+        <!-- Credentials block -->
+        <section class="section credentials-section">
+          <div class="field">
+            <label for="botToken">Bot Token</label>
+            <input type="password" id="botToken" placeholder="123456789:ABC...">
           </div>
-
+          <div class="field">
+            <label for="chatId">Chat ID</label>
+            <input type="text" id="chatId" placeholder="-1001234567890">
+          </div>
           <div class="actions">
             <button id="saveBtn" class="primary">Save & Connect</button>
             <span id="status"></span>
+          </div>
+        </section>
+
+        <!-- How to block with carousel -->
+        <section class="section howto-section">
+          <h2>How to</h2>
+
+          <div class="carousel">
+            <button class="carousel-arrow carousel-prev" id="carouselPrev">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+
+            <div class="carousel-content">
+              <div class="carousel-slides" id="carouselSlides">
+                <div class="carousel-slide" data-step="1">
+                  <div class="slide-image" data-placeholder="Step 1"></div>
+                  <div class="slide-text">Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send <code>/newbot</code></div>
+                </div>
+                <div class="carousel-slide" data-step="2">
+                  <div class="slide-image" data-placeholder="Step 2"></div>
+                  <div class="slide-text">Copy the bot token that BotFather gives you</div>
+                </div>
+                <div class="carousel-slide" data-step="3">
+                  <div class="slide-image" data-placeholder="Step 3"></div>
+                  <div class="slide-text">Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to get your Chat ID</div>
+                </div>
+                <div class="carousel-slide" data-step="4">
+                  <div class="slide-image" data-placeholder="Step 4"></div>
+                  <div class="slide-text">Find your bot in Telegram and press <strong>Start</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <button class="carousel-arrow carousel-next" id="carouselNext">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+
+          <div class="carousel-dots" id="carouselDots">
+            <button class="carousel-dot active" data-step="1">1</button>
+            <button class="carousel-dot" data-step="2">2</button>
+            <button class="carousel-dot" data-step="3">3</button>
+            <button class="carousel-dot" data-step="4">4</button>
           </div>
         </section>
       </div>
