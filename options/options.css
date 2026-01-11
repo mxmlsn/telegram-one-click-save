@@ -465,8 +465,8 @@ button.secondary:hover {
 
 /* Custom tags list */
 .custom-tags-list {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   margin-bottom: 12px;
   min-height: 32px;

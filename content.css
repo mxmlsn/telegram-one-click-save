@@ -35,9 +35,9 @@
 
   /* Size */
   overflow: hidden !important;
-  width: 250px !important;
-  min-width: 250px !important;
-  max-width: 250px !important;
+  width: 167px !important;
+  min-width: 167px !important;
+  max-width: 167px !important;
   box-sizing: border-box !important;
 
   /* Reset margins and padding */
@@ -133,17 +133,13 @@
 }
 
 .tg-saver-tags-container {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
+  display: flex !important;
+  flex-direction: column !important;
   gap: 8px !important;
   width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
   box-sizing: border-box !important;
-}
-
-.tg-saver-tags-container.tg-saver-single-column {
-  grid-template-columns: 1fr !important;
 }
 
 
@@ -207,7 +203,6 @@
 }
 
 .tg-saver-skip-btn {
-  grid-column: 1 / -1 !important;
   justify-content: center !important;
   background: rgba(255, 255, 255, 0.05) !important;
   color: rgba(255, 255, 255, 0.6) !important;

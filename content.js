@@ -74,13 +74,10 @@ function showTagSelectionToast(customTags, requestId) {
 
     // Build tags HTML
     let tagsHtml = '';
-    let useTwoColumns = false;
     if (customTags) {
       const nonEmptyTags = customTags
         .map((tag, index) => ({ ...tag, index }))
         .filter(tag => tag.name && tag.name.trim().length > 0);
-
-      useTwoColumns = nonEmptyTags.some(tag => tag.index % 2 === 1);
 
       tagsHtml = nonEmptyTags.map(tag => `
         <button class="tg-saver-tag-btn" data-index="${tag.index}">
@@ -89,8 +86,6 @@ function showTagSelectionToast(customTags, requestId) {
         </button>
       `).join('');
     }
-
-    const columnsClass = useTwoColumns ? '' : ' tg-saver-single-column';
 
     toast.innerHTML = `
       <div class="tg-saver-toast-content">
@@ -104,7 +99,7 @@ function showTagSelectionToast(customTags, requestId) {
             </svg>
           </button>
         </div>
-        <div class="tg-saver-tags-container${columnsClass}">
+        <div class="tg-saver-tags-container">
           ${tagsHtml}
           <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
             <span>Skip</span>
