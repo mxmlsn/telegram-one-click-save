@@ -731,6 +731,49 @@ input:checked+.slider:before {
   stroke-width: 3;
 }
 
+/* Emoji Pack Selector */
+.emoji-pack-selector {
+  margin-top: 12px;
+}
+
+.emoji-pack-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.emoji-pack-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.emoji-tab {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  background: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.emoji-tab:hover {
+  border-color: #bbb;
+  background: #f8f8f8;
+}
+
+.emoji-tab.active {
+  border-color: #0088cc;
+  background: #e6f4fa;
+  color: #0088cc;
+}
+
 /* Timer Duration Slider */
 .timer-field {
   margin-top: 12px;

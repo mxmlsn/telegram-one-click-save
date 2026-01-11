@@ -1,3 +1,11 @@
+// Emoji packs definition (red, orange, yellow, green, blue, purple, black, white)
+const EMOJI_PACKS = {
+  standard: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  cute: ['🍄', '🍊', '🐤', '🐸', '💧', '🔮', '🌚', '💭'],
+  random: ['📌', '☢️', '📒', '🔋', '📪', '☮️', '🎥', '📁']
+};
+
 const DEFAULT_SETTINGS = {
   botToken: '',
   chatId: '',
@@ -14,6 +22,7 @@ const DEFAULT_SETTINGS = {
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4,
+  emojiPack: 'standard',
   isConnected: false,
   // Fixed 8 tags
   customTags: [
@@ -142,6 +151,20 @@ timerDurationInput.addEventListener('change', (e) => {
   saveSetting('timerDuration', value);
 });
 
+// Emoji pack tabs
+document.querySelectorAll('.emoji-tab').forEach(tab => {
+  tab.addEventListener('click', (e) => {
+    const packName = e.currentTarget.dataset.pack;
+
+    // Update active state
+    document.querySelectorAll('.emoji-tab').forEach(t => t.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+
+    // Save setting
+    saveSetting('emojiPack', packName);
+  });
+});
+
 async function loadSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
 
@@ -170,6 +193,16 @@ async function loadSettings() {
 
   const iconColor = settings.iconColor || 'blue';
   document.querySelector(`input[name="iconColor"][value="${iconColor}"]`).checked = true;
+
+  // Set emoji pack tab
+  const emojiPack = settings.emojiPack || 'standard';
+  document.querySelectorAll('.emoji-tab').forEach(tab => {
+    if (tab.dataset.pack === emojiPack) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
 
   // Load custom tags
   // Ensure we have the structure of 8 tags even if loading old data

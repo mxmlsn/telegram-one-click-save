@@ -1,3 +1,24 @@
+// Emoji packs definition
+// Order: red, orange, yellow, green, blue, purple, black, white
+const EMOJI_PACKS = {
+  standard: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  cute: ['🍄', '🍊', '🐤', '🐸', '💧', '🔮', '🌚', '💭'],
+  random: ['📌', '☢️', '📒', '🔋', '📪', '☮️', '🎥', '📁']
+};
+
+// Color ID to index mapping (for emoji pack lookup)
+const COLOR_ID_TO_INDEX = {
+  'red': 0,
+  'orange': 1,
+  'yellow': 2,
+  'green': 3,
+  'blue': 4,
+  'purple': 5,
+  'black': 6,
+  'white': 7
+};
+
 // Default settings
 const DEFAULT_SETTINGS = {
   botToken: '',
@@ -14,6 +35,7 @@ const DEFAULT_SETTINGS = {
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4, // Timer duration in seconds (3-9)
+  emojiPack: 'standard',
   // Fixed 8 tags default structure
   customTags: [
     { name: '', color: '#377CDE', id: 'blue' },
@@ -27,17 +49,14 @@ const DEFAULT_SETTINGS = {
   ]
 };
 
-// Emoji mapping for colors
-const COLOR_EMOJIS = {
-  '#377CDE': '🔵', // Blue
-  '#3D3D3B': '⚫️', // Black
-  '#4ED345': '🟢', // Green
-  '#BB4FFF': '🟣', // Purple
-  '#DEDEDE': '⚪️', // White
-  '#E64541': '🔴', // Red
-  '#EC9738': '🟠', // Orange
-  '#FFDE42': '🟡'  // Yellow
-};
+// Get emoji for a tag based on selected pack
+function getEmojiForTag(tag, emojiPack = 'standard') {
+  if (!tag || !tag.id) return '';
+  const index = COLOR_ID_TO_INDEX[tag.id];
+  if (index === undefined) return '';
+  const pack = EMOJI_PACKS[emojiPack] || EMOJI_PACKS.standard;
+  return pack[index] || '';
+}
 
 // Update extension icon
 function updateIcon(color) {
@@ -197,8 +216,8 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
     let tagText = `#${selectedTag.name}`;
 
     // Prepend emoji if enabled
-    if (settings.sendWithColor && selectedTag.color) {
-      const emoji = COLOR_EMOJIS[selectedTag.color];
+    if (settings.sendWithColor) {
+      const emoji = getEmojiForTag(selectedTag, settings.emojiPack);
       if (emoji) {
         tagText = `${emoji} ${tagText}`;
       }
