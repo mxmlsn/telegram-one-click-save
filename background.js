@@ -105,7 +105,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       await sendQuote(info.selectionText, tab.url, settings);
     } else if (info.srcUrl) {
       // If clicked on image element directly, use srcUrl
-      await sendImage(info.srcUrl, tab.url, settings);
+      await sendImage(info.srcUrl, tab.url, settings, tab.id);
     } else {
       // Otherwise try to detect media under cursor or send link
       await sendImageFromPage(tab, settings);
@@ -327,53 +327,91 @@ async function sendScreenshot(tab, settings) {
 
 // Send image from context menu
 async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag = null) {
+  // tabId should always be provided by caller now
   if (!tabId) {
-    const tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
-    tabId = tab?.id;
+    console.error('sendImage called without tabId');
+    return;
   }
 
-  // Start fetching image immediately (non-blocking)
-  let blobPromise = fetch(imageUrl)
-    .then(response => {
-      if (!response.ok) throw new Error('Failed to fetch image');
-      return response.blob();
-    })
-    .catch(e => {
-      console.error('Image fetch error, using screenshot fallback:', e);
-      return null; // Signal to use screenshot
-    });
-
-  // Show tag selection IMMEDIATELY (runs in parallel with fetch)
+  // SHOW TOAST IMMEDIATELY - before any async operations
+  let tagSelectionShown = false;
   if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
-    selectedTag = await showTagSelection(tabId, settings.customTags);
-    // Check if cancelled
+    // Show tag selection toast instantly
+    const tagPromise = showTagSelection(tabId, settings.customTags);
+    tagSelectionShown = true;
+
+    // Start fetching image in parallel (non-blocking)
+    const blobPromise = fetch(imageUrl)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch image');
+        return response.blob();
+      })
+      .catch(e => {
+        console.error('Image fetch error, using screenshot fallback:', e);
+        return null; // Signal to use screenshot
+      });
+
+    // Wait for user to select tag
+    selectedTag = await tagPromise;
     if (selectedTag === '__CANCELLED__') {
       return;
     }
-  } else if (tabId && !selectedTag) {
-    await showToast(tabId, 'pending', 'Sending');
-  }
 
-  // Wait for image fetch to complete
-  let blob = await blobPromise;
-  let useScreenshot = false;
+    // Wait for image fetch to complete
+    let blob = await blobPromise;
+    let useScreenshot = false;
 
-  // If fetch failed, take screenshot
-  if (!blob && tabId) {
-    useScreenshot = true;
-    const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-    blob = await fetch(screenshotDataUrl).then(r => r.blob());
-  }
+    // If fetch failed, take screenshot
+    if (!blob && tabId) {
+      useScreenshot = true;
+      const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+      blob = await fetch(screenshotDataUrl).then(r => r.blob());
+    }
 
-  const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+    const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
 
-  if (settings.imageCompression || useScreenshot) {
-    await sendPhoto(blob, caption, settings);
+    if (settings.imageCompression || useScreenshot) {
+      await sendPhoto(blob, caption, settings);
+    } else {
+      await sendDocument(blob, caption, settings, imageUrl);
+    }
+
+    if (tabId) await showToast(tabId, 'success', 'Success');
   } else {
-    await sendDocument(blob, caption, settings, imageUrl);
-  }
+    // No tag selection - show pending toast instantly
+    if (tabId && !selectedTag) {
+      await showToast(tabId, 'pending', 'Sending');
+    }
 
-  if (tabId) await showToast(tabId, 'success', 'Success');
+    // Fetch image
+    let blob;
+    let useScreenshot = false;
+
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error('Failed to fetch image');
+      blob = await response.blob();
+    } catch (e) {
+      console.error('Image fetch error, using screenshot fallback:', e);
+      useScreenshot = true;
+    }
+
+    // If fetch failed, take screenshot
+    if (useScreenshot && tabId) {
+      const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+      blob = await fetch(screenshotDataUrl).then(r => r.blob());
+    }
+
+    const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+
+    if (settings.imageCompression || useScreenshot) {
+      await sendPhoto(blob, caption, settings);
+    } else {
+      await sendDocument(blob, caption, settings, imageUrl);
+    }
+
+    if (tabId) await showToast(tabId, 'success', 'Success');
+  }
 }
 
 // Send image or video found under cursor (for sites like Instagram)
@@ -381,17 +419,12 @@ async function sendImageFromPage(tab, settings) {
   const tabId = tab.id;
   const isInstagram = tab.url.includes('instagram.com');
 
-  // Show tag selection first if custom tags exist and enabled
-  let selectedTag = null;
-  if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
-    selectedTag = await showTagSelection(tabId, settings.customTags);
-    // Check if cancelled
-    if (selectedTag === '__CANCELLED__') {
-      return;
-    }
-  }
+  // SHOW TAG SELECTION IMMEDIATELY - before detecting media type
+  const tagSelectionPromise = (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0)
+    ? showTagSelection(tabId, settings.customTags)
+    : Promise.resolve(null);
 
-  // Find image or video under cursor via content script
+  // Find image or video under cursor via content script (runs in parallel)
   // Rule: only detect as image if clicked DIRECTLY on <img> or <video> element
   // (browser would show "Save image as" in context menu for these)
   // Exception: Instagram - images are hidden behind overlay divs
@@ -462,6 +495,12 @@ async function sendImageFromPage(tab, settings) {
 
   const media = results[0]?.result;
 
+  // Wait for tag selection to complete
+  let selectedTag = await tagSelectionPromise;
+  if (selectedTag === '__CANCELLED__') {
+    return;
+  }
+
   if (!media || !media.type) {
     // No media found - send screenshot + link
     await sendScreenshotWithTag(tab, settings, selectedTag);
@@ -529,7 +568,13 @@ async function sendScreenshotWithTag(tab, settings, selectedTag) {
 
 // Send image with pre-selected tag (for sendImageFromPage flow)
 async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag) {
-  // Start fetching image immediately (non-blocking)
+  // SHOW TOAST FIRST - before any async operations
+  if (!selectedTag) {
+    // Show toast instantly, don't wait
+    showToast(tabId, 'pending', 'Sending');
+  }
+
+  // Start fetching image (non-blocking)
   let blobPromise = fetch(imageUrl)
     .then(response => {
       if (!response.ok) throw new Error('Failed to fetch image');
@@ -539,11 +584,6 @@ async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag)
       console.error('Image fetch error, using screenshot fallback:', e);
       return null; // Signal to use screenshot
     });
-
-  // Show toast IMMEDIATELY (runs in parallel with fetch)
-  if (!selectedTag) {
-    await showToast(tabId, 'pending', 'Sending');
-  }
 
   // Wait for image fetch to complete
   let blob = await blobPromise;
