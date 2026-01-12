@@ -291,6 +291,28 @@ async function showTagSelection(tabId, customTags) {
   }
 }
 
+// Hide toast before taking screenshot
+async function hideToastForScreenshot(tabId) {
+  try {
+    await chrome.tabs.sendMessage(tabId, {
+      action: 'hideToastBeforeScreenshot'
+    });
+  } catch (e) {
+    // Ignore errors - toast may not exist
+  }
+}
+
+// Restore toast after taking screenshot
+async function restoreToastAfterScreenshot(tabId) {
+  try {
+    await chrome.tabs.sendMessage(tabId, {
+      action: 'restoreToastAfterScreenshot'
+    });
+  } catch (e) {
+    // Ignore errors - toast may not exist
+  }
+}
+
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
   // Show tag selection if custom tags exist and enabled
@@ -305,7 +327,10 @@ async function sendScreenshot(tab, settings) {
     await showToast(tab.id, 'pending', 'Sending');
   }
 
+  // Hide toast before screenshot to prevent it from appearing in capture
+  await hideToastForScreenshot(tab.id);
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  await restoreToastAfterScreenshot(tab.id);
 
   if (!settings.addScreenshot) {
     // Send just the link without screenshot
@@ -352,7 +377,9 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
   }
 
   if (useScreenshot && tabId) {
+    await hideToastForScreenshot(tabId);
     const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+    await restoreToastAfterScreenshot(tabId);
     blob = await fetch(dataUrl).then(r => r.blob());
   }
 
@@ -481,7 +508,9 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
     await showToast(tab.id, 'pending', 'Sending');
   }
 
+  await hideToastForScreenshot(tab.id);
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  await restoreToastAfterScreenshot(tab.id);
   const blob = await fetch(dataUrl).then(r => r.blob());
 
   const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
@@ -496,7 +525,9 @@ async function sendScreenshotWithTag(tab, settings, selectedTag) {
     await showToast(tab.id, 'pending', 'Sending');
   }
 
+  await hideToastForScreenshot(tab.id);
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  await restoreToastAfterScreenshot(tab.id);
 
   if (!settings.addScreenshot) {
     await sendMessage(tab.url, settings, selectedTag);
@@ -530,7 +561,9 @@ async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag)
   }
 
   if (useScreenshot && tabId) {
+    await hideToastForScreenshot(tabId);
     const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+    await restoreToastAfterScreenshot(tabId);
     blob = await fetch(dataUrl).then(r => r.blob());
   }
 
