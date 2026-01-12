@@ -332,22 +332,18 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
     tabId = tab?.id;
   }
 
-  let blob;
-  let useScreenshot = false;
+  // Start fetching image immediately (non-blocking)
+  let blobPromise = fetch(imageUrl)
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to fetch image');
+      return response.blob();
+    })
+    .catch(e => {
+      console.error('Image fetch error, using screenshot fallback:', e);
+      return null; // Signal to use screenshot
+    });
 
-  try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) throw new Error('Failed to fetch image');
-    blob = await response.blob();
-  } catch (e) {
-    console.error('Image fetch error, using screenshot fallback:', e);
-    useScreenshot = true;
-  }
-
-  // Start capture immediately (non-blocking) if needed
-  const screenshotPromise = (useScreenshot && tabId) ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
-
-  // Show tag selection if custom tags exist and not already selected (runs in parallel)
+  // Show tag selection IMMEDIATELY (runs in parallel with fetch)
   if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
     selectedTag = await showTagSelection(tabId, settings.customTags);
     // Check if cancelled
@@ -358,9 +354,14 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
     await showToast(tabId, 'pending', 'Sending');
   }
 
-  // Wait for capture to complete if it was started
-  if (screenshotPromise) {
-    const screenshotDataUrl = await screenshotPromise;
+  // Wait for image fetch to complete
+  let blob = await blobPromise;
+  let useScreenshot = false;
+
+  // If fetch failed, take screenshot
+  if (!blob && tabId) {
+    useScreenshot = true;
+    const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
     blob = await fetch(screenshotDataUrl).then(r => r.blob());
   }
 
@@ -528,28 +529,30 @@ async function sendScreenshotWithTag(tab, settings, selectedTag) {
 
 // Send image with pre-selected tag (for sendImageFromPage flow)
 async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag) {
-  let blob;
-  let useScreenshot = false;
+  // Start fetching image immediately (non-blocking)
+  let blobPromise = fetch(imageUrl)
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to fetch image');
+      return response.blob();
+    })
+    .catch(e => {
+      console.error('Image fetch error, using screenshot fallback:', e);
+      return null; // Signal to use screenshot
+    });
 
-  try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) throw new Error('Failed to fetch image');
-    blob = await response.blob();
-  } catch (e) {
-    console.error('Image fetch error, using screenshot fallback:', e);
-    useScreenshot = true;
-  }
-
-  // Start capture immediately (non-blocking) if needed
-  const screenshotPromise = (useScreenshot && tabId) ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
-
+  // Show toast IMMEDIATELY (runs in parallel with fetch)
   if (!selectedTag) {
     await showToast(tabId, 'pending', 'Sending');
   }
 
-  // Wait for capture to complete if it was started
-  if (screenshotPromise) {
-    const screenshotDataUrl = await screenshotPromise;
+  // Wait for image fetch to complete
+  let blob = await blobPromise;
+  let useScreenshot = false;
+
+  // If fetch failed, take screenshot
+  if (!blob && tabId) {
+    useScreenshot = true;
+    const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
     blob = await fetch(screenshotDataUrl).then(r => r.blob());
   }
 
