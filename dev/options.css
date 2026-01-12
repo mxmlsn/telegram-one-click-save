@@ -550,7 +550,8 @@ button.secondary:active {
 .settings-hint {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 12px;
+  margin-top: 12px;
+  /* Changed from margin-bottom as it's now below the list */
   letter-spacing: -0.02em;
 }
 
@@ -567,7 +568,7 @@ button.secondary:active {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 12px;
+  padding: 0 12px;
   background: rgba(45, 45, 45, 0.41);
   border-radius: 9999px;
   font-size: 13px;
@@ -576,6 +577,8 @@ button.secondary:active {
     opacity 0.15s ease;
   border: 1px solid transparent;
   position: relative;
+  height: 40px;
+  min-height: 40px;
 }
 
 .custom-tag-item:active {
@@ -634,7 +637,8 @@ button.secondary:active {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
   width: 100%;
-  padding: 6px 4px;
+  padding: 0 4px;
+  /* Removed vertical padding as it's handled by container height & flex */
   border-radius: 4px;
   font-family: 'MartianMono', monospace;
   letter-spacing: -0.02em;
@@ -852,6 +856,15 @@ input:checked+.slider:before {
   transform: translateY(0);
 }
 
+.theme-tags-header {
+  margin-bottom: 12px;
+}
+
+.emoji-global-toggle {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
 .saved-icon {
   width: 16px;
   height: 16px;
@@ -862,8 +875,8 @@ input:checked+.slider:before {
 .theme-tags-columns {
   display: flex;
   gap: 20px;
-  margin-top: 36px;
-  /* Increased by 20px as requested */
+  margin-top: 0;
+  /* Aligned to section top */
   margin-bottom: 20px;
 }
 
@@ -871,7 +884,8 @@ input:checked+.slider:before {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+  /* Align directly to the top */
 }
 
 .theme-tags-right {
@@ -917,7 +931,8 @@ input:checked+.slider:before {
 
 /* Emoji Pack Selector */
 .emoji-pack-selector {
-  margin-top: 8px;
+  margin-top: 0;
+  /* Remove top margin for alignment */
 }
 
 .emoji-pack-label {
@@ -936,8 +951,9 @@ input:checked+.slider:before {
 }
 
 .emoji-tab {
-  padding: 6px 16px;
-  border: none;
+  padding: 0 16px;
+  /* Vertical padding handled by height & flex */
+  border: 1px solid transparent;
   background: rgba(45, 45, 45, 0.41);
   border-radius: 9999px;
   font-size: 13px;
@@ -950,8 +966,9 @@ input:checked+.slider:before {
   /* Left aligned as requested */
   font-family: 'MartianMono', monospace;
   letter-spacing: -0.02em;
-  min-height: 39px;
-  /* Matched to tag height (25px dot + 2*6px padding + 2px border) */
+  height: 40px;
+  /* Exact match to tags */
+  min-height: 40px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
