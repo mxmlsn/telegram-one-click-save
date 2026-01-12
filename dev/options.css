@@ -67,7 +67,7 @@ h1 {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 30px;
-  padding: 20px;
+  padding: 23px;
   box-shadow: none;
 }
 
@@ -910,7 +910,7 @@ input:checked+.slider:before {
 /* Theme Tags Two Columns Layout */
 .theme-tags-main-wrapper {
   display: flex;
-  gap: 20px;
+  gap: 63px;
   align-items: flex-start;
 }
 
