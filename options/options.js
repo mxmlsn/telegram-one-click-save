@@ -172,11 +172,7 @@ document.querySelectorAll('input[name="iconColor"]').forEach(radio => {
   });
 });
 
-document.querySelectorAll('input[name="toastStyle"]').forEach(radio => {
-  radio.addEventListener('change', (e) => {
-    saveSetting('toastStyle', e.target.value);
-  });
-});
+
 
 // Timer duration buttons
 if (timerMinusBtn && timerPlusBtn) {
@@ -229,6 +225,7 @@ document.querySelectorAll('.emoji-tab').forEach(tab => {
 if (popupStyleInput) {
   popupStyleInput.addEventListener('change', (e) => {
     saveSetting('popupStyleMinimalist', e.target.checked);
+    saveSetting('toastStyle', e.target.checked ? 'minimalist' : 'normal');
   });
 }
 
@@ -291,12 +288,6 @@ async function loadSettings() {
     iconRadio.checked = true;
   }
 
-  const toastStyle = settings.toastStyle || 'normal';
-  const toastRadio = document.querySelector(`input[name="toastStyle"][value="${toastStyle}"]`);
-  if (toastRadio) {
-    toastRadio.checked = true;
-  }
-
   // Set emoji pack tab
   const emojiPack = settings.emojiPack || 'circle';
   document.querySelectorAll('.emoji-tab').forEach(tab => {
@@ -309,7 +300,8 @@ async function loadSettings() {
 
   // Set new toggle settings
   if (popupStyleInput) {
-    popupStyleInput.checked = settings.popupStyleMinimalist || false;
+    // Check either the explicit boolean OR the legacy string
+    popupStyleInput.checked = settings.popupStyleMinimalist || (settings.toastStyle === 'minimalist');
   }
   if (themeLightInput) {
     themeLightInput.checked = settings.themeLight || false;

@@ -1,22 +1,20 @@
 // Emoji packs definition
-// Order: red, orange, yellow, green, blue, purple, black, white
+// Order: red, yellow, green, blue, purple, black, white
 const EMOJI_PACKS = {
-  standard: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
-  cute: ['🍄', '🍊', '🐤', '🐸', '💧', '🔮', '🌚', '💭'],
-  random: ['📌', '☢️', '📒', '🔋', '📪', '☮️', '🎥', '📁']
+  circle: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  heart: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  soft: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
 };
 
 // Color ID to index mapping (for emoji pack lookup)
 const COLOR_ID_TO_INDEX = {
   'red': 0,
-  'orange': 1,
-  'yellow': 2,
-  'green': 3,
-  'blue': 4,
-  'purple': 5,
-  'black': 6,
-  'white': 7
+  'yellow': 1,
+  'green': 2,
+  'blue': 3,
+  'purple': 4,
+  'black': 5,
+  'white': 6
 };
 
 // Default settings
@@ -35,26 +33,31 @@ const DEFAULT_SETTINGS = {
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4, // Timer duration in seconds (3-9)
-  emojiPack: 'standard',
-  // Fixed 8 tags default structure
+  emojiPack: 'circle',
+  customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  // Fixed 7 tags default structure
   customTags: [
-    { name: '', color: '#377CDE', id: 'blue' },
-    { name: '', color: '#3D3D3B', id: 'black' },
-    { name: '', color: '#4ED345', id: 'green' },
-    { name: '', color: '#BB4FFF', id: 'purple' },
-    { name: '', color: '#DEDEDE', id: 'white' },
     { name: '', color: '#E64541', id: 'red' },
-    { name: '', color: '#EC9738', id: 'orange' },
-    { name: '', color: '#FFDE42', id: 'yellow' }
+    { name: '', color: '#FFDE42', id: 'yellow' },
+    { name: '', color: '#4ED345', id: 'green' },
+    { name: '', color: '#377CDE', id: 'blue' },
+    { name: '', color: '#BB4FFF', id: 'purple' },
+    { name: '', color: '#3D3D3B', id: 'black' },
+    { name: '', color: '#DEDEDE', id: 'white' }
   ]
 };
 
 // Get emoji for a tag based on selected pack
-function getEmojiForTag(tag, emojiPack = 'standard') {
+function getEmojiForTag(tag, emojiPack = 'circle', customEmoji = []) {
   if (!tag || !tag.id) return '';
   const index = COLOR_ID_TO_INDEX[tag.id];
   if (index === undefined) return '';
-  const pack = EMOJI_PACKS[emojiPack] || EMOJI_PACKS.standard;
+
+  if (emojiPack === 'custom' && customEmoji && customEmoji.length > index) {
+    return customEmoji[index] || '';
+  }
+
+  const pack = EMOJI_PACKS[emojiPack] || EMOJI_PACKS.circle;
   return pack[index] || '';
 }
 
@@ -269,7 +272,7 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
 
     // Prepend emoji if enabled
     if (settings.sendWithColor) {
-      const emoji = getEmojiForTag(selectedTag, settings.emojiPack);
+      const emoji = getEmojiForTag(selectedTag, settings.emojiPack, settings.customEmoji);
       if (emoji) {
         tagText = `${emoji} ${tagText}`;
       }
@@ -332,7 +335,7 @@ async function showTagSelection(tabId, customTags) {
   chrome.tabs.sendMessage(tabId, {
     action: 'preShowToast',
     requestId: requestId
-  }).catch(() => {});
+  }).catch(() => { });
 
   return tagPromise;
 }
