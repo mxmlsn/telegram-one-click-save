@@ -58,8 +58,11 @@
   flex-direction: row !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 12px 20px !important;
+  padding: 12px 10px !important;
   justify-content: center !important;
+  width: 168px !important;
+  min-width: 168px !important;
+  max-width: 168px !important;
 }
 
 .tg-saver-toast.tg-saver-visible {
@@ -77,6 +80,7 @@
   font-weight: 400 !important;
   margin: 0 !important;
   padding: 0 !important;
+  flex-shrink: 0 !important;
 }
 
 .tg-saver-text {
@@ -90,6 +94,7 @@
   padding: 0 !important;
   text-transform: none !important;
   letter-spacing: normal !important;
+  flex-shrink: 0 !important;
 }
 
 /* Toast with tags */
@@ -98,6 +103,9 @@
   background: rgba(51, 51, 51, 0.9) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
+  width: 168px !important;
+  min-width: 168px !important;
+  max-width: 168px !important;
 }
 
 .tg-saver-toast-content {

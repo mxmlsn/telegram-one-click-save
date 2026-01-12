@@ -302,7 +302,7 @@ async function sendScreenshot(tab, settings) {
       return;
     }
   } else {
-    await showToast(tab.id, 'pending', 'Sending...');
+    await showToast(tab.id, 'pending', 'Sending');
   }
 
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
@@ -310,7 +310,7 @@ async function sendScreenshot(tab, settings) {
   if (!settings.addScreenshot) {
     // Send just the link without screenshot
     await sendMessage(tab.url, settings, selectedTag);
-    await showToast(tab.id, 'success', 'Sent!');
+    await showToast(tab.id, 'success', 'Success');
     return;
   }
 
@@ -318,7 +318,7 @@ async function sendScreenshot(tab, settings) {
   const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
   await sendPhoto(blob, caption, settings);
-  await showToast(tab.id, 'success', 'Sent!');
+  await showToast(tab.id, 'success', 'Success');
 }
 
 // Send image from context menu
@@ -336,7 +336,7 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
       return;
     }
   } else if (tabId && !selectedTag) {
-    await showToast(tabId, 'pending', 'Sending...');
+    await showToast(tabId, 'pending', 'Sending');
   }
 
   let blob;
@@ -364,7 +364,7 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
     await sendDocument(blob, caption, settings, imageUrl);
   }
 
-  if (tabId) await showToast(tabId, 'success', 'Sent!');
+  if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
 // Send image or video found under cursor (for sites like Instagram)
@@ -478,7 +478,7 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
       return;
     }
   } else if (!selectedTag) {
-    await showToast(tab.id, 'pending', 'Sending...');
+    await showToast(tab.id, 'pending', 'Sending');
   }
 
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
@@ -487,20 +487,20 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
   const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
 
   await sendPhoto(blob, caption, settings);
-  await showToast(tab.id, 'success', 'Sent!');
+  await showToast(tab.id, 'success', 'Success');
 }
 
 // Send screenshot with pre-selected tag (for sendImageFromPage flow)
 async function sendScreenshotWithTag(tab, settings, selectedTag) {
   if (!selectedTag) {
-    await showToast(tab.id, 'pending', 'Sending...');
+    await showToast(tab.id, 'pending', 'Sending');
   }
 
   const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
 
   if (!settings.addScreenshot) {
     await sendMessage(tab.url, settings, selectedTag);
-    await showToast(tab.id, 'success', 'Sent!');
+    await showToast(tab.id, 'success', 'Success');
     return;
   }
 
@@ -508,13 +508,13 @@ async function sendScreenshotWithTag(tab, settings, selectedTag) {
   const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
   await sendPhoto(blob, caption, settings);
-  await showToast(tab.id, 'success', 'Sent!');
+  await showToast(tab.id, 'success', 'Success');
 }
 
 // Send image with pre-selected tag (for sendImageFromPage flow)
 async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag) {
   if (!selectedTag) {
-    await showToast(tabId, 'pending', 'Sending...');
+    await showToast(tabId, 'pending', 'Sending');
   }
 
   let blob;
@@ -542,7 +542,7 @@ async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag)
     await sendDocument(blob, caption, settings, imageUrl);
   }
 
-  if (tabId) await showToast(tabId, 'success', 'Sent!');
+  if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
 // Send quote from context menu
@@ -562,13 +562,13 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
       return;
     }
   } else if (tabId) {
-    await showToast(tabId, 'pending', 'Sending...');
+    await showToast(tabId, 'pending', 'Sending');
   }
 
   const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
   await sendTextMessage(caption, settings);
 
-  if (tabId) await showToast(tabId, 'success', 'Sent!');
+  if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
 // Send just a message (link without screenshot)

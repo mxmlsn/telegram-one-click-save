@@ -41,16 +41,31 @@ function showSimpleToast(state, message) {
     document.body.appendChild(toast);
 
     requestAnimationFrame(() => toast.classList.add('tg-saver-visible'));
-  } else if (state === 'success' && toast) {
+  } else if (state === 'success') {
     killTimer();
+
+    // Create new toast if it doesn't exist
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'tg-saver-toast';
+      toast.className = 'tg-saver-toast';
+      document.body.appendChild(toast);
+    }
+
     toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
     toast.classList.add('tg-saver-success');
     toast.classList.remove('tg-saver-with-tags');
 
-    setTimeout(() => {
-      toast.classList.remove('tg-saver-visible');
-      setTimeout(() => toast.remove(), 200);
-    }, 1200);
+    // Ensure toast is visible
+    requestAnimationFrame(() => {
+      toast.classList.add('tg-saver-visible');
+
+      // Keep success message visible for exactly 1500ms
+      setTimeout(() => {
+        toast.classList.remove('tg-saver-visible');
+        setTimeout(() => toast.remove(), 200);
+      }, 1500);
+    });
   }
 }
 
@@ -148,15 +163,10 @@ function showTagSelectionToast(customTags, requestId) {
         killTimer();
 
         // Show gray "sending" state immediately
-        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending...</span>`;
+        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
         toast.classList.remove('tg-saver-with-tags');
 
-        // Fade out smoothly
-        setTimeout(() => {
-          toast.classList.remove('tg-saver-visible');
-          setTimeout(() => toast.remove(), 200);
-        }, 300);
-
+        // Don't fade out - let it transform into success toast
         doSend(requestId, selectedTag);
       });
     });
@@ -285,16 +295,11 @@ function startCountdown(requestId) {
       // Show gray "sending" state immediately
       const toast = document.getElementById('tg-saver-toast');
       if (toast) {
-        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending...</span>`;
+        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
         toast.classList.remove('tg-saver-with-tags');
-
-        // Fade out smoothly
-        setTimeout(() => {
-          toast.classList.remove('tg-saver-visible');
-          setTimeout(() => toast.remove(), 200);
-        }, 300);
       }
 
+      // Don't fade out - let it transform into success toast
       doSend(requestId, null);
     }
   }, TICK);
