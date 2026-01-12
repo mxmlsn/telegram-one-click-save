@@ -94,7 +94,7 @@ h1 {
 .column-second {
   width: 514px;
   flex-shrink: 0;
-  gap: 5px;
+  gap: 4px;
 }
 
 .column-third {
@@ -141,20 +141,28 @@ h3 {
 /* Credentials section */
 .credentials-section .field {
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.credentials-section .field:nth-child(2) {
+  margin-bottom: 46px;
 }
 
 .credentials-section .field label {
-  display: block;
   font-weight: 400;
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
-  margin-bottom: 6px;
   letter-spacing: -0.02em;
+  width: 90px;
+  flex-shrink: 0;
+  text-align: left;
 }
 
 .credentials-section input[type="text"],
 .credentials-section input[type="password"] {
-  width: 100%;
+  flex: 1;
   padding: 12px 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 9999px;
@@ -179,7 +187,7 @@ h3 {
 
 /* How to section - New collapsible design */
 .howto-section {
-  height: 314px;
+  height: 296px;
   transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   cursor: pointer;
@@ -198,7 +206,7 @@ h3 {
 .howto-image-area {
   width: 218px;
   flex-shrink: 0;
-  height: 268px;
+  height: 252px;
 }
 
 .howto-image {
