@@ -583,7 +583,7 @@ button.secondary:active {
   transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1),
     background 0.2s ease,
     opacity 0.15s ease;
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   height: 40px;
   min-height: 40px;
@@ -880,6 +880,7 @@ input:checked+.slider:before {
 
 .theme-tags-header {
   margin-bottom: 12px;
+  padding-bottom: 20px;
 }
 
 .emoji-global-toggle {
@@ -933,6 +934,9 @@ input:checked+.slider:before {
 .emoji-pack-selector {
   margin-top: 0;
   /* Remove top margin for alignment */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .emoji-pack-label {
@@ -948,6 +952,8 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin: 0;
+  padding-bottom: 8px;
 }
 
 .emoji-tab {
@@ -1056,9 +1062,9 @@ input:checked+.slider:before {
 
 /* Emoji Preview */
 .emoji-preview {
-  margin-top: 8px;
+  margin: 0;
   padding: 0 16px;
-  background: rgba(45, 45, 45, 0.41);
+  background: #353535;
   border-radius: 9999px;
   height: 40px;
   min-height: 40px;
@@ -1068,7 +1074,7 @@ input:checked+.slider:before {
   font-size: 16px;
   gap: 8px;
   width: 219px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: none;
   transition: all 0.2s;
 }
 
