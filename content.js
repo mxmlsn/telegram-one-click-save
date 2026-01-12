@@ -64,12 +64,13 @@ function showTagSelectionToast(customTags, requestId) {
   ToastState.isCancelled = false;
   ToastState.isPaused = false;
 
-  chrome.storage.local.get({ timerDuration: 4 }, (result) => {
+  chrome.storage.local.get({ timerDuration: 4, toastStyle: 'normal' }, (result) => {
     ToastState.timeLeft = result.timerDuration * 1000;
+    const isMinimalist = result.toastStyle === 'minimalist';
 
     toast = document.createElement('div');
     toast.id = 'tg-saver-toast';
-    toast.className = 'tg-saver-toast tg-saver-with-tags';
+    toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '');
     toast.dataset.requestId = requestId;
 
     // Build tags HTML
@@ -87,35 +88,49 @@ function showTagSelectionToast(customTags, requestId) {
       `).join('');
     }
 
-    toast.innerHTML = `
-      <div class="tg-saver-toast-content">
-        <div class="tg-saver-toast-header">
-          <span class="tg-saver-toast-title">Tags?</span>
-          <button class="tg-saver-cancel-btn" title="Cancel send">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+    if (isMinimalist) {
+      toast.innerHTML = `
+        <div class="tg-saver-toast-content">
+          <div class="tg-saver-tags-container">
+            ${tagsHtml}
+          </div>
         </div>
-        <div class="tg-saver-tags-container">
-          ${tagsHtml}
-          <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
-            <div class="tg-saver-timer-loader"></div>
-            <span class="tg-saver-skip-btn-text">no tag</span>
-          </button>
+        <div class="tg-saver-minimalist-loader"></div>
+      `;
+    } else {
+      toast.innerHTML = `
+        <div class="tg-saver-toast-content">
+          <div class="tg-saver-toast-header">
+            <span class="tg-saver-toast-title">Tags?</span>
+            <button class="tg-saver-cancel-btn" title="Cancel send">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="tg-saver-tags-container">
+            ${tagsHtml}
+            <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
+              <div class="tg-saver-timer-loader"></div>
+              <span class="tg-saver-skip-btn-text">no tag</span>
+            </button>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
     document.body.appendChild(toast);
 
-    // Cancel button
-    toast.querySelector('.tg-saver-cancel-btn').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      cancelSend();
-    });
+    // Cancel button (only in normal mode)
+    const cancelBtn = toast.querySelector('.tg-saver-cancel-btn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        cancelSend();
+      });
+    }
 
     // Tag buttons - MANUAL CLICK - always sends
     toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
@@ -144,19 +159,25 @@ function showTagSelectionToast(customTags, requestId) {
     // HOVER - set pause flag
     toast.addEventListener('mouseenter', () => {
       ToastState.isPaused = true;
-      const loader = toast.querySelector('.tg-saver-timer-loader');
+      const loader = isMinimalist
+        ? toast.querySelector('.tg-saver-minimalist-loader')
+        : toast.querySelector('.tg-saver-timer-loader');
       if (loader) loader.style.animationPlayState = 'paused';
     });
 
     toast.addEventListener('mouseleave', () => {
       ToastState.isPaused = false;
-      const loader = toast.querySelector('.tg-saver-timer-loader');
+      const loader = isMinimalist
+        ? toast.querySelector('.tg-saver-minimalist-loader')
+        : toast.querySelector('.tg-saver-timer-loader');
       if (loader) loader.style.animationPlayState = 'running';
     });
 
     requestAnimationFrame(() => {
       toast.classList.add('tg-saver-visible');
-      const loader = toast.querySelector('.tg-saver-timer-loader');
+      const loader = isMinimalist
+        ? toast.querySelector('.tg-saver-minimalist-loader')
+        : toast.querySelector('.tg-saver-timer-loader');
       if (loader) {
         loader.style.animation = `tg-saver-timer-shrink ${ToastState.timeLeft}ms linear forwards`;
       }

@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   sendWithColor: true,
   timerDuration: 4,
   emojiPack: 'standard',
+  toastStyle: 'normal',
   isConnected: false,
   // Fixed 8 tags
   customTags: [
@@ -166,6 +167,12 @@ document.querySelectorAll('input[name="iconColor"]').forEach(radio => {
   });
 });
 
+document.querySelectorAll('input[name="toastStyle"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    saveSetting('toastStyle', e.target.value);
+  });
+});
+
 // Timer duration slider
 timerDurationInput.addEventListener('input', (e) => {
   const value = parseInt(e.target.value);
@@ -226,6 +233,9 @@ async function loadSettings() {
 
   const iconColor = settings.iconColor || 'blue';
   document.querySelector(`input[name="iconColor"][value="${iconColor}"]`).checked = true;
+
+  const toastStyle = settings.toastStyle || 'normal';
+  document.querySelector(`input[name="toastStyle"][value="${toastStyle}"]`).checked = true;
 
   // Set emoji pack tab
   const emojiPack = settings.emojiPack || 'standard';
