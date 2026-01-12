@@ -329,19 +329,33 @@
                 </label>
               </div>
 
-              <div class="field timer-field">
-                <label>
-                  Timer Duration: <span id="timerValue">4</span>s <span class="optimal-label">(optimal)</span>
-                </label>
-                <input type="range" id="timerDuration" min="2" max="8" value="4" step="1">
-                <div class="timer-labels">
-                  <span>2s</span>
-                  <span>8s</span>
+              <div class="field pill-toggle-field timer-field">
+                <span class="pill-toggle-label">Timer Duration</span>
+                <div class="timer-control-wrapper">
+                  <div class="timer-controls">
+                    <button id="timerMinus" class="timer-btn">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                        stroke-linecap="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </button>
+                    <div class="timer-display">
+                      <span id="timerValue">4</span>s
+                    </div>
+                    <button id="timerPlus" class="timer-btn">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                        stroke-linecap="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                      </svg>
+                    </button>
+                  </div>
+                  <span id="optimalLabel" class="optimal-label">(optimal)</span>
                 </div>
               </div>
             </div>
 
-            <button id="resetBtn" class="secondary">Reset to default</button>
+
           </div>
         </section>
       </div>

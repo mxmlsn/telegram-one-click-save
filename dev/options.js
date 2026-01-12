@@ -131,16 +131,16 @@ const tagLinkInput = document.getElementById('tagLink');
 const tagQuoteInput = document.getElementById('tagQuote');
 const enableQuickTagsInput = document.getElementById('enableQuickTags');
 const saveBtn = document.getElementById('saveBtn'); // Now only for "Save & Connect"
-const resetBtn = document.getElementById('resetBtn');
 const statusEl = document.getElementById('status');
 const savedIndicator = document.getElementById('savedIndicator');
 
 // Custom tags elements
 const customTagsList = document.getElementById('customTagsList');
 const sendWithColorInput = document.getElementById('sendWithColor');
-const timerDurationInput = document.getElementById('timerDuration');
+const timerMinusBtn = document.getElementById('timerMinus');
+const timerPlusBtn = document.getElementById('timerPlus');
 const timerValueDisplay = document.getElementById('timerValue');
-const optimalLabel = document.querySelector('.optimal-label');
+const optimalLabel = document.getElementById('optimalLabel');
 
 
 // Custom tags state
@@ -152,8 +152,7 @@ document.addEventListener('DOMContentLoaded', loadSettings);
 // Save & Connect button (only for credentials)
 saveBtn.addEventListener('click', saveCredentials);
 
-// Reset settings on button click
-resetBtn.addEventListener('click', resetSettings);
+
 
 
 // Quick tags settings container
@@ -260,23 +259,35 @@ document.querySelectorAll('input[name="toastStyle"]').forEach(radio => {
   });
 });
 
-// Timer duration slider
-timerDurationInput.addEventListener('input', (e) => {
-  const value = parseInt(e.target.value);
+// Timer duration buttons
+if (timerMinusBtn && timerPlusBtn) {
+  timerMinusBtn.addEventListener('click', () => {
+    let current = parseInt(timerValueDisplay.textContent);
+    if (current > 2) {
+      updateTimerValue(current - 1);
+    }
+  });
+
+  timerPlusBtn.addEventListener('click', () => {
+    let current = parseInt(timerValueDisplay.textContent);
+    if (current < 8) {
+      updateTimerValue(current + 1);
+    }
+  });
+}
+
+function updateTimerValue(value) {
   timerValueDisplay.textContent = value;
 
-  // Show "(optimal)" only for value 4
-  if (value === 4) {
-    optimalLabel.style.display = 'inline';
-  } else {
-    optimalLabel.style.display = 'none';
-  }
-});
+  if (timerMinusBtn) timerMinusBtn.disabled = value <= 2;
+  if (timerPlusBtn) timerPlusBtn.disabled = value >= 8;
 
-timerDurationInput.addEventListener('change', (e) => {
-  const value = parseInt(e.target.value);
+  if (optimalLabel) {
+    optimalLabel.style.display = value === 4 ? 'inline' : 'none';
+  }
+
   saveSetting('timerDuration', value);
-});
+}
 
 // Emoji pack tabs
 document.querySelectorAll('.emoji-tab').forEach(tab => {
@@ -305,23 +316,7 @@ if (themeLightInput) {
   });
 }
 
-// Timer duration slider
-timerDurationInput.addEventListener('input', (e) => {
-  const value = parseInt(e.target.value);
-  timerValueDisplay.textContent = value;
 
-  // Show "(optimal)" only for value 4
-  if (value === 4) {
-    optimalLabel.style.display = 'inline';
-  } else {
-    optimalLabel.style.display = 'none';
-  }
-});
-
-timerDurationInput.addEventListener('change', (e) => {
-  const value = parseInt(e.target.value);
-  saveSetting('timerDuration', value);
-});
 
 async function loadSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
@@ -341,9 +336,12 @@ async function loadSettings() {
 
   // Set timer duration
   const timerDuration = settings.timerDuration || 4;
-  timerDurationInput.value = timerDuration;
   timerValueDisplay.textContent = timerDuration;
-  optimalLabel.style.display = timerDuration === 4 ? 'inline' : 'none';
+  if (optimalLabel) {
+    optimalLabel.style.display = timerDuration === 4 ? 'inline' : 'none';
+  }
+  if (timerMinusBtn) timerMinusBtn.disabled = timerDuration <= 2;
+  if (timerPlusBtn) timerPlusBtn.disabled = timerDuration >= 8;
 
   // Set emoji pack selector visibility
   toggleEmojiPackSettings(settings.sendWithColor !== false);
