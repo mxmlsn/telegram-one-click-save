@@ -278,10 +278,13 @@ async function showTagSelection(tabId, customTags) {
       }, 30000);
     });
 
-    await chrome.tabs.sendMessage(tabId, {
+    // Send message WITHOUT await - fire and forget for speed
+    chrome.tabs.sendMessage(tabId, {
       action: 'showTagSelection',
       customTags: customTags,
       requestId: requestId
+    }).catch(e => {
+      console.error('Failed to send tag selection message:', e);
     });
 
     return await tagPromise;
