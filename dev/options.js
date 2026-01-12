@@ -18,7 +18,7 @@ const mockStorage = {
     enableQuickTags: true,
     sendWithColor: true,
     timerDuration: 4,
-    emojiPack: 'standard',
+    emojiPack: 'circle',
     customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
     toastStyle: 'normal',
     popupStyleMinimalist: false,
@@ -80,9 +80,9 @@ window.chrome = {
 
 // Emoji packs definition (red, yellow, green, blue, purple, black, white) - 7 tags only
 const EMOJI_PACKS = {
-  standard: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  hearts: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
-  cute: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
+  circle: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  heart: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  soft: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
 };
 
 const DEFAULT_SETTINGS = {
@@ -101,7 +101,7 @@ const DEFAULT_SETTINGS = {
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4,
-  emojiPack: 'standard',
+  emojiPack: 'circle',
   toastStyle: 'normal',
   isConnected: false,
   customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
@@ -357,7 +357,7 @@ async function loadSettings() {
   }
 
   // Update emoji preview
-  updateEmojiPreview(settings.emojiPack || 'standard');
+  updateEmojiPreview(settings.emojiPack || 'circle');
 
   // Set image compression toggle (checked = photo/true, unchecked = file/false)
   imageCompressionInput.checked = settings.imageCompression;
@@ -377,7 +377,7 @@ async function loadSettings() {
   }
 
   // Set emoji pack tab
-  const emojiPack = settings.emojiPack || 'standard';
+  const emojiPack = settings.emojiPack || 'circle';
   document.querySelectorAll('.emoji-tab').forEach(tab => {
     if (tab.dataset.pack === emojiPack) {
       tab.classList.add('active');
@@ -903,7 +903,7 @@ async function updateEmojiPreview(packName) {
   } else {
     // Show read-only preview
     emojiPreview.classList.remove('editable');
-    const emojis = EMOJI_PACKS[packName] || EMOJI_PACKS.standard;
+    const emojis = EMOJI_PACKS[packName] || EMOJI_PACKS.circle;
     emojiPreview.textContent = emojis.join(' ');
   }
 }

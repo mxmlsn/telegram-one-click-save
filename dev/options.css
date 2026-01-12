@@ -315,6 +315,10 @@ h3 {
   color: rgba(255, 255, 255, 0.8);
 }
 
+.section-tags > .checkbox-field {
+  margin-bottom: 20px;
+}
+
 .radio-group {
   display: flex;
   flex-direction: column;
