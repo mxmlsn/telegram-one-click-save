@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Instant Saver — Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+
+<body>
+  <div class="container">
+    <h1>Telegram Instant Saver</h1>
+    <div id="savedIndicator" class="saved-indicator">
+      <svg class="saved-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      Saved
+    </div>
+
+    <div class="two-columns">
+      <!-- Left column: Setup -->
+      <div class="column column-left">
+        <!-- Credentials block -->
+        <section class="section credentials-section">
+          <div class="field">
+            <label for="botToken">Bot Token</label>
+            <input type="password" id="botToken" placeholder="123456789:ABC...">
+          </div>
+          <div class="field">
+            <label for="chatId">Chat ID</label>
+            <input type="text" id="chatId" placeholder="-1001234567890">
+          </div>
+          <div class="actions">
+            <button id="saveBtn" class="primary">Save & Connect</button>
+            <span id="status"></span>
+          </div>
+        </section>
+
+        <!-- How to block with carousel -->
+        <section class="section howto-section">
+          <h2>How to</h2>
+
+          <div class="carousel">
+            <button class="carousel-arrow carousel-prev" id="carouselPrev">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+
+            <div class="carousel-content">
+              <div class="carousel-slides" id="carouselSlides">
+                <div class="carousel-slide" data-step="1">
+                  <div class="slide-image" data-placeholder="Step 1"></div>
+                  <div class="slide-text">Open <a href="https://t.me/BotFather" target="_blank">@BotFather</a> and send
+                    <code>/newbot</code>
+                  </div>
+                </div>
+                <div class="carousel-slide" data-step="2">
+                  <div class="slide-image" data-placeholder="Step 2"></div>
+                  <div class="slide-text">Copy the bot token that BotFather gives you</div>
+                </div>
+                <div class="carousel-slide" data-step="3">
+                  <div class="slide-image" data-placeholder="Step 3"></div>
+                  <div class="slide-text">Open <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a> to
+                    get your Chat ID</div>
+                </div>
+                <div class="carousel-slide" data-step="4">
+                  <div class="slide-image" data-placeholder="Step 4"></div>
+                  <div class="slide-text">Find your bot in Telegram and press <strong>Start</strong></div>
+                </div>
+              </div>
+            </div>
+
+            <button class="carousel-arrow carousel-next" id="carouselNext">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+
+          <div class="carousel-dots" id="carouselDots">
+            <button class="carousel-dot active" data-step="1">1</button>
+            <button class="carousel-dot" data-step="2">2</button>
+            <button class="carousel-dot" data-step="3">3</button>
+            <button class="carousel-dot" data-step="4">4</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Right column: Settings -->
+      <div class="column column-right">
+        <!-- Section 1: Behavior + Image Compression -->
+        <section class="section section-behavior">
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="addScreenshot" checked>
+                <span class="slider"></span>
+              </label>
+              Add page screenshot to link
+            </label>
+          </div>
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="showSelectionIcon" checked>
+                <span class="slider"></span>
+              </label>
+              Show icon near selected text
+            </label>
+          </div>
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="quoteMonospace" checked>
+                <span class="slider"></span>
+              </label>
+              Monospace font for quotes
+            </label>
+          </div>
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="showLinkPreview" checked>
+                <span class="slider"></span>
+              </label>
+              Show link preview in messages
+            </label>
+          </div>
+
+          <div class="field image-sending-field">
+            <span class="image-sending-label">Send image as</span>
+            <label class="image-toggle">
+              <input type="checkbox" id="imageCompression" checked>
+              <span class="image-slider">
+                <span class="option-photo">photo</span>
+                <span class="option-file">file</span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Section 2: Icon -->
+        <section class="section section-icon">
+          <div class="icon-section-wrapper">
+            <h2>ICON</h2>
+            <div class="field icon-selector">
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="circle1" checked>
+                <img src="../icons/circle1.svg" alt="Circle 1">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="circle2">
+                <img src="../icons/circle2.svg" alt="Circle 2">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="circle3">
+                <img src="../icons/circle3.svg" alt="Circle 3">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="clip1">
+                <img src="../icons/clip1.svg" alt="Clip 1">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="clip2">
+                <img src="../icons/clip2.svg" alt="Clip 2">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="clip3">
+                <img src="../icons/clip3.svg" alt="Clip 3">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="clip4">
+                <img src="../icons/clip4.svg" alt="Clip 4">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="plus1">
+                <img src="../icons/plus1.svg" alt="Plus 1">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="plus2">
+                <img src="../icons/plus2.svg" alt="Plus 2">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="plus3">
+                <img src="../icons/plus3.svg" alt="Plus 3">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="plus4">
+                <img src="../icons/plus4.svg" alt="Plus 4">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="tg1">
+                <img src="../icons/tg1.svg" alt="TG 1">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="tg3">
+                <img src="../icons/tg3.svg" alt="TG 3">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="tgc1">
+                <img src="../icons/tgc1.svg" alt="TG Circle 1">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="tgc3">
+                <img src="../icons/tgc3.svg" alt="TG Circle 3">
+              </label>
+              <label class="icon-option">
+                <input type="radio" name="iconColor" value="save">
+                <img src="../icons/save.png" alt="Save">
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3: Content Type Tags -->
+        <section class="section section-tags">
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="useHashtags" checked>
+                <span class="slider"></span>
+              </label>
+              CONTENT TYPE TAGS
+            </label>
+          </div>
+          <div id="hashtagsSettings">
+            <div class="field">
+              <div class="tags-grid">
+                <div class="tags-column">
+                  <div class="tag-field">
+                    <img src="../icons/image.svg" class="tag-icon" alt="Image">
+                    <div class="hashtag-input">
+                      <span class="prefix">#</span>
+                      <input type="text" id="tagImage" value="image" maxlength="11">
+                    </div>
+                  </div>
+                  <div class="tag-field">
+                    <img src="../icons/link.svg" class="tag-icon" alt="Link">
+                    <div class="hashtag-input">
+                      <span class="prefix">#</span>
+                      <input type="text" id="tagLink" value="link" maxlength="11">
+                    </div>
+                  </div>
+                </div>
+                <div class="tags-column">
+                  <div class="tag-field">
+                    <img src="../icons/quote.svg" class="tag-icon" alt="Quote">
+                    <div class="hashtag-input">
+                      <span class="prefix">#</span>
+                      <input type="text" id="tagQuote" value="quote" maxlength="11">
+                    </div>
+                  </div>
+                  <p class="tag-hint">Start with letter,<br>no spaces, 11 symbols max</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4: Theme Tags -->
+        <section class="section section-quicktags">
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="enableQuickTags" checked>
+                <span class="slider"></span>
+              </label>
+              THEME TAGS
+            </label>
+          </div>
+          <div id="quickTagsSettings">
+            <!-- Two columns layout -->
+            <div class="theme-tags-columns">
+              <!-- Left column: Emoji settings -->
+              <div class="theme-tags-left">
+                <div class="field checkbox-field">
+                  <label>
+                    <label class="switch">
+                      <input type="checkbox" id="sendWithColor" checked>
+                      <span class="slider"></span>
+                    </label>
+                    Send with emoji
+                  </label>
+                </div>
+
+                <div id="emojiPackSettings" class="emoji-pack-selector">
+                  <div class="emoji-pack-tabs">
+                    <button class="emoji-tab" data-pack="standard">🔴 Standard</button>
+                    <button class="emoji-tab" data-pack="hearts">❤️ Hearts</button>
+                    <button class="emoji-tab" data-pack="cute">🍄 Cute</button>
+                    <button class="emoji-tab" data-pack="random">📌 Random</button>
+                    <button class="emoji-tab" data-pack="custom">✏️ Custom</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right column: Tags list -->
+              <div class="theme-tags-right">
+                <p class="settings-hint">Drag to reorder. Empty tags are hidden.</p>
+                <div id="customTagsList" class="custom-tags-list"></div>
+              </div>
+            </div>
+
+            <!-- Additional settings below columns -->
+            <div class="theme-tags-additional">
+              <div class="field toggle-field">
+                <label class="switch">
+                  <input type="checkbox" id="popupStyleMinimalist">
+                  <span class="slider"></span>
+                </label>
+                <span class="toggle-label-wrapper">
+                  <span class="toggle-off">Pop-up: Standard</span>
+                  <span class="toggle-on">Pop-up: Minimalist</span>
+                </span>
+              </div>
+
+              <div class="field toggle-field">
+                <label class="switch">
+                  <input type="checkbox" id="themeLight">
+                  <span class="slider"></span>
+                </label>
+                <span class="toggle-label-wrapper">
+                  <span class="toggle-off">Theme: Dark</span>
+                  <span class="toggle-on">Theme: Light</span>
+                </span>
+              </div>
+
+              <div class="field timer-field">
+                <label>
+                  Timer Duration: <span id="timerValue">4</span>s <span class="optimal-label">(optimal)</span>
+                </label>
+                <input type="range" id="timerDuration" min="2" max="8" value="4" step="1">
+                <div class="timer-labels">
+                  <span>2s</span>
+                  <span>8s</span>
+                </div>
+              </div>
+            </div>
+
+            <button id="resetBtn" class="secondary">Reset to default</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+
+</html>
