@@ -193,6 +193,11 @@ autoSaveInputs.forEach(item => {
         toggleQuickTagsSettings(item.el.checked);
       }
 
+      // Toggle emoji pack selector visibility
+      if (item.key === 'sendWithColor') {
+        toggleEmojiPackSettings(item.el.checked);
+      }
+
       // Toggle hashtags settings visibility
       if (item.key === 'useHashtags') {
         toggleHashtagsSettings(item.el.checked);
@@ -339,6 +344,9 @@ async function loadSettings() {
   timerDurationInput.value = timerDuration;
   timerValueDisplay.textContent = timerDuration;
   optimalLabel.style.display = timerDuration === 4 ? 'inline' : 'none';
+
+  // Set emoji pack selector visibility
+  toggleEmojiPackSettings(settings.sendWithColor !== false);
 
   // Set image compression toggle (checked = photo/true, unchecked = file/false)
   imageCompressionInput.checked = settings.imageCompression;
@@ -798,6 +806,13 @@ async function saveCustomTagsOnly() {
 function toggleQuickTagsSettings(enabled) {
   if (quickTagsSettings) {
     quickTagsSettings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+function toggleEmojiPackSettings(enabled) {
+  const emojiPackSettings = document.getElementById('emojiPackSettings');
+  if (emojiPackSettings) {
+    emojiPackSettings.style.display = enabled ? 'block' : 'none';
   }
 }
 
