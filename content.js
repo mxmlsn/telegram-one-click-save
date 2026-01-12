@@ -98,215 +98,222 @@ function showTagSelectionToast(customTags, requestId) {
   ToastState.isCancelled = false;
   ToastState.isPaused = false;
 
+  // Use cached settings or defaults (to avoid async delay)
+  const timerDuration = window.__TG_Settings?.timerDuration || 4;
+  const toastStyle = window.__TG_Settings?.toastStyle || 'normal';
+
+  ToastState.timeLeft = timerDuration * 1000;
+  const isMinimalist = toastStyle === 'minimalist';
+
+  // Update cache async (for next time)
   chrome.storage.local.get({ timerDuration: 4, toastStyle: 'normal' }, (result) => {
-    ToastState.timeLeft = result.timerDuration * 1000;
-    const isMinimalist = result.toastStyle === 'minimalist';
+    window.__TG_Settings = result;
+  });
 
-    toast = document.createElement('div');
-    toast.id = 'tg-saver-toast';
-    toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '');
-    toast.dataset.requestId = requestId;
+  toast = document.createElement('div');
+  toast.id = 'tg-saver-toast';
+  toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '');
+  toast.dataset.requestId = requestId;
 
-    // Build tags HTML
-    let tagsHtml = '';
-    if (customTags) {
-      const nonEmptyTags = customTags
-        .map((tag, index) => ({ ...tag, index }))
-        .filter(tag => tag.name && tag.name.trim().length > 0);
+  // Build tags HTML
+  let tagsHtml = '';
+  if (customTags) {
+    const nonEmptyTags = customTags
+      .map((tag, index) => ({ ...tag, index }))
+      .filter(tag => tag.name && tag.name.trim().length > 0);
 
-      tagsHtml = nonEmptyTags.map(tag => `
-        <button class="tg-saver-tag-btn" data-index="${tag.index}" data-tag-name="${tag.name}">
-          <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
-          <span class="tg-saver-tag-name">${tag.name}</span>
-        </button>
-      `).join('');
-    }
+    tagsHtml = nonEmptyTags.map(tag => `
+      <button class="tg-saver-tag-btn" data-index="${tag.index}" data-tag-name="${tag.name}">
+        <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
+        <span class="tg-saver-tag-name">${tag.name}</span>
+      </button>
+    `).join('');
+  }
 
-    if (isMinimalist) {
-      toast.innerHTML = `
-        <div class="tg-saver-toast-content">
-          <div class="tg-saver-tags-container">
-            ${tagsHtml}
-          </div>
+  if (isMinimalist) {
+    toast.innerHTML = `
+      <div class="tg-saver-toast-content">
+        <div class="tg-saver-tags-container">
+          ${tagsHtml}
         </div>
-        <div class="tg-saver-minimalist-loader"></div>
-      `;
-    } else {
-      toast.innerHTML = `
-        <div class="tg-saver-toast-content">
-          <div class="tg-saver-toast-header">
-            <span class="tg-saver-toast-title">Tags?</span>
-            <button class="tg-saver-cancel-btn" title="Cancel send">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-          <div class="tg-saver-tags-container">
-            ${tagsHtml}
-            <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
-              <div class="tg-saver-timer-loader"></div>
-              <span class="tg-saver-skip-btn-text">no tag</span>
-            </button>
-          </div>
+      </div>
+      <div class="tg-saver-minimalist-loader"></div>
+    `;
+  } else {
+    toast.innerHTML = `
+      <div class="tg-saver-toast-content">
+        <div class="tg-saver-toast-header">
+          <span class="tg-saver-toast-title">Tags?</span>
+          <button class="tg-saver-cancel-btn" title="Cancel send">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
-      `;
-    }
+        <div class="tg-saver-tags-container">
+          ${tagsHtml}
+          <button class="tg-saver-tag-btn tg-saver-skip-btn" data-index="-1">
+            <div class="tg-saver-timer-loader"></div>
+            <span class="tg-saver-skip-btn-text">no tag</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
-    document.body.appendChild(toast);
+  document.body.appendChild(toast);
 
-    // Cancel button (only in normal mode)
-    const cancelBtn = toast.querySelector('.tg-saver-cancel-btn');
-    if (cancelBtn) {
-      cancelBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        cancelSend();
+  // Cancel button (only in normal mode)
+  const cancelBtn = toast.querySelector('.tg-saver-cancel-btn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelSend();
+    });
+  }
+
+  // Tag buttons - MANUAL CLICK - always sends
+  toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Hide tooltip on click
+      const tooltip = document.getElementById('tg-saver-tag-tooltip');
+      if (tooltip) tooltip.remove();
+
+      const index = parseInt(btn.dataset.index);
+      const selectedTag = index >= 0 ? customTags[index] : null;
+
+      killTimer();
+
+      // Fix current height for smooth morph to min-height
+      const currentHeight = toast.offsetHeight;
+      toast.style.height = currentHeight + 'px';
+
+      // Fade out content
+      const content = toast.querySelector('.tg-saver-toast-content');
+      if (content) {
+        content.style.opacity = '0';
+      }
+
+      // Shrink to min-height (44px)
+      requestAnimationFrame(() => {
+        toast.style.height = '44px';
+
+        // Wait for animation, then change content
+        setTimeout(() => {
+          toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
+          toast.classList.remove('tg-saver-with-tags');
+          toast.style.height = '';
+
+          // Fade in new content
+          requestAnimationFrame(() => {
+            const icon = toast.querySelector('.tg-saver-icon');
+            const text = toast.querySelector('.tg-saver-text');
+            if (icon) icon.classList.add('tg-saver-visible-content');
+            if (text) text.classList.add('tg-saver-visible-content');
+          });
+
+          doSend(requestId, selectedTag);
+        }, 200);
       });
-    }
+    });
+  });
 
-    // Tag buttons - MANUAL CLICK - always sends
-    toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+  // Add hover tooltip for minimalist mode (using event delegation on toast)
+  if (isMinimalist) {
+    toast.addEventListener('mouseover', (e) => {
+      const btn = e.target.closest('.tg-saver-tag-btn');
+      if (!btn) return;
 
-        // Hide tooltip on click
+      const tagName = btn.getAttribute('data-tag-name');
+      if (!tagName) return;
+
+      let tooltip = document.getElementById('tg-saver-tag-tooltip');
+      if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'tg-saver-tag-tooltip';
+        tooltip.style.cssText = `
+          position: fixed;
+          z-index: 2147483647;
+          font-family: 'MartianMono', monospace;
+          font-size: 14px;
+          font-weight: 400;
+          color: white;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
+          white-space: nowrap;
+          pointer-events: none;
+          padding: 0;
+          margin: 0;
+          line-height: 1;
+          letter-spacing: -0.02em;
+          text-align: right;
+          opacity: 0;
+          transition: opacity 0.12s ease-out;
+        `;
+        document.body.appendChild(tooltip);
+      }
+
+      tooltip.textContent = tagName;
+      const toastRect = toast.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+
+      // Position to the left of the toast with 10px gap, vertically centered with the button
+      tooltip.style.top = (btnRect.top + btnRect.height / 2) + 'px';
+      tooltip.style.right = (window.innerWidth - toastRect.left + 10) + 'px';
+      tooltip.style.transform = 'translateY(-50%)';
+
+      // Fade in with requestAnimationFrame for smooth animation
+      requestAnimationFrame(() => {
+        tooltip.style.opacity = '1';
+      });
+    });
+
+    toast.addEventListener('mouseout', (e) => {
+      const btn = e.target.closest('.tg-saver-tag-btn');
+      const relatedBtn = e.relatedTarget ? e.relatedTarget.closest('.tg-saver-tag-btn') : null;
+
+      if (btn && btn !== relatedBtn) {
         const tooltip = document.getElementById('tg-saver-tag-tooltip');
-        if (tooltip) tooltip.remove();
-
-        const index = parseInt(btn.dataset.index);
-        const selectedTag = index >= 0 ? customTags[index] : null;
-
-        killTimer();
-
-        // Fix current height for smooth morph to min-height
-        const currentHeight = toast.offsetHeight;
-        toast.style.height = currentHeight + 'px';
-
-        // Fade out content
-        const content = toast.querySelector('.tg-saver-toast-content');
-        if (content) {
-          content.style.opacity = '0';
+        if (tooltip) {
+          tooltip.style.opacity = '0';
         }
-
-        // Shrink to min-height (44px)
-        requestAnimationFrame(() => {
-          toast.style.height = '44px';
-
-          // Wait for animation, then change content
-          setTimeout(() => {
-            toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
-            toast.classList.remove('tg-saver-with-tags');
-            toast.style.height = '';
-
-            // Fade in new content
-            requestAnimationFrame(() => {
-              const icon = toast.querySelector('.tg-saver-icon');
-              const text = toast.querySelector('.tg-saver-text');
-              if (icon) icon.classList.add('tg-saver-visible-content');
-              if (text) text.classList.add('tg-saver-visible-content');
-            });
-
-            doSend(requestId, selectedTag);
-          }, 200);
-        });
-      });
-    });
-
-    // Add hover tooltip for minimalist mode (using event delegation on toast)
-    if (isMinimalist) {
-      toast.addEventListener('mouseover', (e) => {
-        const btn = e.target.closest('.tg-saver-tag-btn');
-        if (!btn) return;
-
-        const tagName = btn.getAttribute('data-tag-name');
-        if (!tagName) return;
-
-        let tooltip = document.getElementById('tg-saver-tag-tooltip');
-        if (!tooltip) {
-          tooltip = document.createElement('div');
-          tooltip.id = 'tg-saver-tag-tooltip';
-          tooltip.style.cssText = `
-            position: fixed;
-            z-index: 2147483647;
-            font-family: 'MartianMono', monospace;
-            font-size: 14px;
-            font-weight: 400;
-            color: white;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
-            white-space: nowrap;
-            pointer-events: none;
-            padding: 0;
-            margin: 0;
-            line-height: 1;
-            letter-spacing: -0.02em;
-            text-align: right;
-            opacity: 0;
-            transition: opacity 0.12s ease-out;
-          `;
-          document.body.appendChild(tooltip);
-        }
-
-        tooltip.textContent = tagName;
-        const toastRect = toast.getBoundingClientRect();
-        const btnRect = btn.getBoundingClientRect();
-
-        // Position to the left of the toast with 10px gap, vertically centered with the button
-        tooltip.style.top = (btnRect.top + btnRect.height / 2) + 'px';
-        tooltip.style.right = (window.innerWidth - toastRect.left + 10) + 'px';
-        tooltip.style.transform = 'translateY(-50%)';
-
-        // Fade in with requestAnimationFrame for smooth animation
-        requestAnimationFrame(() => {
-          tooltip.style.opacity = '1';
-        });
-      });
-
-      toast.addEventListener('mouseout', (e) => {
-        const btn = e.target.closest('.tg-saver-tag-btn');
-        const relatedBtn = e.relatedTarget ? e.relatedTarget.closest('.tg-saver-tag-btn') : null;
-
-        if (btn && btn !== relatedBtn) {
-          const tooltip = document.getElementById('tg-saver-tag-tooltip');
-          if (tooltip) {
-            tooltip.style.opacity = '0';
-          }
-        }
-      });
-    }
-
-    // HOVER - set pause flag
-    toast.addEventListener('mouseenter', () => {
-      ToastState.isPaused = true;
-      const loader = isMinimalist
-        ? toast.querySelector('.tg-saver-minimalist-loader')
-        : toast.querySelector('.tg-saver-timer-loader');
-      if (loader) loader.style.animationPlayState = 'paused';
-    });
-
-    toast.addEventListener('mouseleave', () => {
-      ToastState.isPaused = false;
-      const loader = isMinimalist
-        ? toast.querySelector('.tg-saver-minimalist-loader')
-        : toast.querySelector('.tg-saver-timer-loader');
-      if (loader) loader.style.animationPlayState = 'running';
-    });
-
-    requestAnimationFrame(() => {
-      toast.classList.add('tg-saver-visible');
-      const loader = isMinimalist
-        ? toast.querySelector('.tg-saver-minimalist-loader')
-        : toast.querySelector('.tg-saver-timer-loader');
-      if (loader) {
-        loader.style.animation = `tg-saver-timer-shrink ${ToastState.timeLeft}ms linear forwards`;
       }
     });
+  }
 
-    // Start countdown
-    startCountdown(requestId);
+  // HOVER - set pause flag
+  toast.addEventListener('mouseenter', () => {
+    ToastState.isPaused = true;
+    const loader = isMinimalist
+      ? toast.querySelector('.tg-saver-minimalist-loader')
+      : toast.querySelector('.tg-saver-timer-loader');
+    if (loader) loader.style.animationPlayState = 'paused';
   });
+
+  toast.addEventListener('mouseleave', () => {
+    ToastState.isPaused = false;
+    const loader = isMinimalist
+      ? toast.querySelector('.tg-saver-minimalist-loader')
+      : toast.querySelector('.tg-saver-timer-loader');
+    if (loader) loader.style.animationPlayState = 'running';
+  });
+
+  requestAnimationFrame(() => {
+    toast.classList.add('tg-saver-visible');
+    const loader = isMinimalist
+      ? toast.querySelector('.tg-saver-minimalist-loader')
+      : toast.querySelector('.tg-saver-timer-loader');
+    if (loader) {
+      loader.style.animation = `tg-saver-timer-shrink ${ToastState.timeLeft}ms linear forwards`;
+    }
+  });
+
+  // Start countdown
+  startCountdown(requestId);
 }
 
 function startCountdown(requestId) {

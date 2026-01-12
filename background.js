@@ -92,7 +92,29 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  const settings = await getSettings();
+  console.time('contextMenuClick'); // TIMING START
+
+  // Fire showTagSelection IMMEDIATELY if possible
+  const settingsPromise = getSettings();
+
+  // Try to show toast as fast as possible for images
+  if (info.menuItemId === 'pocketIt' && info.srcUrl) {
+    // For images, start showing toast immediately (parallel with settings load)
+    const settings = await settingsPromise;
+
+    if (!settings.botToken || !settings.chatId) {
+      chrome.runtime.openOptionsPage();
+      return;
+    }
+
+    console.timeLog('contextMenuClick', 'before sendImage'); // TIMING
+    await sendImage(info.srcUrl, tab.url, settings, tab.id);
+    console.timeEnd('contextMenuClick'); // TIMING END
+    return;
+  }
+
+  // For other cases (text, links)
+  const settings = await settingsPromise;
 
   if (!settings.botToken || !settings.chatId) {
     chrome.runtime.openOptionsPage();
@@ -100,14 +122,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   if (info.menuItemId === 'pocketIt') {
-    // If text is selected, send as quote
     if (info.selectionText) {
       await sendQuote(info.selectionText, tab.url, settings);
-    } else if (info.srcUrl) {
-      // If clicked on image element directly, use srcUrl
-      await sendImage(info.srcUrl, tab.url, settings, tab.id);
     } else {
-      // Otherwise try to detect media under cursor or send link
       await sendImageFromPage(tab, settings);
     }
   }
@@ -261,6 +278,7 @@ async function showToast(tabId, state, message) {
 
 // Show tag selection toast and wait for response
 async function showTagSelection(tabId, customTags) {
+  console.time('showTagSelection'); // TIMING START
   const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
   try {
@@ -278,6 +296,7 @@ async function showTagSelection(tabId, customTags) {
       }, 30000);
     });
 
+    console.timeLog('showTagSelection', 'before sendMessage'); // TIMING
     // Send message WITHOUT await - fire and forget for speed
     chrome.tabs.sendMessage(tabId, {
       action: 'showTagSelection',
@@ -286,8 +305,11 @@ async function showTagSelection(tabId, customTags) {
     }).catch(e => {
       console.error('Failed to send tag selection message:', e);
     });
+    console.timeLog('showTagSelection', 'after sendMessage'); // TIMING
 
-    return await tagPromise;
+    const result = await tagPromise;
+    console.timeEnd('showTagSelection'); // TIMING END
+    return result;
   } catch (e) {
     console.error('Failed to show tag selection:', e);
     return null;
