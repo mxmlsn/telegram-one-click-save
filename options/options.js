@@ -1,9 +1,8 @@
-// Emoji packs definition (red, orange, yellow, green, blue, purple, black, white)
+// Emoji packs definition (red, yellow, green, blue, purple, black, white) - 7 tags only
 const EMOJI_PACKS = {
-  standard: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
-  cute: ['🍄', '🍊', '🐤', '🐸', '💧', '🔮', '🌚', '💭'],
-  random: ['📌', '☢️', '📒', '🔋', '📪', '☮️', '🎥', '📁']
+  circle: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  heart: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  soft: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
 };
 
 const DEFAULT_SETTINGS = {
@@ -22,19 +21,19 @@ const DEFAULT_SETTINGS = {
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4,
-  emojiPack: 'standard',
+  emojiPack: 'circle',
   toastStyle: 'normal',
   isConnected: false,
-  // Fixed 8 tags
+  customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  // Fixed 7 tags
   customTags: [
-    { name: '', color: '#377CDE', id: 'blue' },
-    { name: '', color: '#3D3D3B', id: 'black' },
-    { name: '', color: '#4ED345', id: 'green' },
-    { name: '', color: '#BB4FFF', id: 'purple' },
-    { name: '', color: '#DEDEDE', id: 'white' },
     { name: '', color: '#E64541', id: 'red' },
-    { name: '', color: '#EC9738', id: 'orange' },
-    { name: '', color: '#FFDE42', id: 'yellow' }
+    { name: '', color: '#FFDE42', id: 'yellow' },
+    { name: '', color: '#4ED345', id: 'green' },
+    { name: '', color: '#377CDE', id: 'blue' },
+    { name: '', color: '#BB4FFF', id: 'purple' },
+    { name: '', color: '#3D3D3B', id: 'black' },
+    { name: '', color: '#DEDEDE', id: 'white' }
   ]
 };
 
@@ -51,16 +50,16 @@ const tagLinkInput = document.getElementById('tagLink');
 const tagQuoteInput = document.getElementById('tagQuote');
 const enableQuickTagsInput = document.getElementById('enableQuickTags');
 const saveBtn = document.getElementById('saveBtn'); // Now only for "Save & Connect"
-const resetBtn = document.getElementById('resetBtn');
-const statusEl = document.getElementById('status');
+const statusEl = document.getElementById('connectionStatus');
 const savedIndicator = document.getElementById('savedIndicator');
 
 // Custom tags elements
 const customTagsList = document.getElementById('customTagsList');
 const sendWithColorInput = document.getElementById('sendWithColor');
-const timerDurationInput = document.getElementById('timerDuration');
+const timerMinusBtn = document.getElementById('timerMinus');
+const timerPlusBtn = document.getElementById('timerPlus');
 const timerValueDisplay = document.getElementById('timerValue');
-const optimalLabel = document.querySelector('.optimal-label');
+const optimalLabel = document.getElementById('optimalLabel');
 
 
 // Custom tags state
@@ -72,14 +71,20 @@ document.addEventListener('DOMContentLoaded', loadSettings);
 // Save & Connect button (only for credentials)
 saveBtn.addEventListener('click', saveCredentials);
 
-// Reset settings on button click
-resetBtn.addEventListener('click', resetSettings);
+
 
 
 // Quick tags settings container
 const quickTagsSettings = document.getElementById('quickTagsSettings');
 // Hashtags settings container
 const hashtagsSettings = document.getElementById('hashtagsSettings');
+
+// Image compression input
+const imageCompressionInput = document.getElementById('imageCompression');
+
+// New toggle settings
+const popupStyleInput = document.getElementById('popupStyleMinimalist');
+const themeLightInput = document.getElementById('themeLight');
 
 // Auto-save listeners
 const autoSaveInputs = [
@@ -90,6 +95,7 @@ const autoSaveInputs = [
   { el: useHashtagsInput, key: 'useHashtags', type: 'checkbox' },
   { el: enableQuickTagsInput, key: 'enableQuickTags', type: 'checkbox' },
   { el: sendWithColorInput, key: 'sendWithColor', type: 'checkbox' },
+  { el: imageCompressionInput, key: 'imageCompression', type: 'checkbox' },
   { el: tagImageInput, key: 'tagImage', type: 'text' },
   { el: tagLinkInput, key: 'tagLink', type: 'text' },
   { el: tagQuoteInput, key: 'tagQuote', type: 'text' }
@@ -103,6 +109,11 @@ autoSaveInputs.forEach(item => {
       // Toggle quick tags settings visibility
       if (item.key === 'enableQuickTags') {
         toggleQuickTagsSettings(item.el.checked);
+      }
+
+      // Toggle emoji pack selector visibility
+      if (item.key === 'sendWithColor') {
+        toggleEmojiPackSettings(item.el.checked);
       }
 
       // Toggle hashtags settings visibility
@@ -155,12 +166,6 @@ autoSaveInputs.forEach(item => {
 });
 
 // Radio buttons listeners
-document.querySelectorAll('input[name="imageCompression"]').forEach(radio => {
-  radio.addEventListener('change', (e) => {
-    saveSetting('imageCompression', e.target.value === 'true');
-  });
-});
-
 document.querySelectorAll('input[name="iconColor"]').forEach(radio => {
   radio.addEventListener('change', (e) => {
     saveSetting('iconColor', e.target.value);
@@ -173,23 +178,35 @@ document.querySelectorAll('input[name="toastStyle"]').forEach(radio => {
   });
 });
 
-// Timer duration slider
-timerDurationInput.addEventListener('input', (e) => {
-  const value = parseInt(e.target.value);
+// Timer duration buttons
+if (timerMinusBtn && timerPlusBtn) {
+  timerMinusBtn.addEventListener('click', () => {
+    let current = parseInt(timerValueDisplay.textContent);
+    if (current > 2) {
+      updateTimerValue(current - 1);
+    }
+  });
+
+  timerPlusBtn.addEventListener('click', () => {
+    let current = parseInt(timerValueDisplay.textContent);
+    if (current < 8) {
+      updateTimerValue(current + 1);
+    }
+  });
+}
+
+function updateTimerValue(value) {
   timerValueDisplay.textContent = value;
 
-  // Show "(optimal)" only for value 4
-  if (value === 4) {
-    optimalLabel.style.display = 'inline';
-  } else {
-    optimalLabel.style.display = 'none';
-  }
-});
+  if (timerMinusBtn) timerMinusBtn.disabled = value <= 2;
+  if (timerPlusBtn) timerPlusBtn.disabled = value >= 8;
 
-timerDurationInput.addEventListener('change', (e) => {
-  const value = parseInt(e.target.value);
+  if (optimalLabel) {
+    optimalLabel.style.display = value === 4 ? 'inline' : 'none';
+  }
+
   saveSetting('timerDuration', value);
-});
+}
 
 // Emoji pack tabs
 document.querySelectorAll('.emoji-tab').forEach(tab => {
@@ -200,10 +217,28 @@ document.querySelectorAll('.emoji-tab').forEach(tab => {
     document.querySelectorAll('.emoji-tab').forEach(t => t.classList.remove('active'));
     e.currentTarget.classList.add('active');
 
+    // Update preview
+    updateEmojiPreview(packName);
+
     // Save setting
     saveSetting('emojiPack', packName);
   });
 });
+
+// New toggle settings
+if (popupStyleInput) {
+  popupStyleInput.addEventListener('change', (e) => {
+    saveSetting('popupStyleMinimalist', e.target.checked);
+  });
+}
+
+if (themeLightInput) {
+  themeLightInput.addEventListener('change', (e) => {
+    saveSetting('themeLight', e.target.checked);
+  });
+}
+
+
 
 async function loadSettings() {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
@@ -223,22 +258,47 @@ async function loadSettings() {
 
   // Set timer duration
   const timerDuration = settings.timerDuration || 4;
-  timerDurationInput.value = timerDuration;
   timerValueDisplay.textContent = timerDuration;
-  optimalLabel.style.display = timerDuration === 4 ? 'inline' : 'none';
+  if (optimalLabel) {
+    optimalLabel.style.display = timerDuration === 4 ? 'inline' : 'none';
+  }
+  if (timerMinusBtn) timerMinusBtn.disabled = timerDuration <= 2;
+  if (timerPlusBtn) timerPlusBtn.disabled = timerDuration >= 8;
+
+  // Set emoji pack selector visibility
+  toggleEmojiPackSettings(settings.sendWithColor !== false);
+
+  // Load custom emoji
+  console.log('Loading settings customEmoji:', settings.customEmoji);
+  if (settings.customEmoji && Array.isArray(settings.customEmoji) && settings.customEmoji.length === 7) {
+    // Valid custom emoji saved
+  } else {
+    // Initialize with default
+    await chrome.storage.local.set({ customEmoji: DEFAULT_SETTINGS.customEmoji });
+  }
+
+  // Update emoji preview
+  updateEmojiPreview(settings.emojiPack || 'circle');
+
+  // Set image compression toggle (checked = photo/true, unchecked = file/false)
+  imageCompressionInput.checked = settings.imageCompression;
 
   // Set radio buttons
-  const compressionValue = settings.imageCompression ? 'true' : 'false';
-  document.querySelector(`input[name="imageCompression"][value="${compressionValue}"]`).checked = true;
-
+  // Set radio buttons
   const iconColor = settings.iconColor || 'circle1';
-  document.querySelector(`input[name="iconColor"][value="${iconColor}"]`).checked = true;
+  const iconRadio = document.querySelector(`input[name="iconColor"][value="${iconColor}"]`);
+  if (iconRadio) {
+    iconRadio.checked = true;
+  }
 
   const toastStyle = settings.toastStyle || 'normal';
-  document.querySelector(`input[name="toastStyle"][value="${toastStyle}"]`).checked = true;
+  const toastRadio = document.querySelector(`input[name="toastStyle"][value="${toastStyle}"]`);
+  if (toastRadio) {
+    toastRadio.checked = true;
+  }
 
   // Set emoji pack tab
-  const emojiPack = settings.emojiPack || 'standard';
+  const emojiPack = settings.emojiPack || 'circle';
   document.querySelectorAll('.emoji-tab').forEach(tab => {
     if (tab.dataset.pack === emojiPack) {
       tab.classList.add('active');
@@ -247,10 +307,20 @@ async function loadSettings() {
     }
   });
 
+  // Set new toggle settings
+  if (popupStyleInput) {
+    popupStyleInput.checked = settings.popupStyleMinimalist || false;
+  }
+  if (themeLightInput) {
+    themeLightInput.checked = settings.themeLight || false;
+  }
+
   // Load custom tags
   // Ensure we have the structure of 8 tags even if loading old data
   customTags = mergeCustomTags(settings.customTags || []);
+  console.log('[loadSettings] About to call renderCustomTags, customTags:', customTags);
   renderCustomTags();
+  console.log('[loadSettings] renderCustomTags completed');
 
   // Toggle quick tags settings visibility based on enableQuickTags
   toggleQuickTagsSettings(settings.enableQuickTags !== false);
@@ -262,28 +332,22 @@ async function loadSettings() {
 function mergeCustomTags(savedTags) {
   const defaultTags = DEFAULT_SETTINGS.customTags;
 
-  // If saved tags are old format or empty, stick to default structure but try to preserve names if ids match? 
-  // Actually, user wants fixed 8 colors. 
-  // Let's assume we always want the 8 fixed colors. 
-  // If we have saved data that matches the new structure (has IDs), we use it.
-  // If not, we use default.
-
+  // Now we have fixed 7 colors instead of 8
   if (!savedTags || savedTags.length === 0) return defaultTags;
 
   // Check if saved tags have the new ID structure
   const hasNewStructure = savedTags.every(t => t.id && t.color);
 
   if (hasNewStructure) {
-    if (savedTags.length !== 8) {
-      // If by some reason length is wrong, merge missing defaults
-      // But for dragging support, order matters.
-      // Let's just return savedTags for now, assuming logic holds.
-      return savedTags;
+    // Filter out orange tag if it exists (id === 'orange')
+    const filtered = savedTags.filter(t => t.id !== 'orange');
+    if (filtered.length !== 7) {
+      return defaultTags;
     }
-    return savedTags;
+    return filtered;
   }
 
-  // If old structure (dynamic), discard and use defaults (user accepted this in plan)
+  // If old structure (dynamic), discard and use defaults
   return defaultTags;
 }
 
@@ -363,7 +427,8 @@ async function testConnection(botToken, chatId) {
 
 function showStatus(message, success) {
   statusEl.textContent = message;
-  statusEl.className = success === true ? 'success' : success === false ? 'error' : '';
+  statusEl.className = 'status-value ' + (success === true ? 'connected' : success === false ? 'error' : '');
+  // Removed global failure handling since we use CSS classes now
 }
 
 async function resetSettings() {
@@ -382,54 +447,97 @@ async function resetSettings() {
   showStatus('Settings reset to default', true);
 }
 
-// Carousel
-const carouselSlides = document.getElementById('carouselSlides');
-const carouselDots = document.getElementById('carouselDots');
-const carouselPrev = document.getElementById('carouselPrev');
-const carouselNext = document.getElementById('carouselNext');
-let currentSlide = 0;
-const totalSlides = 4;
+// How to section - collapsible with steps
+const howtoSection = document.getElementById('howtoSection');
+const howtoToggle = document.getElementById('howtoToggle');
+const howtoDots = document.getElementById('howtoDots');
+const howtoNext = document.getElementById('howtoNext');
+const howtoTextContent = document.getElementById('howtoTextContent');
+const howtoImageArea = document.querySelector('.howto-image-area .howto-image');
+let currentStep = 0;
+const totalSteps = 4;
 
-function updateCarousel() {
-  carouselSlides.style.transform = `translateX(-${currentSlide * 100}%)`;
-
-  // Update dots
-  carouselDots.querySelectorAll('.carousel-dot').forEach((dot, index) => {
-    dot.classList.toggle('active', index === currentSlide);
+function updateHowtoStep() {
+  // Update text steps
+  howtoTextContent.querySelectorAll('.howto-step').forEach((step, index) => {
+    step.classList.toggle('active', index === currentStep);
   });
 
-  // Update arrows
-  carouselPrev.disabled = currentSlide === 0;
-  carouselNext.disabled = currentSlide === totalSlides - 1;
+  // Update dots
+  howtoDots.querySelectorAll('.howto-dot').forEach((dot, index) => {
+    dot.classList.toggle('active', index === currentStep);
+  });
+
+  // Update image
+  if (howtoImageArea) {
+    howtoImageArea.dataset.step = currentStep + 1;
+  }
 }
 
-carouselPrev.addEventListener('click', () => {
-  if (currentSlide > 0) {
-    currentSlide--;
-    updateCarousel();
+// Toggle collapse/expand with fade animation for title
+function toggleHowtoSection() {
+  // Add collapsing class for fade animation
+  howtoSection.classList.add('collapsing');
+
+  // Wait for fade out (200ms)
+  setTimeout(() => {
+    howtoSection.classList.toggle('collapsed');
+
+    // Remove collapsing class early so title fades in before animation ends
+    setTimeout(() => {
+      howtoSection.classList.remove('collapsing');
+    }, 150); // Title appears 150ms into the 300ms animation
+  }, 200);
+}
+
+// Click on section to expand (only when collapsed)
+howtoSection.addEventListener('click', (e) => {
+  // Only expand if collapsed and not clicking the toggle button
+  if (howtoSection.classList.contains('collapsed') && !e.target.closest('.howto-toggle-btn')) {
+    toggleHowtoSection();
   }
 });
 
-carouselNext.addEventListener('click', () => {
-  if (currentSlide < totalSlides - 1) {
-    currentSlide++;
-    updateCarousel();
-  }
+// Click on toggle button to collapse/expand
+howtoToggle.addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent section click event
+  toggleHowtoSection();
 });
 
-carouselDots.addEventListener('click', (e) => {
-  const dot = e.target.closest('.carousel-dot');
+// Dots navigation
+howtoDots.addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent section click event
+  const dot = e.target.closest('.howto-dot');
   if (dot) {
-    currentSlide = parseInt(dot.dataset.step) - 1;
-    updateCarousel();
+    currentStep = parseInt(dot.dataset.step) - 1;
+    updateHowtoStep();
   }
 });
 
-// Initialize carousel
-updateCarousel();
+// Next button navigation
+howtoNext.addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent section click event
+  if (currentStep < totalSteps - 1) {
+    currentStep++;
+  } else {
+    currentStep = 0; // Loop back to first step
+  }
+  updateHowtoStep();
+});
+
+// Initialize
+updateHowtoStep();
 
 // Custom tags functions
 function renderCustomTags() {
+  console.log('[renderCustomTags] Called with customTags:', customTags);
+  console.log('[renderCustomTags] customTagsList element:', customTagsList);
+
+  if (!customTagsList) {
+    console.error('[renderCustomTags] ERROR: customTagsList is null!');
+    return;
+  }
+
   customTagsList.innerHTML = '';
 
   customTags.forEach((tag, index) => {
@@ -654,10 +762,98 @@ function toggleQuickTagsSettings(enabled) {
   if (quickTagsSettings) {
     quickTagsSettings.style.display = enabled ? 'block' : 'none';
   }
+  const customTagsListWrapper = document.getElementById('customTagsListWrapper');
+  if (customTagsListWrapper) {
+    customTagsListWrapper.style.display = enabled ? 'flex' : 'none';
+  }
+  const quickTagsSettingsAdditional = document.getElementById('quickTagsSettingsAdditional');
+  if (quickTagsSettingsAdditional) {
+    quickTagsSettingsAdditional.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+function toggleEmojiPackSettings(enabled) {
+  const emojiPackSettings = document.getElementById('emojiPackSettings');
+  if (emojiPackSettings) {
+    emojiPackSettings.style.display = enabled ? 'block' : 'none';
+  }
 }
 
 function toggleHashtagsSettings(enabled) {
   if (hashtagsSettings) {
     hashtagsSettings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+// Emoji Preview Management
+async function updateEmojiPreview(packName) {
+  const emojiPreview = document.getElementById('emojiPreview');
+  if (!emojiPreview) return;
+
+  if (packName === 'custom') {
+    // Show input for custom emoji
+    const settings = await chrome.storage.local.get({ customEmoji: DEFAULT_SETTINGS.customEmoji });
+    const customEmoji = settings.customEmoji || DEFAULT_SETTINGS.customEmoji;
+
+    emojiPreview.classList.add('editable');
+    emojiPreview.innerHTML = `<input type="text" id="customEmojiInput" maxlength="14" value="${customEmoji.join('')}" placeholder="🔴🟡🟢🔵🟣⚫️⚪️">`;
+
+    const input = document.getElementById('customEmojiInput');
+
+    input.addEventListener('input', async (e) => {
+      // Parse emoji from input
+      const emojis = Array.from(e.target.value).filter(char => {
+        // Keep only emoji and special characters that form emoji
+        return /\p{Emoji}/u.test(char) || /[\uFE0F\u200D]/u.test(char);
+      });
+
+      // Join back and limit to reasonable length for 7 emoji (with modifiers)
+      e.target.value = emojis.join('');
+    });
+
+    input.addEventListener('blur', async (e) => {
+      const emojis = Array.from(e.target.value).filter(char => {
+        return /\p{Emoji}/u.test(char) || /[\uFE0F\u200D]/u.test(char);
+      });
+
+      // Extract exactly 7 emoji (or use defaults if not enough)
+      let finalEmojis = [];
+      let currentEmoji = '';
+
+      for (let char of emojis) {
+        if (/[\uFE0F\u200D]/u.test(char)) {
+          // Modifier or joiner - add to current emoji
+          currentEmoji += char;
+        } else {
+          // New emoji
+          if (currentEmoji) {
+            finalEmojis.push(currentEmoji);
+          }
+          currentEmoji = char;
+        }
+
+        if (finalEmojis.length >= 7) break;
+      }
+
+      // Add last emoji if exists
+      if (currentEmoji && finalEmojis.length < 7) {
+        finalEmojis.push(currentEmoji);
+      }
+
+      // Pad with defaults if needed
+      while (finalEmojis.length < 7) {
+        finalEmojis.push(DEFAULT_SETTINGS.customEmoji[finalEmojis.length]);
+      }
+
+      // Save
+      await chrome.storage.local.set({ customEmoji: finalEmojis });
+      e.target.value = finalEmojis.join('');
+      showSavedIndicator();
+    });
+  } else {
+    // Show read-only preview
+    emojiPreview.classList.remove('editable');
+    const emojis = EMOJI_PACKS[packName] || EMOJI_PACKS.circle;
+    emojiPreview.textContent = emojis.join(' ');
   }
 }
