@@ -261,39 +261,40 @@
 
         <!-- Section 4: Theme Tags -->
         <section class="section section-quicktags">
+          <div class="field checkbox-field theme-tags-header">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="enableQuickTags" checked>
+                <span class="slider"></span>
+              </label>
+              THEME TAGS
+            </label>
+          </div>
+
           <div id="quickTagsSettings">
             <!-- Two columns layout encompassing the title as well -->
             <div class="theme-tags-columns">
-              <!-- Left column: All Controls & Pack Selector -->
+              <!-- Left column: All Controls & Pack Selector in single wrapper -->
               <div class="theme-tags-left">
-                <div class="field checkbox-field theme-tags-header">
-                  <label>
-                    <label class="switch">
-                      <input type="checkbox" id="enableQuickTags" checked>
-                      <span class="slider"></span>
+                <div class="emoji-controls-wrapper">
+                  <div class="field checkbox-field emoji-global-toggle">
+                    <label>
+                      <label class="switch">
+                        <input type="checkbox" id="sendWithColor" checked>
+                        <span class="slider"></span>
+                      </label>
+                      Send with emoji
                     </label>
-                    THEME TAGS
-                  </label>
-                </div>
+                  </div>
 
-                <!-- Toggle moved inside left column for top alignment with tags -->
-                <div class="field checkbox-field emoji-global-toggle">
-                  <label>
-                    <label class="switch">
-                      <input type="checkbox" id="sendWithColor" checked>
-                      <span class="slider"></span>
-                    </label>
-                    Send with emoji
-                  </label>
-                </div>
-
-                <div id="emojiPackSettings" class="emoji-pack-selector">
-                  <div class="emoji-pack-tabs">
-                    <button class="emoji-tab" data-pack="standard">🔴 Standard</button>
-                    <button class="emoji-tab" data-pack="hearts">❤️ Hearts</button>
-                    <button class="emoji-tab" data-pack="cute">🍄 Cute</button>
-                    <button class="emoji-tab" data-pack="random">📌 Random</button>
-                    <button class="emoji-tab" data-pack="custom">✏️ Custom</button>
+                  <div id="emojiPackSettings" class="emoji-pack-selector">
+                    <div class="emoji-pack-tabs">
+                      <button class="emoji-tab" data-pack="standard">standard</button>
+                      <button class="emoji-tab" data-pack="hearts">hearts</button>
+                      <button class="emoji-tab" data-pack="cute">cute</button>
+                      <button class="emoji-tab" data-pack="custom">custom</button>
+                    </div>
+                    <div id="emojiPreview" class="emoji-preview"></div>
                   </div>
                 </div>
               </div>
@@ -301,7 +302,6 @@
               <!-- Right column: Tags list -->
               <div class="theme-tags-right">
                 <div id="customTagsList" class="custom-tags-list"></div>
-                <p class="settings-hint">Drag to reorder. Empty tags are hidden.</p>
               </div>
             </div>
 

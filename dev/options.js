@@ -19,19 +19,19 @@ const mockStorage = {
     sendWithColor: true,
     timerDuration: 4,
     emojiPack: 'standard',
+    customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
     toastStyle: 'normal',
     popupStyleMinimalist: false,
     themeLight: false,
     isConnected: false,
     customTags: [
-      { name: 'work', color: '#377CDE', id: 'blue' },
-      { name: 'personal', color: '#3D3D3B', id: 'black' },
-      { name: 'urgent', color: '#4ED345', id: 'green' },
-      { name: 'ideas', color: '#BB4FFF', id: 'purple' },
-      { name: '', color: '#DEDEDE', id: 'white' },
       { name: 'important', color: '#E64541', id: 'red' },
-      { name: '', color: '#EC9738', id: 'orange' },
-      { name: '', color: '#FFDE42', id: 'yellow' }
+      { name: '', color: '#FFDE42', id: 'yellow' },
+      { name: 'urgent', color: '#4ED345', id: 'green' },
+      { name: 'work', color: '#377CDE', id: 'blue' },
+      { name: 'ideas', color: '#BB4FFF', id: 'purple' },
+      { name: 'personal', color: '#3D3D3B', id: 'black' },
+      { name: '', color: '#DEDEDE', id: 'white' }
     ]
   },
 
@@ -78,12 +78,11 @@ window.chrome = {
 // Original options.js code below
 // ============================================
 
-// Emoji packs definition (red, orange, yellow, green, blue, purple, black, white)
+// Emoji packs definition (red, yellow, green, blue, purple, black, white) - 7 tags only
 const EMOJI_PACKS = {
-  standard: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
-  cute: ['🍄', '🍊', '🐤', '🐸', '💧', '🔮', '🌚', '💭'],
-  random: ['📌', '☢️', '📒', '🔋', '📪', '☮️', '🎥', '📁']
+  standard: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  hearts: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  cute: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
 };
 
 const DEFAULT_SETTINGS = {
@@ -105,16 +104,16 @@ const DEFAULT_SETTINGS = {
   emojiPack: 'standard',
   toastStyle: 'normal',
   isConnected: false,
-  // Fixed 8 tags
+  customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
+  // Fixed 7 tags
   customTags: [
-    { name: '', color: '#377CDE', id: 'blue' },
-    { name: '', color: '#3D3D3B', id: 'black' },
-    { name: '', color: '#4ED345', id: 'green' },
-    { name: '', color: '#BB4FFF', id: 'purple' },
-    { name: '', color: '#DEDEDE', id: 'white' },
     { name: '', color: '#E64541', id: 'red' },
-    { name: '', color: '#EC9738', id: 'orange' },
-    { name: '', color: '#FFDE42', id: 'yellow' }
+    { name: '', color: '#FFDE42', id: 'yellow' },
+    { name: '', color: '#4ED345', id: 'green' },
+    { name: '', color: '#377CDE', id: 'blue' },
+    { name: '', color: '#BB4FFF', id: 'purple' },
+    { name: '', color: '#3D3D3B', id: 'black' },
+    { name: '', color: '#DEDEDE', id: 'white' }
   ]
 };
 
@@ -298,6 +297,9 @@ document.querySelectorAll('.emoji-tab').forEach(tab => {
     document.querySelectorAll('.emoji-tab').forEach(t => t.classList.remove('active'));
     e.currentTarget.classList.add('active');
 
+    // Update preview
+    updateEmojiPreview(packName);
+
     // Save setting
     saveSetting('emojiPack', packName);
   });
@@ -345,6 +347,17 @@ async function loadSettings() {
 
   // Set emoji pack selector visibility
   toggleEmojiPackSettings(settings.sendWithColor !== false);
+
+  // Load custom emoji
+  if (settings.customEmoji && Array.isArray(settings.customEmoji) && settings.customEmoji.length === 7) {
+    // Valid custom emoji saved
+  } else {
+    // Initialize with default
+    await chrome.storage.local.set({ customEmoji: DEFAULT_SETTINGS.customEmoji });
+  }
+
+  // Update emoji preview
+  updateEmojiPreview(settings.emojiPack || 'standard');
 
   // Set image compression toggle (checked = photo/true, unchecked = file/false)
   imageCompressionInput.checked = settings.imageCompression;
@@ -398,28 +411,22 @@ async function loadSettings() {
 function mergeCustomTags(savedTags) {
   const defaultTags = DEFAULT_SETTINGS.customTags;
 
-  // If saved tags are old format or empty, stick to default structure but try to preserve names if ids match? 
-  // Actually, user wants fixed 8 colors. 
-  // Let's assume we always want the 8 fixed colors. 
-  // If we have saved data that matches the new structure (has IDs), we use it.
-  // If not, we use default.
-
+  // Now we have fixed 7 colors instead of 8
   if (!savedTags || savedTags.length === 0) return defaultTags;
 
   // Check if saved tags have the new ID structure
   const hasNewStructure = savedTags.every(t => t.id && t.color);
 
   if (hasNewStructure) {
-    if (savedTags.length !== 8) {
-      // If by some reason length is wrong, merge missing defaults
-      // But for dragging support, order matters.
-      // Let's just return savedTags for now, assuming logic holds.
-      return savedTags;
+    // Filter out orange tag if it exists (id === 'orange')
+    const filtered = savedTags.filter(t => t.id !== 'orange');
+    if (filtered.length !== 7) {
+      return defaultTags;
     }
-    return savedTags;
+    return filtered;
   }
 
-  // If old structure (dynamic), discard and use defaults (user accepted this in plan)
+  // If old structure (dynamic), discard and use defaults
   return defaultTags;
 }
 
@@ -817,5 +824,78 @@ function toggleEmojiPackSettings(enabled) {
 function toggleHashtagsSettings(enabled) {
   if (hashtagsSettings) {
     hashtagsSettings.style.display = enabled ? 'block' : 'none';
+  }
+}
+
+// Emoji Preview Management
+async function updateEmojiPreview(packName) {
+  const emojiPreview = document.getElementById('emojiPreview');
+  if (!emojiPreview) return;
+
+  if (packName === 'custom') {
+    // Show input for custom emoji
+    const settings = await chrome.storage.local.get({ customEmoji: DEFAULT_SETTINGS.customEmoji });
+    const customEmoji = settings.customEmoji || DEFAULT_SETTINGS.customEmoji;
+
+    emojiPreview.classList.add('editable');
+    emojiPreview.innerHTML = `<input type="text" id="customEmojiInput" maxlength="14" value="${customEmoji.join('')}" placeholder="🔴🟡🟢🔵🟣⚫️⚪️">`;
+
+    const input = document.getElementById('customEmojiInput');
+
+    input.addEventListener('input', async (e) => {
+      // Parse emoji from input
+      const emojis = Array.from(e.target.value).filter(char => {
+        // Keep only emoji and special characters that form emoji
+        return /\p{Emoji}/u.test(char) || /[\uFE0F\u200D]/u.test(char);
+      });
+
+      // Join back and limit to reasonable length for 7 emoji (with modifiers)
+      e.target.value = emojis.join('');
+    });
+
+    input.addEventListener('blur', async (e) => {
+      const emojis = Array.from(e.target.value).filter(char => {
+        return /\p{Emoji}/u.test(char) || /[\uFE0F\u200D]/u.test(char);
+      });
+
+      // Extract exactly 7 emoji (or use defaults if not enough)
+      let finalEmojis = [];
+      let currentEmoji = '';
+
+      for (let char of emojis) {
+        if (/[\uFE0F\u200D]/u.test(char)) {
+          // Modifier or joiner - add to current emoji
+          currentEmoji += char;
+        } else {
+          // New emoji
+          if (currentEmoji) {
+            finalEmojis.push(currentEmoji);
+          }
+          currentEmoji = char;
+        }
+
+        if (finalEmojis.length >= 7) break;
+      }
+
+      // Add last emoji if exists
+      if (currentEmoji && finalEmojis.length < 7) {
+        finalEmojis.push(currentEmoji);
+      }
+
+      // Pad with defaults if needed
+      while (finalEmojis.length < 7) {
+        finalEmojis.push(DEFAULT_SETTINGS.customEmoji[finalEmojis.length]);
+      }
+
+      // Save
+      await chrome.storage.local.set({ customEmoji: finalEmojis });
+      e.target.value = finalEmojis.join('');
+      showSavedIndicator();
+    });
+  } else {
+    // Show read-only preview
+    emojiPreview.classList.remove('editable');
+    const emojis = EMOJI_PACKS[packName] || EMOJI_PACKS.standard;
+    emojiPreview.textContent = emojis.join(' ');
   }
 }
