@@ -894,16 +894,14 @@ input:checked+.slider:before {
 }
 
 /* Theme Tags Two Columns Layout */
-.theme-tags-columns {
+.theme-tags-main-wrapper {
   display: flex;
   gap: 20px;
-  margin-top: 0;
-  /* Aligned to section top */
   margin-bottom: 20px;
   align-items: flex-end;
 }
 
-.theme-tags-left {
+.theme-tags-left-wrapper {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -911,6 +909,8 @@ input:checked+.slider:before {
 
 .theme-tags-right {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .emoji-controls-wrapper {
