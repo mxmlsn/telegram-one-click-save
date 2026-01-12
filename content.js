@@ -3,6 +3,31 @@ document.addEventListener('contextmenu', (e) => {
   window.__tgSaverLastRightClicked = e.target;
 }, true);
 
+// Cache settings in content script for instant toast display
+let cachedContentSettings = null;
+
+// Load settings on script init
+chrome.storage.local.get({
+  customTags: [],
+  enableQuickTags: true,
+  timerDuration: 4,
+  toastStyle: 'normal'
+}, (result) => {
+  cachedContentSettings = result;
+  window.__TG_Settings = result;
+});
+
+// Keep cache updated
+chrome.storage.onChanged.addListener((changes) => {
+  if (!cachedContentSettings) cachedContentSettings = {};
+  for (const key of Object.keys(changes)) {
+    cachedContentSettings[key] = changes[key].newValue;
+    if (window.__TG_Settings) {
+      window.__TG_Settings[key] = changes[key].newValue;
+    }
+  }
+});
+
 // ============ TOAST SYSTEM ============
 
 // Single state object - stored on window to persist across any re-injections
@@ -21,7 +46,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'showToast') {
     showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
+    // Use LOCAL cached settings for instant display (no async!)
     showTagSelectionToast(message.customTags, message.requestId);
+    sendResponse({ received: true });
+    return true;
+  } else if (message.action === 'preShowToast') {
+    // Pre-show toast instantly from background signal
+    preShowTagSelection(message.requestId);
     sendResponse({ received: true });
     return true;
   }
@@ -88,9 +119,23 @@ function showSimpleToast(state, message) {
   }
 }
 
+// Pre-show toast using LOCAL cache (called when we just need to show UI fast)
+// Exposed on window for executeScript access
+window.preShowTagSelection = function(requestId) {
+  // Use locally cached tags - no network call!
+  const tags = cachedContentSettings?.customTags || [];
+  const hasNonEmptyTags = tags.some(t => t.name && t.name.trim());
+
+  if (hasNonEmptyTags) {
+    showTagSelectionToast(tags, requestId);
+  } else {
+    showSimpleToast('pending', 'Sending');
+  }
+};
+
 function showTagSelectionToast(customTags, requestId) {
-  let toast = document.getElementById('tg-saver-toast');
-  if (toast) toast.remove();
+  const existingToast = document.getElementById('tg-saver-toast');
+  if (existingToast) existingToast.remove();
   killTimer();
 
   // Reset state
@@ -98,19 +143,14 @@ function showTagSelectionToast(customTags, requestId) {
   ToastState.isCancelled = false;
   ToastState.isPaused = false;
 
-  // Use cached settings or defaults (to avoid async delay)
-  const timerDuration = window.__TG_Settings?.timerDuration || 4;
-  const toastStyle = window.__TG_Settings?.toastStyle || 'normal';
+  // Use cached settings (already loaded synchronously)
+  const timerDuration = cachedContentSettings?.timerDuration || 4;
+  const toastStyle = cachedContentSettings?.toastStyle || 'normal';
 
   ToastState.timeLeft = timerDuration * 1000;
   const isMinimalist = toastStyle === 'minimalist';
 
-  // Update cache async (for next time)
-  chrome.storage.local.get({ timerDuration: 4, toastStyle: 'normal' }, (result) => {
-    window.__TG_Settings = result;
-  });
-
-  toast = document.createElement('div');
+  const toast = document.createElement('div');
   toast.id = 'tg-saver-toast';
   toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '');
   toast.dataset.requestId = requestId;

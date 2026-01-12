@@ -4,14 +4,14 @@
   "version": "1.0.0",
   "description": "Save screenshots, images, and quotes to Telegram in one click",
   "icons": {
-    "16": "icons/icon-blue-16.png",
-    "48": "icons/icon-blue-48.png",
-    "128": "icons/icon-blue-128.png"
+    "16": "icons/icon-circle1-16.png",
+    "48": "icons/icon-circle1-48.png",
+    "128": "icons/icon-circle1-128.png"
   },
   "action": {
     "default_icon": {
-      "16": "icons/icon-blue-16.png",
-      "48": "icons/icon-blue-48.png"
+      "16": "icons/icon-circle1-16.png",
+      "48": "icons/icon-circle1-48.png"
     },
     "default_title": "Save to Telegram"
   },
@@ -21,9 +21,15 @@
   "options_page": "options/options.html",
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_start"
     }
   ],
@@ -39,8 +45,12 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["MartianMono-Regular.ttf"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "MartianMono-Regular.ttf"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

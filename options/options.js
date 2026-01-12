@@ -14,7 +14,7 @@ const DEFAULT_SETTINGS = {
   showLinkPreview: true,
   showSelectionIcon: true,
   quoteMonospace: true,
-  iconColor: 'blue',
+  iconColor: 'circle1',
   useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',
@@ -231,7 +231,7 @@ async function loadSettings() {
   const compressionValue = settings.imageCompression ? 'true' : 'false';
   document.querySelector(`input[name="imageCompression"][value="${compressionValue}"]`).checked = true;
 
-  const iconColor = settings.iconColor || 'blue';
+  const iconColor = settings.iconColor || 'circle1';
   document.querySelector(`input[name="iconColor"][value="${iconColor}"]`).checked = true;
 
   const toastStyle = settings.toastStyle || 'normal';

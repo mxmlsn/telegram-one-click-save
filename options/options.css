@@ -327,6 +327,7 @@ h3 {
 
 .icon-selector {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -541,8 +542,8 @@ button.secondary:active {
   border-radius: 9999px;
   font-size: 13px;
   transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1),
-              background 0.2s ease,
-              opacity 0.15s ease;
+    background 0.2s ease,
+    opacity 0.15s ease;
   border: 1px solid transparent;
   position: relative;
 }
@@ -621,16 +622,25 @@ button.secondary:active {
 }
 
 @keyframes shake {
-  10%, 90% {
+
+  10%,
+  90% {
     transform: translate3d(-1px, 0, 0);
   }
-  20%, 80% {
+
+  20%,
+  80% {
     transform: translate3d(2px, 0, 0);
   }
-  30%, 50%, 70% {
+
+  30%,
+  50%,
+  70% {
     transform: translate3d(-4px, 0, 0);
   }
-  40%, 60% {
+
+  40%,
+  60% {
     transform: translate3d(4px, 0, 0);
   }
 }

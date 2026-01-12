@@ -27,7 +27,7 @@ const DEFAULT_SETTINGS = {
   imageCompression: true,
   showLinkPreview: true,
   showSelectionIcon: true,
-  iconColor: 'blue',
+  iconColor: 'circle1',
   useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',
@@ -77,8 +77,25 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 
 // Set icon on startup
-chrome.storage.local.get({ iconColor: 'blue' }, (result) => {
+chrome.storage.local.get({ iconColor: 'circle1' }, (result) => {
   updateIcon(result.iconColor);
+});
+
+// Cache settings for instant toast display
+let cachedSettings = null;
+
+// Load settings into cache on startup
+chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
+  cachedSettings = { ...DEFAULT_SETTINGS, ...result };
+});
+
+// Update cache when settings change
+chrome.storage.onChanged.addListener((changes) => {
+  if (cachedSettings) {
+    for (const key of Object.keys(changes)) {
+      cachedSettings[key] = changes[key].newValue;
+    }
+  }
 });
 
 // Create context menu on install
@@ -92,28 +109,30 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  console.time('contextMenuClick'); // TIMING START
+  const clickTime = Date.now();
+  console.log('[TG Saver] Context menu clicked at', clickTime);
 
-  // Fire showTagSelection IMMEDIATELY if possible
+  if (info.menuItemId !== 'pocketIt') return;
+
+  // CRITICAL: Show toast IMMEDIATELY, before any async operations
+  // Use cached settings for instant UI, load fresh settings in parallel
+  const cachedTags = cachedSettings?.customTags;
+  const quickTagsEnabled = cachedSettings?.enableQuickTags !== false;
+  const hasNonEmptyTags = cachedTags && cachedTags.some(t => t.name && t.name.trim());
+
+  // Start settings load in parallel (non-blocking)
   const settingsPromise = getSettings();
 
-  // Try to show toast as fast as possible for images
-  if (info.menuItemId === 'pocketIt' && info.srcUrl) {
-    // For images, start showing toast immediately (parallel with settings load)
-    const settings = await settingsPromise;
-
-    if (!settings.botToken || !settings.chatId) {
-      chrome.runtime.openOptionsPage();
-      return;
-    }
-
-    console.timeLog('contextMenuClick', 'before sendImage'); // TIMING
-    await sendImage(info.srcUrl, tab.url, settings, tab.id);
-    console.timeEnd('contextMenuClick'); // TIMING END
-    return;
+  // Show tag selection toast IMMEDIATELY if we have cached tags with names
+  let tagSelectionPromise = null;
+  if (quickTagsEnabled && hasNonEmptyTags) {
+    tagSelectionPromise = showTagSelection(tab.id, cachedTags);
+  } else {
+    // No tags - show pending toast immediately
+    showToast(tab.id, 'pending', 'Sending');
   }
 
-  // For other cases (text, links)
+  // Now wait for settings
   const settings = await settingsPromise;
 
   if (!settings.botToken || !settings.chatId) {
@@ -121,12 +140,28 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  if (info.menuItemId === 'pocketIt') {
-    if (info.selectionText) {
-      await sendQuote(info.selectionText, tab.url, settings);
-    } else {
-      await sendImageFromPage(tab, settings);
+  // Wait for tag selection if we started it
+  let selectedTag = null;
+  if (tagSelectionPromise) {
+    selectedTag = await tagSelectionPromise;
+    if (selectedTag === '__CANCELLED__') {
+      return;
     }
+  }
+
+  // Handle different content types
+  if (info.srcUrl) {
+    // Image from context menu
+    await sendImageDirect(info.srcUrl, tab.url, settings, tab.id, selectedTag);
+  } else if (info.selectionText) {
+    // Selected text
+    await sendQuoteDirect(info.selectionText, tab.url, settings, tab.id, selectedTag);
+  } else if (info.linkUrl) {
+    // Link
+    await sendLinkDirect(info.linkUrl, tab.url, settings, tab.id, selectedTag);
+  } else {
+    // Page click - detect media under cursor
+    await sendImageFromPageDirect(tab, settings, selectedTag);
   }
 });
 
@@ -278,42 +313,28 @@ async function showToast(tabId, state, message) {
 
 // Show tag selection toast and wait for response
 async function showTagSelection(tabId, customTags) {
-  console.time('showTagSelection'); // TIMING START
   const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
-  try {
-    // Content script is already loaded via manifest.json
-    // Create promise that will be resolved when tag is selected
-    const tagPromise = new Promise((resolve) => {
-      pendingRequests.set(requestId, { resolve });
+  // Create promise that will be resolved when tag is selected
+  const tagPromise = new Promise((resolve) => {
+    pendingRequests.set(requestId, { resolve });
 
-      // Timeout fallback (30 seconds - user may be hovering)
-      setTimeout(() => {
-        if (pendingRequests.has(requestId)) {
-          pendingRequests.delete(requestId);
-          resolve(null);
-        }
-      }, 30000);
-    });
+    // Timeout fallback (30 seconds - user may be hovering)
+    setTimeout(() => {
+      if (pendingRequests.has(requestId)) {
+        pendingRequests.delete(requestId);
+        resolve(null);
+      }
+    }, 30000);
+  });
 
-    console.timeLog('showTagSelection', 'before sendMessage'); // TIMING
-    // Send message WITHOUT await - fire and forget for speed
-    chrome.tabs.sendMessage(tabId, {
-      action: 'showTagSelection',
-      customTags: customTags,
-      requestId: requestId
-    }).catch(e => {
-      console.error('Failed to send tag selection message:', e);
-    });
-    console.timeLog('showTagSelection', 'after sendMessage'); // TIMING
+  // Send minimal message - content script uses its LOCAL cache for tags
+  chrome.tabs.sendMessage(tabId, {
+    action: 'preShowToast',
+    requestId: requestId
+  }).catch(() => {});
 
-    const result = await tagPromise;
-    console.timeEnd('showTagSelection'); // TIMING END
-    return result;
-  } catch (e) {
-    console.error('Failed to show tag selection:', e);
-    return null;
-  }
+  return tagPromise;
 }
 
 // Send screenshot of current tab
@@ -728,4 +749,161 @@ async function sendDocument(blob, caption, settings, originalUrl) {
   }
 
   return response.json();
+}
+
+// ============ DIRECT FUNCTIONS (tag already selected) ============
+
+// Send image directly (tag already selected via context menu handler)
+async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) {
+  // Start fetching image immediately
+  const blobPromise = fetch(imageUrl)
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to fetch image');
+      return response.blob();
+    })
+    .catch(e => {
+      console.error('Image fetch error, using screenshot fallback:', e);
+      return null;
+    });
+
+  // Wait for image
+  let blob = await blobPromise;
+  let useScreenshot = false;
+
+  if (!blob && tabId) {
+    useScreenshot = true;
+    const screenshotDataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+    blob = await fetch(screenshotDataUrl).then(r => r.blob());
+  }
+
+  const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+
+  if (settings.imageCompression || useScreenshot) {
+    await sendPhoto(blob, caption, settings);
+  } else {
+    await sendDocument(blob, caption, settings, imageUrl);
+  }
+
+  if (tabId) await showToast(tabId, 'success', 'Success');
+}
+
+// Send quote directly (tag already selected via context menu handler)
+async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
+  const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
+  await sendTextMessage(caption, settings);
+  if (tabId) await showToast(tabId, 'success', 'Success');
+}
+
+// Send link directly (tag already selected via context menu handler)
+async function sendLinkDirect(linkUrl, pageUrl, settings, tabId, selectedTag) {
+  const caption = buildCaption(linkUrl, settings.tagLink, '', settings, selectedTag);
+  await sendTextMessage(caption, settings);
+  if (tabId) await showToast(tabId, 'success', 'Success');
+}
+
+// Send image from page directly (tag already selected via context menu handler)
+async function sendImageFromPageDirect(tab, settings, selectedTag) {
+  const tabId = tab.id;
+  const isInstagram = tab.url.includes('instagram.com');
+
+  // Find image or video under cursor via content script
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: (isInstagram) => {
+      const el = window.__tgSaverLastRightClicked;
+      if (!el) return { type: null };
+
+      if (!isInstagram) {
+        if (el.tagName === 'VIDEO') {
+          return { type: 'video', src: el.src || el.currentSrc };
+        }
+        if (el.tagName === 'IMG') {
+          return { type: 'image', src: el.src };
+        }
+        return { type: null };
+      }
+
+      // Instagram: aggressive search
+      let video = el.closest('video') || el.querySelector('video');
+      if (!video) {
+        video = el.closest('[aria-label*="Video"], [role="group"]')?.querySelector('video');
+      }
+      if (!video) {
+        let parent = el.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          video = parent.querySelector('video');
+          if (video) break;
+          parent = parent.parentElement;
+        }
+      }
+
+      if (video) {
+        return { type: 'video', src: video.src || video.currentSrc };
+      }
+
+      let img = el.closest('img') || el.querySelector('img');
+      if (!img) {
+        img = el.closest('[class*="image"], [class*="photo"], [class*="media"]')?.querySelector('img');
+      }
+      if (!img) {
+        let parent = el.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          img = parent.querySelector('img');
+          if (img) break;
+          parent = parent.parentElement;
+        }
+      }
+
+      if (img) {
+        return { type: 'image', src: img.src };
+      }
+
+      return { type: null };
+    },
+    args: [isInstagram]
+  });
+
+  const media = results[0]?.result;
+
+  if (!media || !media.type) {
+    // No media found - send screenshot + link
+    await sendScreenshotDirect(tab, settings, selectedTag);
+    return;
+  }
+
+  if (media.type === 'video') {
+    // For video: take screenshot
+    await sendVideoDirect(tab, settings, selectedTag);
+  } else {
+    // For image
+    await sendImageDirect(media.src, tab.url, settings, tabId, selectedTag);
+  }
+}
+
+// Send screenshot directly (tag already selected)
+async function sendScreenshotDirect(tab, settings, selectedTag) {
+  const capturePromise = settings.addScreenshot ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
+
+  if (!settings.addScreenshot) {
+    await sendMessage(tab.url, settings, selectedTag);
+    await showToast(tab.id, 'success', 'Success');
+    return;
+  }
+
+  const dataUrl = await capturePromise;
+  const blob = await fetch(dataUrl).then(r => r.blob());
+  const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
+
+  await sendPhoto(blob, caption, settings);
+  await showToast(tab.id, 'success', 'Success');
+}
+
+// Send video as screenshot directly (tag already selected)
+async function sendVideoDirect(tab, settings, selectedTag) {
+  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  const blob = await fetch(dataUrl).then(r => r.blob());
+  const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
+
+  await sendPhoto(blob, caption, settings);
+  await showToast(tab.id, 'success', 'Success');
 }
