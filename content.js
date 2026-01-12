@@ -81,7 +81,7 @@ function showTagSelectionToast(customTags, requestId) {
         .filter(tag => tag.name && tag.name.trim().length > 0);
 
       tagsHtml = nonEmptyTags.map(tag => `
-        <button class="tg-saver-tag-btn" data-index="${tag.index}">
+        <button class="tg-saver-tag-btn" data-index="${tag.index}" data-tag-name="${tag.name}">
           <span class="tg-saver-tag-dot" style="background: ${tag.color}"></span>
           <span class="tg-saver-tag-name">${tag.name}</span>
         </button>
@@ -137,6 +137,11 @@ function showTagSelectionToast(customTags, requestId) {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        // Hide tooltip on click
+        const tooltip = document.getElementById('tg-saver-tag-tooltip');
+        if (tooltip) tooltip.remove();
+
         const index = parseInt(btn.dataset.index);
         const selectedTag = index >= 0 ? customTags[index] : null;
 
@@ -155,6 +160,92 @@ function showTagSelectionToast(customTags, requestId) {
         doSend(requestId, selectedTag);
       });
     });
+
+    // Add hover tooltip for minimalist mode (using event delegation on toast)
+    if (isMinimalist) {
+      console.log('[TG-Saver] Minimalist mode detected, setting up tooltip listeners');
+      console.log('[TG-Saver] Found tag buttons:', toast.querySelectorAll('.tg-saver-tag-btn').length);
+
+      toast.addEventListener('mouseover', (e) => {
+        console.log('[TG-Saver] mouseover event, target:', e.target.tagName, e.target.className);
+
+        const btn = e.target.closest('.tg-saver-tag-btn');
+        console.log('[TG-Saver] closest btn:', btn);
+
+        if (!btn) {
+          console.log('[TG-Saver] No button found, returning');
+          return;
+        }
+
+        const tagName = btn.getAttribute('data-tag-name');
+        console.log('[TG-Saver] tagName:', tagName);
+
+        if (!tagName) {
+          console.log('[TG-Saver] No tagName, returning');
+          return;
+        }
+
+        let tooltip = document.getElementById('tg-saver-tag-tooltip');
+        console.log('[TG-Saver] Existing tooltip:', tooltip);
+
+        if (!tooltip) {
+          tooltip = document.createElement('div');
+          tooltip.id = 'tg-saver-tag-tooltip';
+          // НЕ используем CSS класс - применяем стили напрямую
+          tooltip.style.cssText = `
+            position: fixed !important;
+            z-index: 2147483647 !important;
+            font-family: 'MartianMono', monospace !important;
+            font-size: 14px !important;
+            font-weight: 400 !important;
+            color: white !important;
+            text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8), 1px 1px 2px rgba(0,0,0,1), -1px -1px 2px rgba(0,0,0,1) !important;
+            white-space: nowrap !important;
+            pointer-events: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            line-height: 1 !important;
+            letter-spacing: -0.02em !important;
+            text-align: right !important;
+            transition: opacity 0.15s ease !important;
+          `;
+          document.body.appendChild(tooltip);
+          console.log('[TG-Saver] Created new tooltip');
+        }
+
+        tooltip.textContent = tagName;
+        const toastRect = toast.getBoundingClientRect();
+        const btnRect = btn.getBoundingClientRect();
+
+        const topPos = btnRect.top + (btnRect.height / 2);
+        const rightPos = window.innerWidth - toastRect.left + 10;
+
+        console.log('[TG-Saver] Positioning - top:', topPos, 'right:', rightPos);
+
+        // Position to the left of the toast with 10px gap, vertically centered with the button
+        tooltip.style.top = topPos + 'px';
+        tooltip.style.right = rightPos + 'px';
+        tooltip.style.transform = 'translateY(-50%)';
+        tooltip.style.opacity = '1';
+        tooltip.style.visibility = 'visible';
+
+        console.log('[TG-Saver] Tooltip should be visible now. Computed style:', window.getComputedStyle(tooltip).opacity);
+      });
+
+      toast.addEventListener('mouseout', (e) => {
+        const btn = e.target.closest('.tg-saver-tag-btn');
+        const relatedBtn = e.relatedTarget ? e.relatedTarget.closest('.tg-saver-tag-btn') : null;
+
+        if (btn && btn !== relatedBtn) {
+          const tooltip = document.getElementById('tg-saver-tag-tooltip');
+          if (tooltip) {
+            tooltip.style.opacity = '0';
+          }
+        }
+      });
+    } else {
+      console.log('[TG-Saver] NOT minimalist mode, toastStyle:', result.toastStyle);
+    }
 
     // HOVER - set pause flag
     toast.addEventListener('mouseenter', () => {
