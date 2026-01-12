@@ -532,51 +532,86 @@ async function resetSettings() {
   showStatus('Settings reset to default', true);
 }
 
-// Carousel
-const carouselSlides = document.getElementById('carouselSlides');
-const carouselDots = document.getElementById('carouselDots');
-const carouselPrev = document.getElementById('carouselPrev');
-const carouselNext = document.getElementById('carouselNext');
-let currentSlide = 0;
-const totalSlides = 4;
+// How to section - collapsible with steps
+const howtoSection = document.getElementById('howtoSection');
+const howtoToggle = document.getElementById('howtoToggle');
+const howtoDots = document.getElementById('howtoDots');
+const howtoNext = document.getElementById('howtoNext');
+const howtoTextContent = document.getElementById('howtoTextContent');
+const howtoImageArea = document.querySelector('.howto-image-area .howto-image');
+let currentStep = 0;
+const totalSteps = 4;
 
-function updateCarousel() {
-  carouselSlides.style.transform = `translateX(-${currentSlide * 100}%)`;
-
-  // Update dots
-  carouselDots.querySelectorAll('.carousel-dot').forEach((dot, index) => {
-    dot.classList.toggle('active', index === currentSlide);
+function updateHowtoStep() {
+  // Update text steps
+  howtoTextContent.querySelectorAll('.howto-step').forEach((step, index) => {
+    step.classList.toggle('active', index === currentStep);
   });
 
-  // Update arrows
-  carouselPrev.disabled = currentSlide === 0;
-  carouselNext.disabled = currentSlide === totalSlides - 1;
+  // Update dots
+  howtoDots.querySelectorAll('.howto-dot').forEach((dot, index) => {
+    dot.classList.toggle('active', index === currentStep);
+  });
+
+  // Update image
+  if (howtoImageArea) {
+    howtoImageArea.dataset.step = currentStep + 1;
+  }
 }
 
-carouselPrev.addEventListener('click', () => {
-  if (currentSlide > 0) {
-    currentSlide--;
-    updateCarousel();
+// Toggle collapse/expand with fade animation for title
+function toggleHowtoSection() {
+  // Add collapsing class for fade animation
+  howtoSection.classList.add('collapsing');
+
+  // Wait for fade out (200ms)
+  setTimeout(() => {
+    howtoSection.classList.toggle('collapsed');
+
+    // Remove collapsing class early so title fades in before animation ends
+    setTimeout(() => {
+      howtoSection.classList.remove('collapsing');
+    }, 150); // Title appears 150ms into the 300ms animation
+  }, 200);
+}
+
+// Click on section to expand (only when collapsed)
+howtoSection.addEventListener('click', (e) => {
+  // Only expand if collapsed and not clicking the toggle button
+  if (howtoSection.classList.contains('collapsed') && !e.target.closest('.howto-toggle-btn')) {
+    toggleHowtoSection();
   }
 });
 
-carouselNext.addEventListener('click', () => {
-  if (currentSlide < totalSlides - 1) {
-    currentSlide++;
-    updateCarousel();
-  }
+// Click on toggle button to collapse/expand
+howtoToggle.addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent section click event
+  toggleHowtoSection();
 });
 
-carouselDots.addEventListener('click', (e) => {
-  const dot = e.target.closest('.carousel-dot');
+// Dots navigation
+howtoDots.addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent section click event
+  const dot = e.target.closest('.howto-dot');
   if (dot) {
-    currentSlide = parseInt(dot.dataset.step) - 1;
-    updateCarousel();
+    currentStep = parseInt(dot.dataset.step) - 1;
+    updateHowtoStep();
   }
 });
 
-// Initialize carousel
-updateCarousel();
+// Next button navigation
+howtoNext.addEventListener('click', (e) => {
+  e.stopPropagation(); // Prevent section click event
+  if (currentStep < totalSteps - 1) {
+    currentStep++;
+  } else {
+    currentStep = 0; // Loop back to first step
+  }
+  updateHowtoStep();
+});
+
+// Initialize
+updateHowtoStep();
 
 // Custom tags functions
 function renderCustomTags() {

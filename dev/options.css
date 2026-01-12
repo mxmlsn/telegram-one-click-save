@@ -23,7 +23,7 @@ body {
 .container {
   margin: 40px auto;
   padding: 0 54px;
-  max-width: calc(208px +514px + 546px + 48px + 108px);
+  max-width: calc(170px +514px + 546px + 48px + 108px);
   /* three columns + gaps + padding */
 }
 
@@ -47,11 +47,10 @@ h1 {
   font-weight: 400;
   color: rgba(255, 255, 255, 0.4);
   letter-spacing: -0.02em;
-  text-transform: uppercase;
 }
 
 .status-value {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.3;
@@ -75,7 +74,7 @@ h1 {
 }
 
 .column-first {
-  width: 208px;
+  width: 170px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -95,7 +94,7 @@ h1 {
 .column-second {
   width: 514px;
   flex-shrink: 0;
-  gap: 16px;
+  gap: 5px;
 }
 
 .column-third {
@@ -161,16 +160,15 @@ h3 {
   border-radius: 9999px;
   font-size: 13px;
   font-family: 'MartianMono', monospace;
-  background: rgba(45, 45, 45, 0.41);
+  background: transparent;
   color: rgba(255, 255, 255, 0.8);
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color 0.2s;
   letter-spacing: -0.02em;
 }
 
 .credentials-section input:focus {
   outline: none;
   border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(45, 45, 45, 0.6);
 }
 
 .credentials-section .actions {
@@ -179,103 +177,139 @@ h3 {
   border-top: none;
 }
 
-/* How to section */
-.howto-section h2 {
-  margin-bottom: 16px;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-/* Carousel */
-.carousel {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.carousel-arrow {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(45, 45, 45, 0.41);
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s;
-}
-
-.carousel-arrow:hover {
-  background: rgba(109, 109, 109, 0.9);
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.carousel-arrow:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.carousel-content {
-  flex: 1;
+/* How to section - New collapsible design */
+.howto-section {
+  height: 314px;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  border-radius: 12px;
+  cursor: pointer;
 }
 
-.carousel-slides {
+.howto-section.collapsed {
+  height: 103px;
+}
+
+.howto-layout {
   display: flex;
-  transition: transform 0.3s ease;
+  gap: 16px;
+  height: 100%;
 }
 
-.carousel-slide {
-  min-width: 100%;
-  display: flex;
-  flex-direction: column;
+.howto-image-area {
+  width: 218px;
+  flex-shrink: 0;
+  height: 268px;
 }
 
-.slide-image {
+.howto-image {
+  width: 100%;
+  height: 100%;
   background: rgba(45, 45, 45, 0.41);
   border-radius: 12px;
-  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.4);
   font-size: 14px;
-  margin-bottom: 12px;
-  letter-spacing: -0.02em;
 }
 
-.slide-image::before {
-  content: attr(data-placeholder);
+.howto-image::before {
+  content: "Step " attr(data-step);
 }
 
-.slide-text {
-  font-size: 13px;
+.howto-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.howto-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.howto-header h2 {
+  font-size: 23px;
+  line-height: 1.2;
+  max-width: 180px;
+  margin-bottom: 0;
+  transition: opacity 0.2s ease;
+}
+
+.howto-section.collapsing .howto-header h2 {
+  opacity: 0;
+}
+
+.howto-toggle-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #1f1f1f;
   color: rgba(255, 255, 255, 0.8);
-  text-align: center;
-  padding: 8px 12px;
-  background: rgba(45, 45, 45, 0.41);
-  border-radius: 9999px;
-  min-height: 48px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  letter-spacing: -0.02em;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
-.slide-text a {
+.howto-section.collapsed .howto-toggle-btn {
+  background: #B0F724;
+  color: #181818;
+}
+
+.howto-toggle-btn:hover {
+  background: #6D6D6D;
+}
+
+.howto-section.collapsed .howto-toggle-btn:hover {
+  background: #9DE310;
+}
+
+.howto-toggle-btn svg {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: rotate(180deg);
+}
+
+.howto-section.collapsed .howto-toggle-btn svg {
+  transform: rotate(0deg);
+}
+
+.howto-text-content {
+  flex: 1;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.howto-step {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  display: none;
+}
+
+.howto-step.active {
+  display: block;
+}
+
+.howto-step a {
   color: #15A2FF;
   text-decoration: none;
 }
 
-.slide-text a:hover {
+.howto-step a:hover {
   text-decoration: underline;
 }
 
-.slide-text code {
+.howto-step code {
   background: rgba(109, 109, 109, 0.9);
   padding: 2px 6px;
   border-radius: 4px;
@@ -283,37 +317,72 @@ h3 {
   font-size: 12px;
 }
 
-/* Carousel dots */
-.carousel-dots {
+.howto-dots {
   display: flex;
-  justify-content: center;
   gap: 8px;
-  margin-top: 16px;
+  position: absolute;
+  bottom: 0;
 }
 
-.carousel-dot {
-  width: 28px;
-  height: 28px;
+.howto-next-btn {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: none;
-  background: rgba(45, 45, 45, 0.41);
+  background: #B0F724;
+  color: #181818;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+}
+
+.howto-next-btn:hover {
+  background: #9DE310;
+}
+
+.howto-next-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.howto-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
   cursor: pointer;
   transition: all 0.2s;
   font-family: 'MartianMono', monospace;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.carousel-dot:hover {
-  background: rgba(109, 109, 109, 0.9);
+.howto-dot:hover {
+  border-color: rgba(255, 255, 255, 0.3);
   color: rgba(255, 255, 255, 0.9);
 }
 
-.carousel-dot.active {
-  background: rgba(109, 109, 109, 0.9);
-  color: rgba(255, 255, 255, 0.9);
-  transform: scale(1.1);
+.howto-dot.active {
+  background: #B0F724;
+  border-color: #B0F724;
+  color: #181818;
+}
+
+.howto-section.collapsed .howto-image-area,
+.howto-section.collapsed .howto-text-content,
+.howto-section.collapsed .howto-dots,
+.howto-section.collapsed .howto-next-btn {
+  display: none;
 }
 
 /* Settings groups */
