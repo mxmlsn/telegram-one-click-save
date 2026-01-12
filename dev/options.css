@@ -897,8 +897,7 @@ input:checked+.slider:before {
 .theme-tags-main-wrapper {
   display: flex;
   gap: 20px;
-  margin-bottom: 20px;
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .theme-tags-left-wrapper {
@@ -916,6 +915,7 @@ input:checked+.slider:before {
 .emoji-controls-wrapper {
   display: flex;
   flex-direction: column;
+  margin-top: auto;
 }
 
 .theme-tags-additional {
@@ -923,6 +923,7 @@ input:checked+.slider:before {
   flex-direction: column;
   gap: 12px;
   padding-top: 20px;
+  margin-top: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 

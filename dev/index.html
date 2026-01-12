@@ -261,21 +261,21 @@
 
         <!-- Section 4: Theme Tags -->
         <section class="section section-quicktags">
-          <div class="field checkbox-field theme-tags-header">
-            <label>
-              <label class="switch">
-                <input type="checkbox" id="enableQuickTags" checked>
-                <span class="slider"></span>
-              </label>
-              THEME TAGS
-            </label>
-          </div>
+          <!-- Two columns layout: left with header and controls, right with tags only -->
+          <div class="theme-tags-main-wrapper">
+            <!-- Left column: Header + Emoji controls -->
+            <div class="theme-tags-left-wrapper">
+              <div class="field checkbox-field theme-tags-header">
+                <label>
+                  <label class="switch">
+                    <input type="checkbox" id="enableQuickTags" checked>
+                    <span class="slider"></span>
+                  </label>
+                  THEME TAGS
+                </label>
+              </div>
 
-          <div id="quickTagsSettings">
-            <!-- Two columns layout -->
-            <div class="theme-tags-main-wrapper">
-              <!-- Left column: Emoji controls -->
-              <div class="theme-tags-left-wrapper">
+              <div id="quickTagsSettings">
                 <div class="emoji-controls-wrapper">
                   <div class="field checkbox-field emoji-global-toggle">
                     <label>
@@ -298,13 +298,15 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Right column: Tags list starting from top -->
-              <div class="theme-tags-right">
-                <div id="customTagsList" class="custom-tags-list"></div>
-              </div>
             </div>
 
+            <!-- Right column: Tags list starting from absolute top -->
+            <div class="theme-tags-right" id="customTagsListWrapper">
+              <div id="customTagsList" class="custom-tags-list"></div>
+            </div>
+          </div>
+
+          <div id="quickTagsSettingsAdditional">
             <!-- Additional settings below columns -->
             <div class="theme-tags-additional">
               <div class="field pill-toggle-field">

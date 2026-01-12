@@ -812,6 +812,14 @@ function toggleQuickTagsSettings(enabled) {
   if (quickTagsSettings) {
     quickTagsSettings.style.display = enabled ? 'block' : 'none';
   }
+  const customTagsListWrapper = document.getElementById('customTagsListWrapper');
+  if (customTagsListWrapper) {
+    customTagsListWrapper.style.display = enabled ? 'flex' : 'none';
+  }
+  const quickTagsSettingsAdditional = document.getElementById('quickTagsSettingsAdditional');
+  if (quickTagsSettingsAdditional) {
+    quickTagsSettingsAdditional.style.display = enabled ? 'block' : 'none';
+  }
 }
 
 function toggleEmojiPackSettings(enabled) {
