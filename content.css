@@ -47,6 +47,7 @@
   width: 168px !important;
   min-width: 168px !important;
   max-width: 168px !important;
+  min-height: 44px !important;
   box-sizing: border-box !important;
 
   /* Reset margins and padding */
@@ -63,6 +64,7 @@
   width: 168px !important;
   min-width: 168px !important;
   max-width: 168px !important;
+  transition: padding 0.2s ease !important;
 }
 
 .tg-saver-toast.tg-saver-visible {
@@ -81,6 +83,12 @@
   margin: 0 !important;
   padding: 0 !important;
   flex-shrink: 0 !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s ease !important;
+}
+
+.tg-saver-icon.tg-saver-visible-content {
+  opacity: 1 !important;
 }
 
 .tg-saver-text {
@@ -95,6 +103,12 @@
   text-transform: none !important;
   letter-spacing: normal !important;
   flex-shrink: 0 !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s ease !important;
+}
+
+.tg-saver-text.tg-saver-visible-content {
+  opacity: 1 !important;
 }
 
 /* Toast with tags */
@@ -106,12 +120,14 @@
   width: 168px !important;
   min-width: 168px !important;
   max-width: 168px !important;
+  transition: height 0.2s ease, padding 0.2s ease !important;
 }
 
 .tg-saver-toast-content {
   padding: 17px 10px 10px 10px !important;
   margin: 0 !important;
   box-sizing: border-box !important;
+  transition: opacity 0.15s ease !important;
 }
 
 .tg-saver-toast-header {

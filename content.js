@@ -40,7 +40,13 @@ function showSimpleToast(state, message) {
     toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">${message}</span>`;
     document.body.appendChild(toast);
 
-    requestAnimationFrame(() => toast.classList.add('tg-saver-visible'));
+    requestAnimationFrame(() => {
+      toast.classList.add('tg-saver-visible');
+      const icon = toast.querySelector('.tg-saver-icon');
+      const text = toast.querySelector('.tg-saver-text');
+      if (icon) icon.classList.add('tg-saver-visible-content');
+      if (text) text.classList.add('tg-saver-visible-content');
+    });
   } else if (state === 'success') {
     killTimer();
 
@@ -52,20 +58,33 @@ function showSimpleToast(state, message) {
       document.body.appendChild(toast);
     }
 
-    toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
-    toast.classList.add('tg-saver-success');
-    toast.classList.remove('tg-saver-with-tags');
+    // Fade out current content if any
+    const currentIcon = toast.querySelector('.tg-saver-icon');
+    const currentText = toast.querySelector('.tg-saver-text');
+    if (currentIcon) currentIcon.classList.remove('tg-saver-visible-content');
+    if (currentText) currentText.classList.remove('tg-saver-visible-content');
 
-    // Ensure toast is visible
-    requestAnimationFrame(() => {
-      toast.classList.add('tg-saver-visible');
+    // Wait for fade out, then change content
+    setTimeout(() => {
+      toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
+      toast.classList.add('tg-saver-success');
+      toast.classList.remove('tg-saver-with-tags');
 
-      // Keep success message visible for exactly 1500ms
-      setTimeout(() => {
-        toast.classList.remove('tg-saver-visible');
-        setTimeout(() => toast.remove(), 200);
-      }, 1500);
-    });
+      // Ensure toast is visible and fade in new content
+      requestAnimationFrame(() => {
+        toast.classList.add('tg-saver-visible');
+        const icon = toast.querySelector('.tg-saver-icon');
+        const text = toast.querySelector('.tg-saver-text');
+        if (icon) icon.classList.add('tg-saver-visible-content');
+        if (text) text.classList.add('tg-saver-visible-content');
+
+        // Keep success message visible for exactly 1500ms
+        setTimeout(() => {
+          toast.classList.remove('tg-saver-visible');
+          setTimeout(() => toast.remove(), 200);
+        }, 1500);
+      });
+    }, 150);
   }
 }
 
@@ -162,12 +181,37 @@ function showTagSelectionToast(customTags, requestId) {
 
         killTimer();
 
-        // Show gray "sending" state immediately
-        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
-        toast.classList.remove('tg-saver-with-tags');
+        // Fix current height for smooth morph to min-height
+        const currentHeight = toast.offsetHeight;
+        toast.style.height = currentHeight + 'px';
 
-        // Don't fade out - let it transform into success toast
-        doSend(requestId, selectedTag);
+        // Fade out content
+        const content = toast.querySelector('.tg-saver-toast-content');
+        if (content) {
+          content.style.opacity = '0';
+        }
+
+        // Shrink to min-height (44px)
+        requestAnimationFrame(() => {
+          toast.style.height = '44px';
+
+          // Wait for animation, then change content
+          setTimeout(() => {
+            toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
+            toast.classList.remove('tg-saver-with-tags');
+            toast.style.height = '';
+
+            // Fade in new content
+            requestAnimationFrame(() => {
+              const icon = toast.querySelector('.tg-saver-icon');
+              const text = toast.querySelector('.tg-saver-text');
+              if (icon) icon.classList.add('tg-saver-visible-content');
+              if (text) text.classList.add('tg-saver-visible-content');
+            });
+
+            doSend(requestId, selectedTag);
+          }, 200);
+        });
       });
     });
 
@@ -292,15 +336,41 @@ function startCountdown(requestId) {
         return;
       }
 
-      // Show gray "sending" state immediately
+      // Show gray "sending" state with smooth morph
       const toast = document.getElementById('tg-saver-toast');
       if (toast) {
-        toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
-        toast.classList.remove('tg-saver-with-tags');
-      }
+        // Fix current height for smooth morph to min-height
+        const currentHeight = toast.offsetHeight;
+        toast.style.height = currentHeight + 'px';
 
-      // Don't fade out - let it transform into success toast
-      doSend(requestId, null);
+        // Fade out content
+        const content = toast.querySelector('.tg-saver-toast-content');
+        if (content) {
+          content.style.opacity = '0';
+        }
+
+        // Shrink to min-height (44px)
+        requestAnimationFrame(() => {
+          toast.style.height = '44px';
+
+          // Wait for animation, then change content
+          setTimeout(() => {
+            toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
+            toast.classList.remove('tg-saver-with-tags');
+            toast.style.height = '';
+
+            // Fade in new content
+            requestAnimationFrame(() => {
+              const icon = toast.querySelector('.tg-saver-icon');
+              const text = toast.querySelector('.tg-saver-text');
+              if (icon) icon.classList.add('tg-saver-visible-content');
+              if (text) text.classList.add('tg-saver-visible-content');
+            });
+
+            doSend(requestId, null);
+          }, 200);
+        });
+      }
     }
   }, TICK);
 }
