@@ -291,31 +291,12 @@ async function showTagSelection(tabId, customTags) {
   }
 }
 
-// Hide toast before taking screenshot
-async function hideToastForScreenshot(tabId) {
-  try {
-    await chrome.tabs.sendMessage(tabId, {
-      action: 'hideToastBeforeScreenshot'
-    });
-  } catch (e) {
-    // Ignore errors - toast may not exist
-  }
-}
-
-// Restore toast after taking screenshot
-async function restoreToastAfterScreenshot(tabId) {
-  try {
-    await chrome.tabs.sendMessage(tabId, {
-      action: 'restoreToastAfterScreenshot'
-    });
-  } catch (e) {
-    // Ignore errors - toast may not exist
-  }
-}
-
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
-  // Show tag selection if custom tags exist and enabled
+  // Start capture immediately (non-blocking)
+  const capturePromise = chrome.tabs.captureVisibleTab(null, { format: 'png' });
+
+  // Show tag selection if custom tags exist and enabled (runs in parallel with capture)
   let selectedTag = null;
   if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tab.id, settings.customTags);
@@ -327,10 +308,8 @@ async function sendScreenshot(tab, settings) {
     await showToast(tab.id, 'pending', 'Sending');
   }
 
-  // Hide toast before screenshot to prevent it from appearing in capture
-  await hideToastForScreenshot(tab.id);
-  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-  await restoreToastAfterScreenshot(tab.id);
+  // Wait for capture to complete
+  const dataUrl = await capturePromise;
 
   if (!settings.addScreenshot) {
     // Send just the link without screenshot
@@ -353,17 +332,6 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
     tabId = tab?.id;
   }
 
-  // Show tag selection if custom tags exist and not already selected
-  if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
-    selectedTag = await showTagSelection(tabId, settings.customTags);
-    // Check if cancelled
-    if (selectedTag === '__CANCELLED__') {
-      return;
-    }
-  } else if (tabId && !selectedTag) {
-    await showToast(tabId, 'pending', 'Sending');
-  }
-
   let blob;
   let useScreenshot = false;
 
@@ -376,11 +344,24 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
     useScreenshot = true;
   }
 
-  if (useScreenshot && tabId) {
-    await hideToastForScreenshot(tabId);
-    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-    await restoreToastAfterScreenshot(tabId);
-    blob = await fetch(dataUrl).then(r => r.blob());
+  // Start capture immediately (non-blocking) if needed
+  const screenshotPromise = (useScreenshot && tabId) ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
+
+  // Show tag selection if custom tags exist and not already selected (runs in parallel)
+  if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
+    selectedTag = await showTagSelection(tabId, settings.customTags);
+    // Check if cancelled
+    if (selectedTag === '__CANCELLED__') {
+      return;
+    }
+  } else if (tabId && !selectedTag) {
+    await showToast(tabId, 'pending', 'Sending');
+  }
+
+  // Wait for capture to complete if it was started
+  if (screenshotPromise) {
+    const screenshotDataUrl = await screenshotPromise;
+    blob = await fetch(screenshotDataUrl).then(r => r.blob());
   }
 
   const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
@@ -497,7 +478,10 @@ async function sendImageFromPage(tab, settings) {
 
 // Send video as screenshot with #image tag
 async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
-  // Show tag selection if custom tags exist and not already selected
+  // Start capture immediately (non-blocking)
+  const capturePromise = chrome.tabs.captureVisibleTab(null, { format: 'png' });
+
+  // Show tag selection if custom tags exist and not already selected (runs in parallel)
   if (selectedTag === null && settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
     selectedTag = await showTagSelection(tab.id, settings.customTags);
     // Check if cancelled
@@ -508,9 +492,8 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
     await showToast(tab.id, 'pending', 'Sending');
   }
 
-  await hideToastForScreenshot(tab.id);
-  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-  await restoreToastAfterScreenshot(tab.id);
+  // Wait for capture to complete
+  const dataUrl = await capturePromise;
   const blob = await fetch(dataUrl).then(r => r.blob());
 
   const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
@@ -521,13 +504,12 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
 
 // Send screenshot with pre-selected tag (for sendImageFromPage flow)
 async function sendScreenshotWithTag(tab, settings, selectedTag) {
+  // Start capture immediately (non-blocking) if needed
+  const capturePromise = settings.addScreenshot ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
+
   if (!selectedTag) {
     await showToast(tab.id, 'pending', 'Sending');
   }
-
-  await hideToastForScreenshot(tab.id);
-  const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-  await restoreToastAfterScreenshot(tab.id);
 
   if (!settings.addScreenshot) {
     await sendMessage(tab.url, settings, selectedTag);
@@ -535,6 +517,8 @@ async function sendScreenshotWithTag(tab, settings, selectedTag) {
     return;
   }
 
+  // Wait for capture to complete
+  const dataUrl = await capturePromise;
   const blob = await fetch(dataUrl).then(r => r.blob());
   const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
@@ -544,10 +528,6 @@ async function sendScreenshotWithTag(tab, settings, selectedTag) {
 
 // Send image with pre-selected tag (for sendImageFromPage flow)
 async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag) {
-  if (!selectedTag) {
-    await showToast(tabId, 'pending', 'Sending');
-  }
-
   let blob;
   let useScreenshot = false;
 
@@ -560,11 +540,17 @@ async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag)
     useScreenshot = true;
   }
 
-  if (useScreenshot && tabId) {
-    await hideToastForScreenshot(tabId);
-    const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
-    await restoreToastAfterScreenshot(tabId);
-    blob = await fetch(dataUrl).then(r => r.blob());
+  // Start capture immediately (non-blocking) if needed
+  const screenshotPromise = (useScreenshot && tabId) ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
+
+  if (!selectedTag) {
+    await showToast(tabId, 'pending', 'Sending');
+  }
+
+  // Wait for capture to complete if it was started
+  if (screenshotPromise) {
+    const screenshotDataUrl = await screenshotPromise;
+    blob = await fetch(screenshotDataUrl).then(r => r.blob());
   }
 
   const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);

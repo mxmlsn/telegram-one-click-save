@@ -24,14 +24,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     showTagSelectionToast(message.customTags, message.requestId);
     sendResponse({ received: true });
     return true;
-  } else if (message.action === 'hideToastBeforeScreenshot') {
-    hideToastBeforeScreenshot();
-    sendResponse({ hidden: true });
-    return true;
-  } else if (message.action === 'restoreToastAfterScreenshot') {
-    restoreToastAfterScreenshot();
-    sendResponse({ restored: true });
-    return true;
   }
 });
 
@@ -423,25 +415,6 @@ function killTimer() {
   if (ToastState.intervalId) {
     clearInterval(ToastState.intervalId);
     ToastState.intervalId = null;
-  }
-}
-
-// Hide toast before screenshot (to avoid capturing it)
-function hideToastBeforeScreenshot() {
-  const toast = document.getElementById('tg-saver-toast');
-  if (toast) {
-    toast.dataset.wasVisible = toast.classList.contains('tg-saver-visible') ? '1' : '0';
-    toast.style.opacity = '0';
-    toast.style.visibility = 'hidden';
-  }
-}
-
-// Restore toast after screenshot
-function restoreToastAfterScreenshot() {
-  const toast = document.getElementById('tg-saver-toast');
-  if (toast && toast.dataset.wasVisible === '1') {
-    toast.style.opacity = '';
-    toast.style.visibility = '';
   }
 }
 
