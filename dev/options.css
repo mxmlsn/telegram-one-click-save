@@ -22,7 +22,8 @@ body {
 .container {
   margin: 40px auto;
   padding: 0 54px;
-  max-width: calc(546px + 546px + 24px + 108px); /* two columns + gap + padding */
+  max-width: calc(546px + 546px + 24px + 108px);
+  /* two columns + gap + padding */
 }
 
 h1 {
@@ -357,8 +358,9 @@ h3 {
 .icon-selector {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 12px;
+  gap: 8px;
   flex: 1;
+  max-width: 80%;
 }
 
 .icon-option {
@@ -366,9 +368,9 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 4px;
   border: 2px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   transition: border-color 0.2s, background 0.2s;
 }
 
@@ -390,8 +392,8 @@ h3 {
 }
 
 .icon-option img {
-  width: 29px;
-  height: 29px;
+  width: 24px;
+  height: 24px;
   transition: transform 0.2s;
 }
 
@@ -791,23 +793,23 @@ input:checked+.slider:before {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.image-toggle input:not(:checked) + .image-slider::before {
+.image-toggle input:not(:checked)+.image-slider::before {
   transform: translateX(calc(100% + 4px));
 }
 
-.image-toggle input:checked + .image-slider .option-photo {
+.image-toggle input:checked+.image-slider .option-photo {
   color: rgba(255, 255, 255, 0.9);
 }
 
-.image-toggle input:checked + .image-slider .option-file {
+.image-toggle input:checked+.image-slider .option-file {
   color: rgba(255, 255, 255, 0.5);
 }
 
-.image-toggle input:not(:checked) + .image-slider .option-photo {
+.image-toggle input:not(:checked)+.image-slider .option-photo {
   color: rgba(255, 255, 255, 0.5);
 }
 
-.image-toggle input:not(:checked) + .image-slider .option-file {
+.image-toggle input:not(:checked)+.image-slider .option-file {
   color: rgba(255, 255, 255, 0.9);
 }
 
@@ -901,14 +903,7 @@ input:checked+.slider:before {
   display: inline;
 }
 
-/* Show/hide based on toggle state */
-.toggle-field .switch input:not(:checked) + .slider ~ + .toggle-label-wrapper .toggle-on {
-  display: none;
-}
-
-.toggle-field .switch input:checked + .slider ~ + .toggle-label-wrapper .toggle-off {
-  display: none;
-}
+/* Show/hide based on toggle state - handled by the simpler approach below */
 
 /* Alternative simpler approach using adjacent sibling */
 .toggle-field:has(input:checked) .toggle-off {

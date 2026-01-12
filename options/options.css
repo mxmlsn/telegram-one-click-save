@@ -328,7 +328,8 @@ h3 {
 .icon-selector {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  max-width: 80%;
 }
 
 .icon-option {
@@ -336,9 +337,9 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 4px;
   border: 2px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   transition: border-color 0.2s, background 0.2s;
 }
 
@@ -360,8 +361,8 @@ h3 {
 }
 
 .icon-option img {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   transition: transform 0.2s;
 }
 
