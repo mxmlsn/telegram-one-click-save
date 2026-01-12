@@ -10,7 +10,6 @@
 
 <body>
   <div class="container">
-    <h1>Telegram Instant Saver</h1>
     <div id="savedIndicator" class="saved-indicator">
       <svg class="saved-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <polyline points="20 6 9 17 4 12"></polyline>
@@ -19,8 +18,13 @@
     </div>
 
     <div class="two-columns">
-      <!-- Left column: Setup -->
-      <div class="column column-left">
+      <!-- First column: Title -->
+      <div class="column column-first">
+        <h1>Telegram Instant Saver</h1>
+      </div>
+
+      <!-- Second column: Setup -->
+      <div class="column column-second">
         <!-- Credentials block -->
         <section class="section credentials-section">
           <div class="field">
@@ -32,8 +36,11 @@
             <input type="text" id="chatId" placeholder="-1001234567890">
           </div>
           <div class="actions">
+            <div class="connection-status">
+              <div class="status-label">Status:</div>
+              <div class="status-value not-configured" id="connectionStatus">Enter bot credentials</div>
+            </div>
             <button id="saveBtn" class="primary">Save & Connect</button>
-            <span id="status"></span>
           </div>
         </section>
 
@@ -88,8 +95,8 @@
         </section>
       </div>
 
-      <!-- Right column: Settings -->
-      <div class="column column-right">
+      <!-- Third column: Settings -->
+      <div class="column column-third">
         <!-- Section 1: Behavior + Image Compression -->
         <section class="section section-behavior">
           <div class="field checkbox-field">
