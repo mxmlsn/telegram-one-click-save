@@ -737,84 +737,95 @@ input:checked+.slider:before {
   transform: translateX(20px);
 }
 
-/* Image Sending Toggle */
-.image-sending-field {
+/* Pill Toggle System */
+.pill-toggle-field {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 20px;
 }
 
-.image-sending-label {
+.pill-toggle-label {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.8);
   letter-spacing: -0.02em;
 }
 
-.image-toggle {
+.pill-toggle {
   position: relative;
   display: inline-block;
   cursor: pointer;
 }
 
-.image-toggle input {
+.pill-toggle input {
   opacity: 0;
   width: 0;
   height: 0;
   position: absolute;
 }
 
-.image-slider {
+.pill-toggle-slider {
   display: flex;
   align-items: center;
-  background: #5A5A5A;
+  background: rgba(45, 45, 45, 0.41);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 9999px;
-  padding: 4px;
+  padding: 2px;
   position: relative;
-  width: 120px;
+  width: 154px;
   height: 32px;
 }
 
-.image-slider span {
+.pill-toggle-slider span {
   flex: 1;
   text-align: center;
-  font-size: 12px;
-  letter-spacing: -0.02em;
+  font-size: 11px;
+  letter-spacing: -0.01em;
   z-index: 1;
   transition: color 0.3s;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'MartianMono', monospace;
 }
 
-.image-slider::before {
+.pill-toggle-slider::before {
   content: "";
   position: absolute;
-  width: calc(50% - 4px);
-  height: calc(100% - 8px);
+  width: calc(50% - 2px);
+  height: calc(100% - 4px);
   background: #15A2FF;
   border-radius: 9999px;
-  left: 4px;
-  transition: transform 0.3s;
+  left: 2px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.image-toggle input:not(:checked)+.image-slider::before {
-  transform: translateX(calc(100% + 4px));
+/* Checked -> Right (Standard) */
+.pill-toggle-standard input:checked+.pill-toggle-slider::before {
+  transform: translateX(100%);
 }
 
-.image-toggle input:checked+.image-slider .option-photo {
-  color: rgba(255, 255, 255, 0.9);
+.pill-toggle-standard input:not(:checked)+.pill-toggle-slider span:first-of-type {
+  color: white;
 }
 
-.image-toggle input:checked+.image-slider .option-file {
-  color: rgba(255, 255, 255, 0.5);
+.pill-toggle-standard input:checked+.pill-toggle-slider span:last-of-type {
+  color: white;
 }
 
-.image-toggle input:not(:checked)+.image-slider .option-photo {
-  color: rgba(255, 255, 255, 0.5);
+/* Checked -> Left (Reverse for compression: true=photo=left) */
+.pill-toggle-reverse input:not(:checked)+.pill-toggle-slider::before {
+  transform: translateX(100%);
 }
 
-.image-toggle input:not(:checked)+.image-slider .option-file {
-  color: rgba(255, 255, 255, 0.9);
+.pill-toggle-reverse input:checked+.pill-toggle-slider span:first-of-type {
+  color: white;
+}
+
+.pill-toggle-reverse input:not(:checked)+.pill-toggle-slider span:last-of-type {
+  color: white;
+}
+
+.image-sending-field {
+  margin-top: 20px;
 }
 
 /* Checkbox field updated for toggle */
@@ -900,34 +911,7 @@ input:checked+.slider:before {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Toggle field layout */
-.toggle-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
 
-.toggle-label-wrapper {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: -0.02em;
-}
-
-.toggle-off,
-.toggle-on {
-  display: inline;
-}
-
-/* Show/hide based on toggle state - handled by the simpler approach below */
-
-/* Alternative simpler approach using adjacent sibling */
-.toggle-field:has(input:checked) .toggle-off {
-  display: none;
-}
-
-.toggle-field:has(input:not(:checked)) .toggle-on {
-  display: none;
-}
 
 /* Emoji Pack Selector */
 .emoji-pack-selector {
