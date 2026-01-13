@@ -72,7 +72,7 @@
   width: var(--tg-toast-width) !important;
   min-width: auto !important;
   max-width: none !important;
-  transition: width 0.3s ease-out !important;
+  transition: width 0.3s ease-out, background-color 0.4s ease, opacity 0.4s ease !important;
 }
 
 .tg-saver-toast.tg-saver-visible {
@@ -494,7 +494,7 @@
   right: 0 !important;
   height: 6px !important;
   background: #15A2FF !important;
-  border-radius: 0 0 26px 26px !important;
+  border-radius: 0 !important;
   transform-origin: left !important;
   pointer-events: none !important;
 }
