@@ -26,6 +26,14 @@ chrome.storage.onChanged.addListener((changes) => {
     if (window.__TG_Settings) {
       window.__TG_Settings[key] = changes[key].newValue;
     }
+
+    // Update local icon if color changed
+    if (key === 'iconColor' && selectionIcon) {
+      const img = selectionIcon.querySelector('img');
+      if (img) {
+        img.src = chrome.runtime.getURL(`icons/icon-${changes.iconColor.newValue}-128.png`);
+      }
+    }
   }
 });
 

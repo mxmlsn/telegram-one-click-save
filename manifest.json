@@ -46,7 +46,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "MartianMono-Regular.ttf"
+        "MartianMono-Regular.ttf",
+        "icons/*.png"
       ],
       "matches": [
         "<all_urls>"
