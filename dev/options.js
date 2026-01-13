@@ -418,6 +418,8 @@ async function loadSettings() {
 
   // Toggle hashtags settings visibility based on useHashtags
   toggleHashtagsSettings(settings.useHashtags !== false);
+
+  updateLivePreview();
 }
 
 function mergeCustomTags(savedTags) {
@@ -445,6 +447,7 @@ function mergeCustomTags(savedTags) {
 async function saveSetting(key, value) {
   await chrome.storage.local.set({ [key]: value });
   showSavedIndicator();
+  updateLivePreview();
 }
 
 function showSavedIndicator() {
@@ -853,6 +856,7 @@ function updateAddTagState() { }
 async function saveCustomTagsOnly() {
   await chrome.storage.local.set({ customTags });
   showSavedIndicator();
+  updateLivePreview();
 }
 
 function toggleQuickTagsSettings(enabled) {
@@ -954,3 +958,317 @@ async function updateEmojiPreview(packName) {
     emojiPreview.textContent = emojis.join(' ');
   }
 }
+
+// ============================================
+// LIVE PREVIEW LOGIC
+// ============================================
+async function updateLivePreview() {
+  const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
+
+  // 1. Gather Settings
+  const addScreenshot = settings.addScreenshot;
+  const quoteMonospace = settings.quoteMonospace;
+  const useHashtags = settings.useHashtags;
+  const enableQuickTags = settings.enableQuickTags !== false;
+  const sendWithColor = settings.sendWithColor !== false;
+  const showLinkPreview = settings.showLinkPreview; // Social share preview
+
+  // Tags
+  const tagImage = useHashtags ? settings.tagImage : '';
+  const tagLink = useHashtags ? settings.tagLink : '';
+  const tagQuote = useHashtags ? settings.tagQuote : '';
+
+  // Theme Tags (Quick Tags)
+  // We need current customTags. They are in global variable `customTags`.
+  // Find the first "active" tag (non-empty name) to simulate a selected tag
+  const activeCustomTag = customTags.find(t => t.name && t.name.trim().length > 0) || customTags[0];
+  const themeTagName = (enableQuickTags && activeCustomTag && activeCustomTag.name) ? `#${activeCustomTag.name}` : '';
+  const themeTagColor = (enableQuickTags && activeCustomTag) ? activeCustomTag.color : null;
+
+  // Emoji
+  // Identify which emoji to show. 
+  // Code uses settings.emojiPack to pick from EMOJI_PACKS or settings.customEmoji
+  let emoji = '';
+  if (enableQuickTags && sendWithColor) {
+    if (settings.emojiPack === 'custom') {
+      const customEmojis = settings.customEmoji || DEFAULT_SETTINGS.customEmoji;
+      // Map color ID to index? The packs are ordered: red, yellow, green, blue, purple, black, white
+      // defaultTags IDs are: red, yellow, green, blue, purple, black, white
+      // corresponding indices: 0, 1, 2, 3, 4, 5, 6
+      const colorId = activeCustomTag.id;
+      const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3, 'purple': 4, 'black': 5, 'white': 6 };
+      const idx = colorMap[colorId] !== undefined ? colorMap[colorId] : 0;
+      emoji = customEmojis[idx] || '🔴';
+    } else {
+      const pack = EMOJI_PACKS[settings.emojiPack || 'circle'];
+      const colorId = activeCustomTag.id;
+      const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3, 'purple': 4, 'black': 5, 'white': 6 };
+      const idx = colorMap[colorId] !== undefined ? colorMap[colorId] : 0;
+      emoji = pack[idx] || '🔴';
+    }
+  }
+
+  // Signature Construction Function
+  const buildSignature = (contentTypeTag) => {
+    const parts = [];
+    if (emoji) parts.push(emoji);
+    if (themeTagName) parts.push(themeTagName);
+    if (contentTypeTag) parts.push(contentTypeTag);
+    // Note: Link/Domain is added separately depending on context
+
+    // Join with " | "
+    return parts.join(' | ');
+  };
+
+  // 2. Update Image Message
+  const previewTagsImage = document.getElementById('previewTagsImage');
+  if (previewTagsImage) {
+    // For images, we just show signature
+    previewTagsImage.textContent = buildSignature(tagImage);
+  }
+
+  // 3. Update Link Message
+  const previewLinkBubble = document.getElementById('previewLinkBubble');
+  if (previewLinkBubble) {
+    previewLinkBubble.innerHTML = '';
+
+    if (addScreenshot) {
+      // CARD VIEW
+      const card = document.createElement('div');
+      card.className = 'preview-link-card';
+
+      // Image
+      const imgDiv = document.createElement('div');
+      imgDiv.className = 'preview-link-image';
+      card.appendChild(imgDiv);
+
+      // Content
+      const contentDiv = document.createElement('div');
+      contentDiv.className = 'preview-link-content';
+
+      const title = document.createElement('div');
+      title.className = 'preview-link-title';
+      title.textContent = 'Wikipedia, the free encyclopedia';
+      contentDiv.appendChild(title);
+
+      const desc = document.createElement('div');
+      desc.className = 'preview-link-desc';
+      desc.textContent = 'Wikipedia is a free online encyclopedia, created and edited by volunteers around the world.';
+      contentDiv.appendChild(desc);
+
+      const domain = document.createElement('div');
+      domain.className = 'preview-link-domain';
+      domain.textContent = 'wikipedia.org';
+      contentDiv.appendChild(domain);
+
+      card.appendChild(contentDiv);
+
+      // Footer with signature + link?
+      // "пример как выглядит подпись со всеми тоглами 🟡 #study | #link | wikipedia.org"
+      // Wait, user said: "но если тогл Add page screenshot to link выключен то ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется"
+      // So if ON, it IS duplicated? Or just the signature?
+      // Usually with screenshot (photo), caption is signature + link.
+      const footer = document.createElement('div');
+      footer.className = 'preview-bubble-footer';
+
+      const sigLine = document.createElement('div');
+      sigLine.className = 'preview-tags-line';
+      const sigBase = buildSignature(tagLink);
+      sigLine.textContent = sigBase ? `${sigBase} | wikipedia.org` : 'wikipedia.org';
+
+      footer.appendChild(sigLine);
+      card.appendChild(footer);
+
+      previewLinkBubble.appendChild(card);
+    } else {
+      // TEXT ONLY VIEW
+      const container = document.createElement('div');
+      container.className = 'preview-link-text-only';
+
+      // "ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется"
+      // User example of signature: 🟡 #study | #link | wikipedia.org
+      // So we display: https://wikipedia.org...
+      // And then signature?
+      // If "рядом с тегами не дублируется" means the link is NOT in the signature line if it's in the body?
+      // Let's assume:
+      // Body: https://wikipedia.org/wiki/Main_Page
+      // Footer: 🟡 #study | #link
+
+      const linkUrl = document.createElement('a');
+      linkUrl.className = 'preview-link-url';
+      linkUrl.href = '#';
+      linkUrl.textContent = 'https://wikipedia.org/wiki/Main_Page';
+
+      if (showLinkPreview) {
+        // If social preview is enabled, Telegram shows a small preview below text.
+        // We can simulate this simply by keeping text separate.
+      }
+
+      container.appendChild(linkUrl);
+
+      // Footer
+      const footer = document.createElement('div');
+      footer.className = 'preview-bubble-footer';
+
+      const sigLine = document.createElement('div');
+      sigLine.className = 'preview-tags-line';
+      // Build signature WITHOUT domain, because it's already in the body?
+      // "ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется" -> implies link is NOT in tags line.
+      const sigBase = buildSignature(tagLink);
+      sigLine.textContent = sigBase;
+
+      footer.appendChild(sigLine);
+      container.appendChild(footer);
+
+      previewLinkBubble.appendChild(container);
+    }
+  }
+
+  // 4. Update Text Message
+  const previewQuoteText = document.getElementById('previewQuoteText');
+  const previewTagsText = document.getElementById('previewTagsText');
+
+  if (previewQuoteText) {
+    if (quoteMonospace) {
+      previewQuoteText.classList.add('mono-font');
+    } else {
+      previewQuoteText.classList.remove('mono-font');
+    }
+  }
+
+  if (previewTagsText) {
+    previewTagsText.textContent = buildSignature(tagQuote);
+  }
+
+  // 5. Update Toast Preview
+  renderToastPreview(settings);
+}
+
+function renderToastPreview(settings) {
+  const wrapper = document.getElementById('previewToastWrapper');
+  if (!wrapper) return;
+
+  wrapper.innerHTML = '';
+
+  const isMinimalist = settings.popupStyleMinimalist;
+  const isLight = settings.themeLight;
+
+  // Create toast element
+  const toast = document.createElement('div');
+  toast.className = 'tg-saver-toast tg-saver-visible tg-saver-with-tags';
+  if (isMinimalist) toast.classList.add('tg-saver-minimalist');
+  if (isLight) {
+    toast.classList.add('tg-saver-light');
+    wrapper.classList.add('tg-saver-light'); // for close btn context
+  } else {
+    wrapper.classList.remove('tg-saver-light');
+  }
+
+  // Content depends on style
+  if (isMinimalist) {
+    // Minimalist Structure
+    const content = document.createElement('div');
+    content.className = 'tg-saver-toast-content';
+
+    // Tags Container
+    const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'tg-saver-tags-container';
+
+    // Add up to 3 tags for preview
+    const activeTags = customTags.filter(t => t.name && t.name.trim().length > 0).slice(0, 3);
+    // If no active tags, show "no tag" button?
+    // User said: "порядок и инфа кастомных тегов как в настройках(пустые скрыты)"
+
+    if (activeTags.length === 0) {
+      // Only "No Tag" button
+      const noTagBtn = document.createElement('button');
+      noTagBtn.className = 'tg-saver-no-tag-btn';
+      const circle = document.createElement('div');
+      circle.className = 'tg-saver-no-tag-circle';
+      noTagBtn.appendChild(circle);
+      tagsContainer.appendChild(noTagBtn);
+    } else {
+      activeTags.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.className = 'tg-saver-tag-btn';
+        const dot = document.createElement('div');
+        dot.className = 'tg-saver-tag-dot';
+        dot.style.background = tag.color;
+        btn.appendChild(dot);
+        tagsContainer.appendChild(btn);
+      });
+    }
+
+    content.appendChild(tagsContainer);
+    toast.appendChild(content);
+
+    // Add close button to WRAPPER, not toast (in minimalist mode)
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tg-saver-minimalist-close-btn';
+    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+    // Wrapper needs to be flex row for minimalist
+    wrapper.appendChild(toast);
+    wrapper.appendChild(closeBtn);
+
+  } else {
+    // Standard Structure
+    const content = document.createElement('div');
+    content.className = 'tg-saver-toast-content';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'tg-saver-toast-header';
+
+    const title = document.createElement('div');
+    title.className = 'tg-saver-toast-title';
+    title.textContent = 'Saved!'; // Or "Save to..."
+    header.appendChild(title);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'tg-saver-cancel-btn';
+    cancelBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+    header.appendChild(cancelBtn);
+
+    content.appendChild(header);
+
+    // Tags Container
+    const tagsContainer = document.createElement('div');
+    tagsContainer.className = 'tg-saver-tags-container';
+
+    const activeTags = customTags.filter(t => t.name && t.name.trim().length > 0).slice(0, 3);
+
+    if (activeTags.length === 0) {
+      // Skip button
+      const skipBtn = document.createElement('button');
+      skipBtn.className = 'tg-saver-tag-btn tg-saver-skip-btn';
+      const text = document.createElement('span');
+      text.className = 'tg-saver-skip-btn-text';
+      text.textContent = 'No tag';
+      skipBtn.appendChild(text);
+      tagsContainer.appendChild(skipBtn);
+    } else {
+      activeTags.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.className = 'tg-saver-tag-btn';
+
+        const dot = document.createElement('div');
+        dot.className = 'tg-saver-tag-dot';
+        dot.style.background = tag.color;
+        btn.appendChild(dot);
+
+        const name = document.createElement('span');
+        name.className = 'tg-saver-tag-name';
+        name.textContent = tag.name;
+        btn.appendChild(name);
+
+        tagsContainer.appendChild(btn);
+      });
+    }
+
+    content.appendChild(tagsContainer);
+    toast.appendChild(content);
+    wrapper.appendChild(toast);
+  }
+}
+

@@ -1441,3 +1441,473 @@ input:checked+.slider:before {
   outline: none;
   padding: 0;
 }
+
+/* ========================================= */
+/* LIVE PREVIEW SECTION                      */
+/* ========================================= */
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.preview-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #0E0E0E;
+  /* Darker background for message area */
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 200px;
+}
+
+.preview-message-row {
+  display: flex;
+  justify-content: flex-start;
+  /* Left aligned */
+  width: 100%;
+}
+
+.preview-message-bubble {
+  background: #212121;
+  border-radius: 12px 12px 12px 0;
+  /* Tail on bottom-left */
+  padding: 8px;
+  max-width: 85%;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* Telegram font */
+  font-size: 14px;
+}
+
+/* Image Message */
+.preview-image-bubble {
+  padding: 4px 4px 8px 4px;
+}
+
+.preview-image-container {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 4px;
+  max-width: 240px;
+}
+
+.preview-image-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Link Message */
+.preview-link-bubble {
+  padding: 0;
+  overflow: hidden;
+  background: #212121;
+}
+
+/* Link Card Style */
+.preview-link-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 300px;
+}
+
+.preview-link-image {
+  width: 100%;
+  height: 140px;
+  background-color: #333;
+  background-image: url('../icons/save.png');
+  /* Placeholder */
+  background-size: cover;
+  background-position: center;
+  border-left: 2px solid #15A2FF;
+  /* Imitate telegram link preview border sometimes or just simple */
+}
+
+/* Actually Telegram link previews structure is Image -> Title/Desc -> Domain */
+.preview-link-content {
+  padding: 8px 10px;
+  border-left: 2px solid #15A2FF;
+  background: #212121;
+}
+
+.preview-link-title {
+  font-weight: 600;
+  color: #15A2FF;
+  margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.preview-link-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.preview-link-domain {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Link Text Only Style */
+.preview-link-text-only {
+  padding: 8px 12px;
+}
+
+.preview-link-url {
+  color: #15A2FF;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+/* Text Message */
+.preview-text-bubble {
+  padding: 8px 12px;
+}
+
+.preview-quote-text {
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+}
+
+.mono-font {
+  font-family: 'MartianMono', monospace;
+  font-size: 13px;
+}
+
+/* Tags Footer */
+.preview-bubble-footer {
+  margin-top: 4px;
+  padding: 0 4px;
+}
+
+.preview-tags-line {
+  color: #15A2FF;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+/* Link bubble specific footer adjustment */
+.preview-link-bubble .preview-bubble-footer {
+  padding: 0 10px 8px 10px;
+}
+
+/* Toast Preview */
+.preview-toast-container {
+  background: #1A1A1A;
+  /* Match section background to blend in, or slightly different? */
+  border-radius: 12px;
+  /* padding: 16px; */
+  /* min-height: 100px; */
+  display: flex;
+  flex-direction: column;
+  /* align-items: center; */
+  /* justify-content: center; */
+}
+
+.preview-toast-wrapper {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  /* Enough space for toast */
+  background-image: linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #000;
+  /* Checkerboard pattern to show transparency */
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 
+   TOAST STYLES ADAPTED FOR PREVIEW 
+   Targeting elements inside .preview-toast-wrapper
+   We use !important heavily in specific toast classes to ensure they override any defaults, 
+   following the pattern in content.css 
+*/
+
+.tg-saver-toast {
+  /* Reset all inherited styles */
+  all: initial;
+
+  /* Layout */
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 28px !important;
+
+  /* Typography */
+  font-family: 'MartianMono', monospace !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+  text-decoration: none !important;
+  font-style: normal !important;
+
+  /* Visual */
+  box-shadow: none !important;
+  background: rgba(51, 51, 51, 0.7) !important;
+  backdrop-filter: blur(7px) !important;
+  -webkit-backdrop-filter: blur(7px) !important;
+  color: white !important;
+  border: none !important;
+
+  /* Size */
+  overflow: hidden !important;
+  width: 168px !important;
+  min-width: 168px !important;
+  max-width: 168px !important;
+  min-height: 52px !important;
+  box-sizing: border-box !important;
+
+  /* Positioning relative to wrapper */
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.tg-saver-toast:not(.tg-saver-with-tags) {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 16px 10px !important;
+  justify-content: center !important;
+}
+
+.tg-saver-toast.tg-saver-with-tags {
+  padding: 0 !important;
+  background: rgba(51, 51, 51, 0.8) !important;
+}
+
+.tg-saver-toast-content {
+  padding: 17px 10px 10px 10px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  width: 100%;
+}
+
+.tg-saver-toast-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin: 0 0 15px 0 !important;
+  padding: 0 9px 0 9px !important;
+  width: 100%;
+  box-sizing: border-box !important;
+}
+
+.tg-saver-toast-title {
+  font-family: 'MartianMono', monospace !important;
+  font-size: 20px !important;
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+}
+
+.tg-saver-icon {
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+.tg-saver-text {
+  font-family: 'MartianMono', monospace !important;
+  font-size: 14px !important;
+  color: inherit !important;
+}
+
+.tg-saver-tags-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.tg-saver-tag-btn {
+  all: initial;
+  display: flex !important;
+  align-items: center !important;
+  width: 148px !important;
+  height: 37px !important;
+  padding: 0 !important;
+  background: rgba(45, 45, 45, 0.41) !important;
+  border-radius: 9999px !important;
+  color: white !important;
+  font-family: 'MartianMono', monospace !important;
+  font-size: 13px !important;
+  cursor: default !important;
+  /* No pointer in preview */
+  box-sizing: border-box !important;
+}
+
+.tg-saver-tag-dot {
+  width: 25px !important;
+  height: 25px !important;
+  border-radius: 50% !important;
+  margin: 6px 0 6px 6px !important;
+}
+
+.tg-saver-tag-name {
+  margin-left: 9.5px !important;
+  font-family: 'MartianMono', monospace !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Minimalist Style */
+.tg-saver-toast.tg-saver-minimalist {
+  height: 52px !important;
+  width: auto !important;
+  min-width: auto !important;
+  padding: 12px !important;
+  border-radius: 26px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-toast-content {
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-toast-header {
+  display: none !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-tags-container {
+  flex-direction: row !important;
+  gap: 5px !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-tag-btn {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 50% !important;
+  justify-content: center !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-tag-dot {
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-tag-name {
+  display: none !important;
+}
+
+/* Light Theme Overrides */
+.tg-saver-light .tg-saver-toast {
+  background: rgba(218, 218, 218, 0.75) !important;
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+.tg-saver-text {
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+.tg-saver-light.tg-saver-with-tags {
+  background: rgba(218, 218, 218, 0.65) !important;
+}
+
+.tg-saver-light .tg-saver-toast-title {
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+.tg-saver-light .tg-saver-tag-btn {
+  background: rgba(198, 198, 198, 0.41) !important;
+}
+
+.tg-saver-light .tg-saver-tag-name {
+  color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Minimalist Close Button */
+.tg-saver-minimalist-close-btn {
+  background: transparent !important;
+  border: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  cursor: pointer !important;
+  margin-left: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tg-saver-light .tg-saver-minimalist-close-btn {
+  color: rgba(0, 0, 0, 0.4) !important;
+}
+
+/* No Tag / Skip Button */
+.tg-saver-no-tag-btn {
+  width: 37px !important;
+  height: 37px !important;
+  min-width: 37px !important;
+  border-radius: 50% !important;
+  background: rgba(45, 45, 45, 0.41) !important;
+  border: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  cursor: default !important;
+  padding: 0 !important;
+}
+
+.tg-saver-light .tg-saver-no-tag-btn {
+  background: rgba(198, 198, 198, 0.41) !important;
+}
+
+.tg-saver-no-tag-circle {
+  width: 25px !important;
+  height: 25px !important;
+  border-radius: 50% !important;
+  border: 2px dashed rgba(255, 255, 255, 0.3) !important;
+}
+
+.tg-saver-light .tg-saver-no-tag-circle {
+  border-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+.tg-saver-skip-btn {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  justify-content: center !important;
+}
+
+.tg-saver-light .tg-saver-skip-btn {
+  border-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.tg-saver-skip-btn-text {
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 13px !important;
+}
+
+.tg-saver-light .tg-saver-skip-btn-text {
+  color: rgba(0, 0, 0, 0.6) !important;
+}
