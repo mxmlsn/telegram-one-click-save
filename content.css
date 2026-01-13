@@ -277,8 +277,8 @@
   font-weight: 400 !important;
   color: rgba(255, 255, 255, 0.8) !important;
   white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
   letter-spacing: -0.02em !important;
 }
 

@@ -10,14 +10,14 @@ const DEFAULT_SETTINGS = {
   chatId: '',
   addScreenshot: true,
   imageCompression: true,
-  showLinkPreview: true,
+  showLinkPreview: false,
   showSelectionIcon: true,
   quoteMonospace: true,
   iconColor: 'circle1',
   useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',
-  tagQuote: '#quote',
+  tagQuote: '#text',
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4,
@@ -70,6 +70,18 @@ document.addEventListener('DOMContentLoaded', loadSettings);
 
 // Save & Connect button (only for credentials)
 saveBtn.addEventListener('click', saveCredentials);
+
+// Toggle password visibility
+const toggleBotTokenBtn = document.getElementById('toggleBotToken');
+if (toggleBotTokenBtn) {
+  toggleBotTokenBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('botToken');
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    toggleBotTokenBtn.classList.toggle('showing', isPassword);
+  });
+}
 
 
 
@@ -541,7 +553,7 @@ function renderCustomTags() {
     tagEl.innerHTML = `
       <span class="drag-handle">⠿</span>
       <span class="tag-color-dot" style="background: ${tag.color}"></span>
-      <input type="text" class="tag-input" value="${tag.name}" placeholder="Tag name" maxlength="12">
+      <input type="text" class="tag-input" value="${tag.name}" placeholder="" maxlength="12">
     `;
 
     const input = tagEl.querySelector('input');
