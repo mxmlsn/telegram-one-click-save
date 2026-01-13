@@ -1,97 +1,67 @@
-# Telegram Instant Saver
+# Telegram Instant Saver 🚀
 
 [English](#english) | [Русский](#russian)
+
+---
 
 <a name="english"></a>
 ## 🇬🇧 English
 
-**Telegram Instant Saver** is a powerful Chrome Extension that allows you to save content from the web directly to your Telegram Saved Messages (or any chat) with a single click. Whether it's screenshots, images, interesting quotes, or links, you can organize them instantly with custom tags.
+**Telegram Instant Saver** is the ultimate tool for researchers, designers, and content curators. It bridges the gap between your browser and Telegram, allowing you to capture and organize web content with unparalleled speed. No more "copy-switch-paste"—just capture and go.
 
-### ✨ Features
+### 🔥 Why it's better than standard saving:
 
-*   **One-Click Screenshots**: Capture the visible part of any webpage and send it to Telegram instantly.
-*   **Context Menu Integration**: Right-click on any image, link, or selected text to "Pocket it" to Telegram.
-*   **Smart Media Detection**: Automatically detects images or videos under your cursor, perfect for sites like Instagram where direct right-clicking is blocked.
-*   **Tagging System**: Organize your saved content with customizable tags (e.g., #work, #ideas, #memes).
-    *   **Quick Tags**: A popup overlay to select tags on the fly before saving.
-    *   **Emoji Packs**: Fun emoji-based tagging themes.
-    *   **Drag & Drop**: Reorder your tags easily in the settings.
-*   **Customizable Experience**:
-    *   Dark/Light themes.
-    *   Minimalist popup mode.
-    *   Configurable timers and toast notifications.
-*   **Privacy Focused**: All data (Bot Token, Chat ID) is stored locally in your browser.
+*   **Speed First**: Save any content—quotes, images, links, or full-page screenshots—in literally one click.
+*   **Context Menu on Steroids**: Right-click anything and select **"Send to Telegram"**. Even on sites like Instagram, it dives through overlays to find the actual image or video.
+*   **The Quick Tags System**: When you save something, a beautiful toast surfaces. 
+    *   **Auto-Send**: Do nothing, and it sends with "no tag" after a few seconds.
+    *   **One-Tap Tagging**: Tap a colored dot to instantly attach a category (e.g., #work, #ref, #ideas) and send it.
+*   **"Photo" vs "File"**: Choose to send images as compressed photos (for quick viewing) or original files (for high-quality assets). 
+*   **Smart Formatting**:
+    *   **Quotes**: Sent as clean, high-readability text (optional monospace).
+    *   **Links**: Choose between a "Screenshot + Link" format or a native "Native Preview + Full URL" format.
+    *   **Signatures**: Automatically appends the source domain (e.g., *wikipedia.org*) and your tags to every message.
 
-### 🛠 Tech Stack
+### 🎨 Premium Aesthetics & Customization:
 
-*   **Core**: HTML5, CSS3, JavaScript (ES6+)
-*   **Platform**: Chrome Extension Manifest V3
-*   **API**: Telegram Bot API
-*   **Styling**: Vanilla CSS (no external frameworks for lightweight performance)
+*   **Live Preview**: The settings page features a real-time message simulator. You see *exactly* how your messages will look in Telegram before you even send them.
+*   **Adaptive UI**: Choose between a **Standard** toast or a sleek **Minimalist** capsule.
+*   **Emoji Themes**: Select from pre-made emoji packs or create your own custom set to match your tagging style.
+*   **Drag & Drop**: Completely customizable tag order. Just drag them to prioritize your most-used categories.
 
-### 🏗 Architecture
-
-The extension follows the standard Chrome Extension Manifest V3 architecture:
-
-1.  **Background Worker (`background.js`)**:
-    *   Acts as the central controller.
-    *   Manages context menus and extension icon clicks.
-    *   Handles all HTTP communication with the Telegram API.
-    *   Manages data persistence via `chrome.storage`.
-
-2.  **Content Scripts (`content.js`, `content.css`)**:
-    *   Injects UI elements (Toast notifications, Quick Tags overlay) into the current webpage.
-    *   Detects elements under the cursor (images/videos).
-    *   Captures text selections for quoting.
-
-3.  **Options Page**:
-    *   A comprehensive settings dashboard to configure your Bot Token, Chat ID, and customize tags/appearance.
-    *   Features a responsive, dark-mode ready UI with drag-and-drop lists.
+### 🛠 Tech Stack & Privacy:
+*   **Privacy First**: Your Bot Token and Chat ID never leave your browser. They are stored in `chrome.storage.local`.
+*   **Performance**: Built with Vanilla JS and CSS for zero impact on browser speed.
+*   **Modern**: Uses Chrome Manifest V3 for future-proof stability.
 
 ---
 
 <a name="russian"></a>
 ## 🇷🇺 Русский
 
-**Telegram Instant Saver** — это мощное расширение для Chrome, позволяющее сохранять контент из интернета прямо в "Избранное" Telegram (или любой другой чат) одним кликом. Скриншоты, картинки, цитаты или ссылки — всё это можно мгновенно структурировать с помощью удобной системы тегов.
+**Telegram Instant Saver** — это идеальный инструмент для исследователей, дизайнеров и всех, кто собирает информацию. Он убирает лишние действия между браузером и Telegram, позволяя сохранять контент с невероятной скоростью. Забудьте про «скопировал-переключился-вставил» — просто сохраняйте на лету.
 
-### ✨ Возможности
+### 🔥 Почему это удобнее обычного сохранения:
 
-*   **Скриншоты в один клик**: Сделайте снимок видимой части любой веб-страницы и мгновенно отправьте его в Telegram.
-*   **Интеграция в контекстное меню**: Нажмите правой кнопкой мыши на любую картинку, ссылку или выделенный текст, чтобы сохранить их.
-*   **Умное определение медиа**: Автоматически находит изображения или видео под курсором. Идеально подходит для сайтов вроде Instagram, где обычное сохранение может быть заблокировано.
-*   **Система тегов**: Организуйте сохраненный контент с помощью настраиваемых тегов (например, #работа, #идеи, #мемы).
-    *   **Быстрые теги**: Всплывающее окно для выбора тега прямо перед сохранением.
-    *   **Эмодзи-паки**: Тематические наборы эмодзи для визуальной маркировки.
-    *   **Drag & Drop**: Легко меняйте порядок тегов в настройках перетаскиванием.
-*   **Гибкие настройки**:
-    *   Темная и светлая темы.
-    *   Минималистичный режим уведомлений.
-    *   Настраиваемые таймеры и стиль уведомлений.
-*   **Приватность**: Все данные (токен бота, ID чата) хранятся локально в вашем браузере.
+*   **Скорость — это всё**: Сохраняйте цитаты, картинки, ссылки или скриншоты страниц буквально в один клик.
+*   **Контекстное меню на максимум**: Нажмите правой кнопкой на любой элемент и выберите **"Send to Telegram"**. Даже на сложных сайтах (например, Instagram) расширение «пробивает» оверлеи, чтобы найти само изображение.
+*   **Система "Быстрых тегов"**: Сразу после сохранения появляется красивое уведомление.
+    *   **Авто-отправка**: Если ничего не делать, контент уйдет без тега через пару секунд.
+    *   **Мгновенная категория**: Нажмите на цветную точку, чтобы мгновенно присвоить категорию (#работа, #реф, #идеи) и завершить отправку.
+*   **«Фото» или «Файл»**: Выбирайте: отправлять картинку как сжатое фото (для быстрого просмотра) или как файл (без потери качества).
+*   **Умное форматирование**:
+    *   **Цитаты**: Отправляются чистым, читабельным текстом.
+    *   **Ссылки**: Два режима — «Скриншот + Ссылка» или «Нативный превью-блок + Полный URL».
+    *   **Подписи**: Расширение само добавляет домен источника (например, *wikipedia.org*) и ваши теги к каждому сообщению.
 
-### 🛠 Технологический стек
+### 🎨 Эстетика и Кастомизация:
 
-*   **Ядро**: HTML5, CSS3, JavaScript (ES6+)
-*   **Платформа**: Chrome Extension Manifest V3
-*   **API**: Telegram Bot API
-*   **Стили**: Vanilla CSS (без тяжелых фреймворков для максимальной скорости)
+*   **Live Preview**: В настройках есть живой симулятор сообщений. Вы видите *ровно то*, что придет вам в Telegram, со всеми отступами и форматированием.
+*   **Адаптивный интерфейс**: Выбирайте между **Стандартным** окном или изящной **Минималистичной** капсулой.
+*   **Наборы Эмодзи**: Используйте готовые паки или создайте свой набор эмодзи для подписей к тегам.
+*   **Drag & Drop**: Полностью настраиваемый порядок тегов. Просто перетащите их, чтобы нужные категории были всегда под рукой.
 
-### 🏗 Архитектура
-
-Расширение построено на архитектуре Chrome Manifest V3:
-
-1.  **Background Worker (`background.js`)**:
-    *   Центральный контроллер приложения.
-    *   Управляет контекстным меню и кликами по иконке расширения.
-    *   Отвечает за все запросы к Telegram API.
-    *   Управляет сохранением настроек через `chrome.storage`.
-
-2.  **Content Scripts (`content.js`, `content.css`)**:
-    *   Встраивает элементы интерфейса (уведомления, меню выбора тегов) на текущую веб-страницу.
-    *   Определяет элементы под курсором (изображения/видео).
-    *   Захватывает выделенный текст для цитирования.
-
-3.  **Страница настроек (Options Page)**:
-    *   Панель управления для настройки токена бота, ID чата и кастомизации тегов.
-    *   Современный интерфейс с поддержкой темной темы и drag-and-drop сортировкой списков.
+### 🛠 Технологии и Приватность:
+*   **Приватность**: Ваш токен бота и ID чата хранятся только в `chrome.storage.local` вашего браузера.
+*   **Скорость**: Написано на чистом JS и CSS — расширение «летает» и не нагружает браузер.
+*   **Современность**: Использует Chrome Manifest V3 для максимальной безопасности и стабильности.
