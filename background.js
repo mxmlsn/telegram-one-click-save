@@ -17,30 +17,34 @@ const COLOR_ID_TO_INDEX = {
   'white': 6
 };
 
-// Default settings
+// Default settings - synced with options.js
 const DEFAULT_SETTINGS = {
   botToken: '',
   chatId: '',
   addScreenshot: true,
   imageCompression: true,
-  showLinkPreview: true,
+  showLinkPreview: false,
   showSelectionIcon: true,
+  quoteMonospace: true,
   iconColor: 'circle1',
   useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',
-  tagQuote: '#quote',
+  tagQuote: '#text',
   enableQuickTags: true,
   sendWithColor: true,
-  timerDuration: 4, // Timer duration in seconds (3-9)
+  timerDuration: 4,
   emojiPack: 'circle',
+  toastStyle: 'normal',
+  themeLight: false,
+  isConnected: false,
   customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  // Fixed 7 tags default structure
+  // Fixed 7 tags
   customTags: [
-    { name: '', color: '#E64541', id: 'red' },
-    { name: '', color: '#FFDE42', id: 'yellow' },
-    { name: '', color: '#4ED345', id: 'green' },
-    { name: '', color: '#377CDE', id: 'blue' },
+    { name: 'work', color: '#E64541', id: 'red' },
+    { name: 'study', color: '#FFDE42', id: 'yellow' },
+    { name: 'refs', color: '#4ED345', id: 'green' },
+    { name: 'project1', color: '#377CDE', id: 'blue' },
     { name: '', color: '#BB4FFF', id: 'purple' },
     { name: '', color: '#3D3D3B', id: 'black' },
     { name: '', color: '#DEDEDE', id: 'white' }
@@ -119,8 +123,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   // CRITICAL: Show toast IMMEDIATELY, before any async operations
   // Use cached settings for instant UI, load fresh settings in parallel
-  const cachedTags = cachedSettings?.customTags;
-  const quickTagsEnabled = cachedSettings?.enableQuickTags !== false;
+  const currentSettings = cachedSettings || DEFAULT_SETTINGS;
+  const cachedTags = currentSettings.customTags;
+  const quickTagsEnabled = currentSettings.enableQuickTags !== false;
   const hasNonEmptyTags = cachedTags && cachedTags.some(t => t.name && t.name.trim());
 
   // Start settings load in parallel (non-blocking)
@@ -359,10 +364,11 @@ async function showTagSelection(tabId, customTags) {
     }, 30000);
   });
 
-  // Send minimal message - content script uses its LOCAL cache for tags
+  // Send minimal message - pass cached tags to ensure they are available instantly
   chrome.tabs.sendMessage(tabId, {
     action: 'preShowToast',
-    requestId: requestId
+    requestId: requestId,
+    customTags: customTags // Pass tags explicitly!
   }).then(() => {
     console.log('[TG Saver] preShowToast message sent successfully');
   }).catch((err) => {
