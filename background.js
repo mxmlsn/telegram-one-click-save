@@ -275,9 +275,35 @@ function formatUrl(url) {
 // Build caption with URL
 function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = null) {
   console.log('[TG Saver] Building caption for:', { url, tag, extraTextLength: extraText?.length, selectedTag: selectedTag?.name });
-  const formatted = formatUrl(url);
+
   const useHashtags = settings.useHashtags !== false;
   const quoteMonospace = settings.quoteMonospace !== false;
+
+  // Special formatting for links when screenshot is disabled
+  if (tag === settings.tagLink && settings.addScreenshot === false && !extraText) {
+    let caption = escapeHTML(url) + '\n\n';
+    let parts = [];
+
+    // Add selected custom tag
+    if (selectedTag && selectedTag.name) {
+      let tagText = `#${escapeHTML(selectedTag.name)}`;
+      if (settings.sendWithColor) {
+        const emoji = getEmojiForTag(selectedTag, settings.emojiPack, settings.customEmoji);
+        if (emoji) tagText = `${emoji} ${tagText}`;
+      }
+      parts.push(tagText);
+    }
+
+    // Add type tag
+    if (useHashtags && tag) {
+      parts.push(escapeHTML(tag));
+    }
+
+    caption += parts.filter(p => p && p.trim()).join(' | ');
+    return caption;
+  }
+
+  const formatted = formatUrl(url);
   let caption = '';
 
   if (extraText) {
