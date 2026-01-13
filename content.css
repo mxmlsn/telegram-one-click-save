@@ -33,9 +33,9 @@
   /* Visual */
   box-shadow: none !important;
   opacity: 0 !important;
-  background: rgba(51, 51, 51, 0.9) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(51, 51, 51, 0.7) !important;
+  backdrop-filter: blur(7px) !important;
+  -webkit-backdrop-filter: blur(7px) !important;
   color: white !important;
   border: none !important;
 
@@ -130,9 +130,9 @@
 /* Toast with tags */
 .tg-saver-toast.tg-saver-with-tags {
   padding: 0 !important;
-  background: rgba(51, 51, 51, 0.9) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(51, 51, 51, 0.8) !important;
+  backdrop-filter: blur(7px) !important;
+  -webkit-backdrop-filter: blur(7px) !important;
   width: 168px !important;
   min-width: 168px !important;
   max-width: 168px !important;
@@ -456,9 +456,9 @@
   width: 34px !important;
   height: 34px !important;
   border-radius: 50% !important;
-  background: rgba(51, 51, 51, 0.9) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(51, 51, 51, 0.7) !important;
+  backdrop-filter: blur(7px) !important;
+  -webkit-backdrop-filter: blur(7px) !important;
   border: none !important;
   cursor: pointer !important;
   display: flex !important;
