@@ -53,6 +53,8 @@ const ToastState = window.__TG_ToastState;
 
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[TG Saver] Content script received message:', message.action, message);
+
   if (message.action === 'showToast') {
     showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
@@ -168,24 +170,70 @@ function showSimpleToast(state, message) {
         setTimeout(() => toast.remove(), 400);
       }, 1500);
     }
+  } else if (state === 'error') {
+    killTimer();
+    const wrapper = document.getElementById('tg-saver-toast-wrapper');
+    const displayToast = wrapper ? wrapper.querySelector('.tg-saver-toast') : toast;
+
+    if (displayToast) {
+      displayToast.classList.add('tg-saver-error');
+      displayToast.classList.remove('tg-saver-with-tags');
+      displayToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
+
+      // Error stays longer (3s)
+      setTimeout(() => {
+        if (wrapper) {
+          wrapper.classList.add('tg-saver-fade-out');
+          setTimeout(() => wrapper.remove(), 400);
+        } else {
+          displayToast.classList.remove('tg-saver-visible');
+          setTimeout(() => displayToast.remove(), 400);
+        }
+      }, 3000);
+    }
   }
 }
 
 // Pre-show toast using LOCAL cache (called when we just need to show UI fast)
 // Exposed on window for executeScript access
 window.preShowTagSelection = function (requestId) {
+  console.log('[TG Saver] preShowTagSelection called for request:', requestId);
+
+  // If settings not loaded yet, wait a tiny bit or just show "Sending"
+  if (!cachedContentSettings) {
+    console.log('[TG Saver] Settings not loaded yet, showing simple toast');
+    showSimpleToast('pending', 'Sending');
+
+    // CRITICAL: Inform background to proceed without waiting for tag
+    chrome.runtime.sendMessage({
+      action: 'tagSelected',
+      requestId: requestId,
+      selectedTag: null
+    });
+    return;
+  }
+
   // Use locally cached tags - no network call!
   const tags = cachedContentSettings?.customTags || [];
   const hasNonEmptyTags = tags.some(t => t.name && t.name.trim());
+
+  console.log('[TG Saver] Has non-empty tags:', hasNonEmptyTags);
 
   if (hasNonEmptyTags) {
     showTagSelectionToast(tags, requestId);
   } else {
     showSimpleToast('pending', 'Sending');
+    // CRITICAL: Inform background to proceed without waiting for tag
+    chrome.runtime.sendMessage({
+      action: 'tagSelected',
+      requestId: requestId,
+      selectedTag: null
+    });
   }
 };
 
 function showTagSelectionToast(customTags, requestId) {
+  console.log('[TG Saver] showTagSelectionToast called', { requestId });
   // Remove existing toast or wrapper
   const existingWrapper = document.getElementById('tg-saver-toast-wrapper');
   const existingToast = document.getElementById('tg-saver-toast');
@@ -211,6 +259,8 @@ function showTagSelectionToast(customTags, requestId) {
   toast.id = 'tg-saver-toast';
   toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '') + lightClass;
   toast.dataset.requestId = requestId;
+
+  console.log('[TG Saver] Rendering toast with style:', toastStyle);
 
   // Build tags HTML
   let tagsHtml = '';

@@ -145,26 +145,38 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   // Wait for tag selection if we started it
   let selectedTag = null;
-  if (tagSelectionPromise) {
-    selectedTag = await tagSelectionPromise;
-    if (selectedTag === '__CANCELLED__') {
-      return;
+  try {
+    if (tagSelectionPromise) {
+      console.log('[TG Saver] Waiting for tag selection...');
+      selectedTag = await tagSelectionPromise;
+      console.log('[TG Saver] Tag selected:', selectedTag?.name || 'none');
+      if (selectedTag === '__CANCELLED__') {
+        console.log('[TG Saver] Request cancelled by user');
+        return;
+      }
     }
+  } catch (err) {
+    console.error('[TG Saver] Error während der Tag-Auswahl:', err);
   }
 
-  // Handle different content types
-  if (info.srcUrl) {
-    // Image from context menu
-    await sendImageDirect(info.srcUrl, tab.url, settings, tab.id, selectedTag);
-  } else if (info.selectionText) {
-    // Selected text
-    await sendQuoteDirect(info.selectionText, tab.url, settings, tab.id, selectedTag);
-  } else if (info.linkUrl) {
-    // Link
-    await sendLinkDirect(info.linkUrl, tab.url, settings, tab.id, selectedTag);
-  } else {
-    // Page click - detect media under cursor
-    await sendImageFromPageDirect(tab, settings, selectedTag);
+  try {
+    // Handle different content types
+    if (info.srcUrl) {
+      console.log('[TG Saver] Handling image source:', info.srcUrl);
+      await sendImageDirect(info.srcUrl, tab.url, settings, tab.id, selectedTag);
+    } else if (info.selectionText) {
+      console.log('[TG Saver] Handling selection text');
+      await sendQuoteDirect(info.selectionText, tab.url, settings, tab.id, selectedTag);
+    } else if (info.linkUrl) {
+      console.log('[TG Saver] Handling link URL:', info.linkUrl);
+      await sendLinkDirect(info.linkUrl, tab.url, settings, tab.id, selectedTag);
+    } else {
+      console.log('[TG Saver] Handling general page click');
+      await sendImageFromPageDirect(tab, settings, selectedTag);
+    }
+  } catch (err) {
+    console.error('[TG Saver] Error in content handling flow:', err);
+    showToast(tab.id, 'error', 'Error: ' + err.message);
   }
 });
 
@@ -233,30 +245,42 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...result };
 }
 
+// Helper to escape HTML for Telegram
+function escapeHTML(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 // Format URL for display
 function formatUrl(url) {
+  if (!url) return { text: '', isLink: false, fullUrl: '' };
   let clean = url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/$/, '');
 
   if (clean.length <= 35) {
-    return { text: clean, isLink: false, fullUrl: url };
+    return { text: escapeHTML(clean), isLink: false, fullUrl: url };
   }
 
   const domain = clean.split('/')[0];
-  return { text: domain, isLink: true, fullUrl: url };
+  return { text: escapeHTML(domain), isLink: true, fullUrl: url };
 }
 
 // Build caption with URL
 function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = null) {
+  console.log('[TG Saver] Building caption for:', { url, tag, extraTextLength: extraText?.length, selectedTag: selectedTag?.name });
   const formatted = formatUrl(url);
   const useHashtags = settings.useHashtags !== false;
   const quoteMonospace = settings.quoteMonospace !== false;
   let caption = '';
 
   if (extraText) {
+    const escapedText = escapeHTML(extraText.slice(0, 3900));
     if (quoteMonospace) {
-      caption += `<code>${extraText.slice(0, 3900)}</code>\n\n`;
+      caption += `<code>${escapedText}</code>\n\n`;
     } else {
-      caption += `${extraText.slice(0, 3900)}\n\n`;
+      caption += `${escapedText}\n\n`;
     }
   } else {
     // Add empty braille space + newline before tag for visual separation
@@ -268,7 +292,7 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
 
   // Add selected custom tag if present
   if (selectedTag && selectedTag.name) {
-    let tagText = `#${selectedTag.name}`;
+    let tagText = `#${escapeHTML(selectedTag.name)}`;
 
     // Prepend emoji if enabled
     if (settings.sendWithColor) {
@@ -282,40 +306,43 @@ function buildCaption(url, tag, extraText = '', settings = {}, selectedTag = nul
   }
 
   // Add type tag if hashtags enabled
-  if (useHashtags) {
-    parts.push(tag);
+  if (useHashtags && tag) {
+    parts.push(escapeHTML(tag));
   }
 
   // Add URL
   if (formatted.isLink) {
     parts.push(`<a href="${formatted.fullUrl}">${formatted.text}</a>`);
-  } else {
+  } else if (formatted.text) {
     parts.push(formatted.text);
   }
 
   // Filter out any empty parts before joining
-  caption += parts.filter(p => p && p.trim()).join(' | ');
+  const finalParts = parts.filter(p => p && p.trim()).join(' | ');
+  caption += finalParts;
 
+  console.log('[TG Saver] Final caption built');
   return caption;
 }
 
 // Show toast notification on page
 async function showToast(tabId, state, message) {
+  if (!tabId) return;
+  console.log(`[TG Saver] Showing toast: ${state} - ${message}`);
   try {
-    // Content script is already loaded via manifest.json
-    // Just send the message
     await chrome.tabs.sendMessage(tabId, {
       action: 'showToast',
       state,
       message
     });
   } catch (e) {
-    console.error('Failed to show toast:', e);
+    console.warn('[TG Saver] Could not send message to tab (normal behavior on some pages):', e);
   }
 }
 
 // Show tag selection toast and wait for response
 async function showTagSelection(tabId, customTags) {
+  console.log('[TG Saver] Showing tag selection for tab:', tabId);
   const requestId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
   // Create promise that will be resolved when tag is selected
@@ -325,6 +352,7 @@ async function showTagSelection(tabId, customTags) {
     // Timeout fallback (30 seconds - user may be hovering)
     setTimeout(() => {
       if (pendingRequests.has(requestId)) {
+        console.log('[TG Saver] Tag selection timeout for request:', requestId);
         pendingRequests.delete(requestId);
         resolve(null);
       }
@@ -335,43 +363,58 @@ async function showTagSelection(tabId, customTags) {
   chrome.tabs.sendMessage(tabId, {
     action: 'preShowToast',
     requestId: requestId
-  }).catch(() => { });
+  }).then(() => {
+    console.log('[TG Saver] preShowToast message sent successfully');
+  }).catch((err) => {
+    console.warn('[TG Saver] Failed to send preShowToast message:', err);
+    // If we can't send message, resolve with null to allow sending without tag
+    const pending = pendingRequests.get(requestId);
+    if (pending) {
+      pendingRequests.delete(requestId);
+      pending.resolve(null);
+    }
+  });
 
   return tagPromise;
 }
 
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
-  // Start capture immediately (non-blocking)
-  const capturePromise = chrome.tabs.captureVisibleTab(null, { format: 'png' });
+  try {
+    // Start capture immediately (non-blocking)
+    const capturePromise = chrome.tabs.captureVisibleTab(null, { format: 'png' });
 
-  // Show tag selection if custom tags exist and enabled (runs in parallel with capture)
-  let selectedTag = null;
-  if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
-    selectedTag = await showTagSelection(tab.id, settings.customTags);
-    // Check if cancelled
-    if (selectedTag === '__CANCELLED__') {
+    // Show tag selection if custom tags exist and enabled (runs in parallel with capture)
+    let selectedTag = null;
+    if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
+      selectedTag = await showTagSelection(tab.id, settings.customTags);
+      // Check if cancelled
+      if (selectedTag === '__CANCELLED__') {
+        return;
+      }
+    } else {
+      await showToast(tab.id, 'pending', 'Sending');
+    }
+
+    // Wait for capture to complete
+    const dataUrl = await capturePromise;
+
+    if (!settings.addScreenshot) {
+      // Send just the link without screenshot
+      await sendMessage(tab.url, settings, selectedTag);
+      await showToast(tab.id, 'success', 'Success');
       return;
     }
-  } else {
-    await showToast(tab.id, 'pending', 'Sending');
-  }
 
-  // Wait for capture to complete
-  const dataUrl = await capturePromise;
+    const blob = await fetch(dataUrl).then(r => r.blob());
+    const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
-  if (!settings.addScreenshot) {
-    // Send just the link without screenshot
-    await sendMessage(tab.url, settings, selectedTag);
+    await sendPhoto(blob, caption, settings);
     await showToast(tab.id, 'success', 'Success');
-    return;
+  } catch (err) {
+    console.error('[TG Saver] Error in sendScreenshot:', err);
+    showToast(tab.id, 'error', 'Error: ' + err.message);
   }
-
-  const blob = await fetch(dataUrl).then(r => r.blob());
-  const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
-
-  await sendPhoto(blob, caption, settings);
-  await showToast(tab.id, 'success', 'Success');
 }
 
 // Send image from context menu
@@ -664,22 +707,27 @@ async function sendQuote(text, pageUrl, settings) {
 
 // Send quote with explicit tabId (for selection icon)
 async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
-  // Show tag selection if custom tags exist
-  let selectedTag = null;
-  if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
-    selectedTag = await showTagSelection(tabId, settings.customTags);
-    // Check if cancelled
-    if (selectedTag === '__CANCELLED__') {
-      return;
+  try {
+    // Show tag selection if custom tags exist
+    let selectedTag = null;
+    if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0 && tabId) {
+      selectedTag = await showTagSelection(tabId, settings.customTags);
+      // Check if cancelled
+      if (selectedTag === '__CANCELLED__') {
+        return;
+      }
+    } else if (tabId) {
+      await showToast(tabId, 'pending', 'Sending');
     }
-  } else if (tabId) {
-    await showToast(tabId, 'pending', 'Sending');
+
+    const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
+    await sendTextMessage(caption, settings);
+
+    if (tabId) await showToast(tabId, 'success', 'Success');
+  } catch (err) {
+    console.error('[TG Saver] Error in sendQuoteWithTabId:', err);
+    if (tabId) showToast(tabId, 'error', 'Error: ' + err.message);
   }
-
-  const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
-  await sendTextMessage(caption, settings);
-
-  if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
 // Send just a message (link without screenshot)
@@ -690,68 +738,92 @@ async function sendMessage(url, settings, selectedTag = null) {
 
 // Telegram API: send text message
 async function sendTextMessage(text, settings) {
-  const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: settings.chatId,
-      text: text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: !settings.showLinkPreview
-    })
-  });
+  console.log('[TG Saver] Sending text message to Telegram...');
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: settings.chatId,
+        text: text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: !settings.showLinkPreview
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.description || 'Telegram API error');
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[TG Saver] Telegram API error (text):', error);
+      throw new Error(error.description || 'Telegram API error');
+    }
+
+    console.log('[TG Saver] Text message sent successfully');
+    return response.json();
+  } catch (err) {
+    console.error('[TG Saver] Network error sending text:', err);
+    throw err;
   }
-
-  return response.json();
 }
 
 // Telegram API: send photo
 async function sendPhoto(blob, caption, settings) {
-  const formData = new FormData();
-  formData.append('chat_id', settings.chatId);
-  formData.append('photo', blob, 'screenshot.png');
-  formData.append('caption', caption);
-  formData.append('parse_mode', 'HTML');
+  console.log('[TG Saver] Sending photo to Telegram...');
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', settings.chatId);
+    formData.append('photo', blob, 'screenshot.png');
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
 
-  const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendPhoto`, {
-    method: 'POST',
-    body: formData
-  });
+    const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.description || 'Telegram API error');
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[TG Saver] Telegram API error (photo):', error);
+      throw new Error(error.description || 'Telegram API error');
+    }
+
+    console.log('[TG Saver] Photo sent successfully');
+    return response.json();
+  } catch (err) {
+    console.error('[TG Saver] Network error sending photo:', err);
+    throw err;
   }
-
-  return response.json();
 }
 
 // Telegram API: send document (uncompressed)
 async function sendDocument(blob, caption, settings, originalUrl) {
-  const ext = originalUrl.split('.').pop()?.split('?')[0] || 'png';
-  const filename = `image.${ext}`;
+  console.log('[TG Saver] Sending document to Telegram...');
+  try {
+    const ext = originalUrl.split('.').pop()?.split('?')[0] || 'png';
+    const filename = `image.${ext}`;
 
-  const formData = new FormData();
-  formData.append('chat_id', settings.chatId);
-  formData.append('document', blob, filename);
-  formData.append('caption', caption);
-  formData.append('parse_mode', 'HTML');
+    const formData = new FormData();
+    formData.append('chat_id', settings.chatId);
+    formData.append('document', blob, filename);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
 
-  const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendDocument`, {
-    method: 'POST',
-    body: formData
-  });
+    const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendDocument`, {
+      method: 'POST',
+      body: formData
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.description || 'Telegram API error');
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[TG Saver] Telegram API error (document):', error);
+      throw new Error(error.description || 'Telegram API error');
+    }
+
+    console.log('[TG Saver] Document sent successfully');
+    return response.json();
+  } catch (err) {
+    console.error('[TG Saver] Network error sending document:', err);
+    throw err;
   }
-
-  return response.json();
 }
 
 // ============ DIRECT FUNCTIONS (tag already selected) ============

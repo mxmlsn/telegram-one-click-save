@@ -83,6 +83,10 @@
   background: #22c55e !important;
 }
 
+.tg-saver-toast.tg-saver-error {
+  background: #ef4444 !important;
+}
+
 .tg-saver-icon {
   font-size: 16px !important;
   line-height: 1 !important;
