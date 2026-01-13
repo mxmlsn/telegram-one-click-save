@@ -971,7 +971,7 @@ async function updateLivePreview() {
   }
 
   // Signature Construction Function
-  const buildSignature = (contentTypeTag) => {
+  const buildSignature = (contentTypeTag, includeDomain = false) => {
     let signature = '';
 
     // 1. Emoji + Theme Tag
@@ -987,14 +987,23 @@ async function updateLivePreview() {
       signature += contentTypeTag;
     }
 
+    if (includeDomain) {
+      if (signature) signature += ' | ';
+      signature += 'wikipedia.org';
+    }
+
     return signature;
   };
 
   // 2. Update Image Message
   const previewTagsImage = document.getElementById('previewTagsImage');
+  const previewImgMsg = document.querySelector('.preview-image-bubble img');
+  if (previewImgMsg) {
+    previewImgMsg.src = '../prevv/image.jpeg'; // Using user-provided image path
+  }
   if (previewTagsImage) {
-    // For images, we just show signature
-    previewTagsImage.textContent = buildSignature(tagImage);
+    // Image messages always have domain in signature now
+    previewTagsImage.textContent = buildSignature(tagImage, true);
   }
 
   // 3. Update Link Message
@@ -1010,7 +1019,7 @@ async function updateLivePreview() {
       const imgContainer = document.createElement('div');
       imgContainer.className = 'preview-image-container';
       const img = document.createElement('img');
-      img.src = '../icons/save.png'; // Placeholder
+      img.src = '../prevv/link.jpeg'; // Using user-provided screenshot path
       imgContainer.appendChild(img);
 
       previewLinkBubble.appendChild(imgContainer);
@@ -1022,8 +1031,7 @@ async function updateLivePreview() {
       sigLine.className = 'preview-tags-line';
 
       // Signature + Domain
-      const sigBase = buildSignature(tagLink);
-      sigLine.textContent = sigBase ? `${sigBase} | wikipedia.org` : 'wikipedia.org';
+      sigLine.textContent = buildSignature(tagLink, true);
 
       footer.appendChild(sigLine);
       previewLinkBubble.appendChild(footer);
@@ -1084,8 +1092,7 @@ async function updateLivePreview() {
       const sigLine = document.createElement('div');
       sigLine.className = 'preview-tags-line';
       // "ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется" -> implies link is not in footer
-      const sigBase = buildSignature(tagLink);
-      sigLine.textContent = sigBase;
+      sigLine.textContent = buildSignature(tagLink, false);
 
       footer.appendChild(sigLine);
       previewLinkBubble.appendChild(footer);
@@ -1105,7 +1112,8 @@ async function updateLivePreview() {
   }
 
   if (previewTagsText) {
-    previewTagsText.textContent = buildSignature(tagQuote);
+    // Text messages always have domain in signature now
+    previewTagsText.textContent = buildSignature(tagQuote, true);
   }
 
   // 5. Update Toast Preview
