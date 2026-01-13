@@ -108,8 +108,8 @@ chrome.storage.onChanged.addListener((changes) => {
 // Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
-    id: 'pocketIt',
-    title: 'Pocket it',
+    id: 'sendToTelegram',
+    title: 'Send to Telegram',
     contexts: ['page', 'frame', 'link', 'image', 'selection']
   });
 });
@@ -119,7 +119,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const clickTime = Date.now();
   console.log('[TG Saver] Context menu clicked at', clickTime);
 
-  if (info.menuItemId !== 'pocketIt') return;
+  if (info.menuItemId !== 'sendToTelegram') return;
 
   // CRITICAL: Show toast IMMEDIATELY, before any async operations
   // Use cached settings for instant UI, load fresh settings in parallel
