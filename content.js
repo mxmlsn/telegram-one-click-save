@@ -134,7 +134,10 @@ window.preShowTagSelection = function(requestId) {
 };
 
 function showTagSelectionToast(customTags, requestId) {
+  // Remove existing toast or wrapper
+  const existingWrapper = document.getElementById('tg-saver-toast-wrapper');
   const existingToast = document.getElementById('tg-saver-toast');
+  if (existingWrapper) existingWrapper.remove();
   if (existingToast) existingToast.remove();
   killTimer();
 
@@ -171,14 +174,39 @@ function showTagSelectionToast(customTags, requestId) {
   }
 
   if (isMinimalist) {
+    // Create wrapper for minimalist mode to handle close button outside
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tg-saver-minimalist-wrapper';
+    wrapper.id = 'tg-saver-toast-wrapper';
+
     toast.innerHTML = `
       <div class="tg-saver-toast-content">
         <div class="tg-saver-tags-container">
           ${tagsHtml}
+          <button class="tg-saver-tag-btn tg-saver-no-tag-btn" data-index="-1" title="Save without tag">
+            <span class="tg-saver-no-tag-circle"></span>
+          </button>
         </div>
       </div>
       <div class="tg-saver-minimalist-loader"></div>
     `;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'tg-saver-minimalist-close-btn';
+    closeBtn.title = 'Cancel send';
+    closeBtn.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    `;
+
+    wrapper.appendChild(toast);
+    wrapper.appendChild(closeBtn);
+    wrapper.dataset.requestId = requestId;
+
+    // Use wrapper instead of toast for minimalist
+    document.body.appendChild(wrapper);
   } else {
     toast.innerHTML = `
       <div class="tg-saver-toast-content">
@@ -200,9 +228,8 @@ function showTagSelectionToast(customTags, requestId) {
         </div>
       </div>
     `;
+    document.body.appendChild(toast);
   }
-
-  document.body.appendChild(toast);
 
   // Cancel button (only in normal mode)
   const cancelBtn = toast.querySelector('.tg-saver-cancel-btn');
@@ -212,6 +239,19 @@ function showTagSelectionToast(customTags, requestId) {
       e.stopPropagation();
       cancelSend();
     });
+  }
+
+  // Close button (only in minimalist mode) - attached in wrapper creation above
+  if (isMinimalist) {
+    const wrapper = document.getElementById('tg-saver-toast-wrapper');
+    const closeBtn = wrapper?.querySelector('.tg-saver-minimalist-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        cancelSend();
+      });
+    }
   }
 
   // Tag buttons - MANUAL CLICK - always sends
@@ -229,37 +269,51 @@ function showTagSelectionToast(customTags, requestId) {
 
       killTimer();
 
-      // Fix current height for smooth morph to min-height
-      const currentHeight = toast.offsetHeight;
-      toast.style.height = currentHeight + 'px';
+      // Check if minimalist mode - need to handle wrapper
+      const wrapper = document.getElementById('tg-saver-toast-wrapper');
 
-      // Fade out content
-      const content = toast.querySelector('.tg-saver-toast-content');
-      if (content) {
-        content.style.opacity = '0';
-      }
-
-      // Shrink to min-height (44px)
-      requestAnimationFrame(() => {
-        toast.style.height = '44px';
-
-        // Wait for animation, then change content
+      if (wrapper) {
+        // Minimalist mode - hide wrapper and show simple toast
+        wrapper.style.opacity = '0';
         setTimeout(() => {
-          toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
-          toast.classList.remove('tg-saver-with-tags');
-          toast.style.height = '';
-
-          // Fade in new content
-          requestAnimationFrame(() => {
-            const icon = toast.querySelector('.tg-saver-icon');
-            const text = toast.querySelector('.tg-saver-text');
-            if (icon) icon.classList.add('tg-saver-visible-content');
-            if (text) text.classList.add('tg-saver-visible-content');
-          });
-
+          wrapper.remove();
+          showSimpleToast('pending', 'Sending');
           doSend(requestId, selectedTag);
         }, 200);
-      });
+      } else {
+        // Normal mode - morph animation
+        // Fix current height for smooth morph to min-height
+        const currentHeight = toast.offsetHeight;
+        toast.style.height = currentHeight + 'px';
+
+        // Fade out content
+        const content = toast.querySelector('.tg-saver-toast-content');
+        if (content) {
+          content.style.opacity = '0';
+        }
+
+        // Shrink to min-height (44px)
+        requestAnimationFrame(() => {
+          toast.style.height = '44px';
+
+          // Wait for animation, then change content
+          setTimeout(() => {
+            toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
+            toast.classList.remove('tg-saver-with-tags');
+            toast.style.height = '';
+
+            // Fade in new content
+            requestAnimationFrame(() => {
+              const icon = toast.querySelector('.tg-saver-icon');
+              const text = toast.querySelector('.tg-saver-text');
+              if (icon) icon.classList.add('tg-saver-visible-content');
+              if (text) text.classList.add('tg-saver-visible-content');
+            });
+
+            doSend(requestId, selectedTag);
+          }, 200);
+        });
+      }
     });
   });
 
@@ -325,22 +379,25 @@ function showTagSelectionToast(customTags, requestId) {
     });
   }
 
-  // HOVER - set pause flag
-  toast.addEventListener('mouseenter', () => {
-    ToastState.isPaused = true;
-    const loader = isMinimalist
-      ? toast.querySelector('.tg-saver-minimalist-loader')
-      : toast.querySelector('.tg-saver-timer-loader');
-    if (loader) loader.style.animationPlayState = 'paused';
-  });
+  // HOVER - set pause flag (use wrapper for minimalist, toast for normal)
+  const hoverTarget = isMinimalist ? document.getElementById('tg-saver-toast-wrapper') : toast;
+  if (hoverTarget) {
+    hoverTarget.addEventListener('mouseenter', () => {
+      ToastState.isPaused = true;
+      const loader = isMinimalist
+        ? toast.querySelector('.tg-saver-minimalist-loader')
+        : toast.querySelector('.tg-saver-timer-loader');
+      if (loader) loader.style.animationPlayState = 'paused';
+    });
 
-  toast.addEventListener('mouseleave', () => {
-    ToastState.isPaused = false;
-    const loader = isMinimalist
-      ? toast.querySelector('.tg-saver-minimalist-loader')
-      : toast.querySelector('.tg-saver-timer-loader');
-    if (loader) loader.style.animationPlayState = 'running';
-  });
+    hoverTarget.addEventListener('mouseleave', () => {
+      ToastState.isPaused = false;
+      const loader = isMinimalist
+        ? toast.querySelector('.tg-saver-minimalist-loader')
+        : toast.querySelector('.tg-saver-timer-loader');
+      if (loader) loader.style.animationPlayState = 'running';
+    });
+  }
 
   requestAnimationFrame(() => {
     toast.classList.add('tg-saver-visible');
@@ -384,8 +441,19 @@ function startCountdown(requestId) {
       }
 
       // Show gray "sending" state with smooth morph
+      const wrapper = document.getElementById('tg-saver-toast-wrapper');
       const toast = document.getElementById('tg-saver-toast');
-      if (toast) {
+
+      if (wrapper) {
+        // Minimalist mode - hide wrapper and show simple toast
+        wrapper.style.opacity = '0';
+        setTimeout(() => {
+          wrapper.remove();
+          showSimpleToast('pending', 'Sending');
+          doSend(requestId, null);
+        }, 200);
+      } else if (toast) {
+        // Normal mode - morph animation
         // Fix current height for smooth morph to min-height
         const currentHeight = toast.offsetHeight;
         toast.style.height = currentHeight + 'px';
@@ -444,8 +512,14 @@ function cancelSend() {
   const tooltip = document.getElementById('tg-saver-tag-tooltip');
   if (tooltip) tooltip.remove();
 
+  // Remove wrapper if minimalist mode, otherwise toast
+  const wrapper = document.getElementById('tg-saver-toast-wrapper');
   const toast = document.getElementById('tg-saver-toast');
-  if (toast) {
+
+  if (wrapper) {
+    wrapper.style.opacity = '0';
+    setTimeout(() => wrapper.remove(), 200);
+  } else if (toast) {
     toast.classList.remove('tg-saver-visible');
     setTimeout(() => toast.remove(), 200);
   }

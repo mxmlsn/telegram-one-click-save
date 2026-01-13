@@ -308,6 +308,20 @@
 
 /* ============ MINIMALIST TOAST STYLE ============ */
 
+/* Wrapper for minimalist mode (contains toast + close button) */
+.tg-saver-minimalist-wrapper {
+  all: initial;
+  position: fixed !important;
+  top: 20px !important;
+  right: 20px !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  opacity: 1 !important;
+  transition: opacity 0.2s ease !important;
+}
+
 .tg-saver-toast.tg-saver-minimalist {
   height: 52px !important;
   width: auto !important;
@@ -315,6 +329,10 @@
   max-width: none !important;
   padding: 12px !important;
   border-radius: 26px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
 }
 
 .tg-saver-toast.tg-saver-minimalist .tg-saver-toast-content {
@@ -366,6 +384,87 @@
   display: none !important;
 }
 
+/* Minimalist "no tag" button */
+.tg-saver-toast.tg-saver-minimalist .tg-saver-no-tag-btn {
+  display: flex !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 50% !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+}
+
+.tg-saver-toast.tg-saver-minimalist .tg-saver-no-tag-btn:hover {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+  background: transparent !important;
+  transform: scale(1.1) !important;
+}
+
+.tg-saver-no-tag-circle {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+}
+
+.tg-saver-no-tag-circle::before {
+  content: "" !important;
+  position: absolute !important;
+  width: 24px !important;
+  height: 1.5px !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+  transform: rotate(45deg) !important;
+  border-radius: 2px !important;
+}
+
+/* Minimalist close button (right of popup) */
+.tg-saver-minimalist-close-btn {
+  all: initial;
+  position: relative !important;
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 50% !important;
+  background: rgba(51, 51, 51, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s ease !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+  flex-shrink: 0 !important;
+}
+
+.tg-saver-minimalist-close-btn:hover {
+  background: rgba(109, 109, 109, 0.9) !important;
+  color: white !important;
+  transform: scale(1.05) !important;
+}
+
+.tg-saver-minimalist-close-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.tg-saver-minimalist-close-btn svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+}
+
 /* Minimalist global timer loader */
 .tg-saver-minimalist-loader {
   position: absolute !important;
@@ -374,7 +473,7 @@
   right: 0 !important;
   height: 6px !important;
   background: #15A2FF !important;
-  border-radius: 0 !important;
+  border-radius: 0 0 26px 26px !important;
   transform-origin: left !important;
   pointer-events: none !important;
 }
