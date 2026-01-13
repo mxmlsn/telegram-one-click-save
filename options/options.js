@@ -997,14 +997,49 @@ async function updateLivePreview() {
   };
 
   // 2. Update Image Message
+  const imageCompression = settings.imageCompression;
+  const previewImgBubble = document.querySelector('.preview-image-bubble');
   const previewTagsImage = document.getElementById('previewTagsImage');
-  const previewImgMsg = document.querySelector('.preview-image-bubble img');
-  if (previewImgMsg) {
-    previewImgMsg.src = '../prevv/image.jpeg'; // Using user-provided image path
-  }
-  if (previewTagsImage) {
-    // Image messages always have domain in signature now
-    previewTagsImage.textContent = buildSignature(tagImage, true);
+
+  if (previewImgBubble) {
+    if (imageCompression) {
+      // Photo Mode
+      previewImgBubble.innerHTML = `
+        <div class="preview-image-container">
+          <img src="../prevv/image.jpg" alt="Preview Image">
+        </div>
+        <div class="preview-bubble-footer">
+          <div class="preview-tags-line" id="previewTagsImage"></div>
+        </div>
+      `;
+    } else {
+      // File Mode
+      previewImgBubble.innerHTML = `
+        <div class="preview-file-container">
+          <div class="preview-file-icon">
+             <img src="../prevv/image.jpg" alt="Preview Image">
+             <div class="preview-file-download-arrow">
+               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                 <path d="M7 13l5 5 5-5M12 18V6"></path>
+               </svg>
+             </div>
+          </div>
+          <div class="preview-file-info">
+            <div class="preview-file-name">image.jpg</div>
+            <div class="preview-file-size">53.0 KB — <span class="preview-file-download">Download</span></div>
+          </div>
+        </div>
+        <div class="preview-bubble-footer">
+          <div class="preview-tags-line" id="previewTagsImage"></div>
+        </div>
+      `;
+    }
+
+    // Refresh the tag content
+    const newTagsEl = previewImgBubble.querySelector('#previewTagsImage');
+    if (newTagsEl) {
+      newTagsEl.textContent = buildSignature(tagImage, true);
+    }
   }
 
   // 3. Update Link Message
