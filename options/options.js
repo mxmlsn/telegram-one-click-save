@@ -1129,6 +1129,14 @@ function renderToastPreview(settings) {
 
   const isMinimalist = settings.popupStyleMinimalist || settings.toastStyle === 'minimalist';
   const isLight = settings.themeLight;
+  const enableQuickTags = settings.enableQuickTags !== false;
+
+  const container = document.querySelector('.preview-toast-container');
+  if (container) {
+    container.style.display = enableQuickTags ? 'block' : 'none';
+  }
+
+  if (!enableQuickTags) return;
 
   // Create toast element
   const toast = document.createElement('div');
@@ -1192,13 +1200,7 @@ function renderToastPreview(settings) {
     loader.style.transform = 'scaleX(0.6)';
     toast.appendChild(loader);
 
-    // Add close button to WRAPPER
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'tg-saver-minimalist-close-btn';
-    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-
     wrapper.appendChild(toast);
-    wrapper.appendChild(closeBtn);
     wrapper.className = 'tg-saver-minimalist-wrapper' + (isLight ? ' tg-saver-light' : '');
 
   } else {
@@ -1212,7 +1214,7 @@ function renderToastPreview(settings) {
 
     const title = document.createElement('div');
     title.className = 'tg-saver-toast-title';
-    title.textContent = 'Saved!'; // Or "Save to..."
+    title.textContent = 'Tags?'; // Or "Save to..."
     header.appendChild(title);
 
     const cancelBtn = document.createElement('button');

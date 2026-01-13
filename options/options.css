@@ -1461,7 +1461,7 @@ input:checked+.slider:before {
   background: #0E0E0E;
   /* Darker background for message area */
   border-radius: 12px;
-  padding: 16px;
+  padding: 8px;
   min-height: 200px;
   /* Increased by ~20% (reversing previous scale 0.8 to 1.0) */
   transform: scale(1.0);
