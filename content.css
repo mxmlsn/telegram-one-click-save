@@ -67,6 +67,14 @@
   transition: padding 0.2s ease !important;
 }
 
+/* Override for width animation - allows custom width during transition */
+.tg-saver-toast.tg-saver-animating-width {
+  width: var(--tg-toast-width) !important;
+  min-width: auto !important;
+  max-width: none !important;
+  transition: width 0.3s ease-out !important;
+}
+
 .tg-saver-toast.tg-saver-visible {
   opacity: 1 !important;
 }
@@ -349,6 +357,7 @@
 .tg-saver-toast.tg-saver-minimalist .tg-saver-tags-container {
   flex-direction: row !important;
   gap: 5px !important;
+  transition: opacity 0.15s ease !important;
 }
 
 .tg-saver-toast.tg-saver-minimalist .tg-saver-tag-btn {

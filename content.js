@@ -81,41 +81,71 @@ function showSimpleToast(state, message) {
   } else if (state === 'success') {
     killTimer();
 
-    // Create new toast if it doesn't exist
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'tg-saver-toast';
-      toast.className = 'tg-saver-toast';
-      document.body.appendChild(toast);
-    }
+    // Check if we have minimalist wrapper (means we came from minimalist tag selection)
+    const wrapper = document.getElementById('tg-saver-toast-wrapper');
 
-    // Fade out current content if any
-    const currentIcon = toast.querySelector('.tg-saver-icon');
-    const currentText = toast.querySelector('.tg-saver-text');
-    if (currentIcon) currentIcon.classList.remove('tg-saver-visible-content');
-    if (currentText) currentText.classList.remove('tg-saver-visible-content');
+    if (wrapper) {
+      // Minimalist mode - toast already morphed to "Sending" state with 168px width
+      // Just change to success state
+      const wrapperToast = wrapper.querySelector('.tg-saver-toast');
 
-    // Wait for fade out, then change content
-    setTimeout(() => {
-      toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
-      toast.classList.add('tg-saver-success');
-      toast.classList.remove('tg-saver-with-tags');
+      if (wrapperToast) {
+        // Fade out current content
+        const currentIcon = wrapperToast.querySelector('.tg-saver-icon');
+        const currentText = wrapperToast.querySelector('.tg-saver-text');
+        if (currentIcon) currentIcon.classList.remove('tg-saver-visible-content');
+        if (currentText) currentText.classList.remove('tg-saver-visible-content');
 
-      // Ensure toast is visible and fade in new content
-      requestAnimationFrame(() => {
-        toast.classList.add('tg-saver-visible');
-        const icon = toast.querySelector('.tg-saver-icon');
-        const text = toast.querySelector('.tg-saver-text');
-        if (icon) icon.classList.add('tg-saver-visible-content');
-        if (text) text.classList.add('tg-saver-visible-content');
-
-        // Keep success message visible for exactly 1500ms
         setTimeout(() => {
-          toast.classList.remove('tg-saver-visible');
-          setTimeout(() => toast.remove(), 200);
-        }, 1500);
-      });
-    }, 150);
+          // Replace with success content
+          wrapperToast.innerHTML = `<span class="tg-saver-icon tg-saver-visible-content">✓</span><span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
+          wrapperToast.classList.add('tg-saver-success');
+
+          // After display time, fade out
+          setTimeout(() => {
+            wrapper.style.opacity = '0';
+            setTimeout(() => wrapper.remove(), 200);
+          }, 1500);
+        }, 150);
+      }
+    } else {
+      // Normal mode - existing behavior
+      // Create new toast if it doesn't exist
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'tg-saver-toast';
+        toast.className = 'tg-saver-toast';
+        document.body.appendChild(toast);
+      }
+
+      // Fade out current content if any
+      const currentIcon = toast.querySelector('.tg-saver-icon');
+      const currentText = toast.querySelector('.tg-saver-text');
+      if (currentIcon) currentIcon.classList.remove('tg-saver-visible-content');
+      if (currentText) currentText.classList.remove('tg-saver-visible-content');
+
+      // Wait for fade out, then change content
+      setTimeout(() => {
+        toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
+        toast.classList.add('tg-saver-success');
+        toast.classList.remove('tg-saver-with-tags');
+
+        // Ensure toast is visible and fade in new content
+        requestAnimationFrame(() => {
+          toast.classList.add('tg-saver-visible');
+          const icon = toast.querySelector('.tg-saver-icon');
+          const text = toast.querySelector('.tg-saver-text');
+          if (icon) icon.classList.add('tg-saver-visible-content');
+          if (text) text.classList.add('tg-saver-visible-content');
+
+          // Keep success message visible for exactly 1500ms
+          setTimeout(() => {
+            toast.classList.remove('tg-saver-visible');
+            setTimeout(() => toast.remove(), 200);
+          }, 1500);
+        });
+      }, 150);
+    }
   }
 }
 
@@ -250,13 +280,45 @@ function showTagSelectionToast(customTags, requestId) {
       const wrapper = document.getElementById('tg-saver-toast-wrapper');
 
       if (wrapper) {
-        // Minimalist mode - hide wrapper and show simple toast
-        wrapper.style.opacity = '0';
+        // Minimalist mode - morph to "Sending" state, keep wrapper for success animation
+        const wrapperToast = wrapper.querySelector('.tg-saver-toast');
+        const currentWidth = wrapperToast ? wrapperToast.offsetWidth : 168;
+        const targetWidth = 168;
+
+        // Fade out tags
+        const tagsContainer = wrapper.querySelector('.tg-saver-tags-container');
+        if (tagsContainer) {
+          tagsContainer.style.opacity = '0';
+        }
+
         setTimeout(() => {
-          wrapper.remove();
-          showSimpleToast('pending', 'Sending');
+          if (wrapperToast) {
+            // Set starting width via CSS variable BEFORE removing classes
+            wrapperToast.style.setProperty('--tg-toast-width', currentWidth + 'px');
+            wrapperToast.classList.add('tg-saver-animating-width');
+
+            // Now remove minimalist classes
+            wrapperToast.classList.remove('tg-saver-with-tags', 'tg-saver-minimalist');
+            wrapperToast.classList.add('tg-saver-visible');
+
+            // Replace with "Sending" content
+            wrapperToast.innerHTML = `<span class="tg-saver-icon tg-saver-visible-content">↑</span><span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
+
+            // Force reflow to apply starting width
+            wrapperToast.offsetWidth;
+
+            // Animate to target width
+            requestAnimationFrame(() => {
+              wrapperToast.style.setProperty('--tg-toast-width', targetWidth + 'px');
+
+              // Remove animating class after transition completes
+              setTimeout(() => {
+                wrapperToast.classList.remove('tg-saver-animating-width');
+              }, 300);
+            });
+          }
           doSend(requestId, selectedTag);
-        }, 200);
+        }, 150);
       } else {
         // Normal mode - morph animation
         // Fix current height for smooth morph to min-height
@@ -424,13 +486,45 @@ function startCountdown(requestId) {
       const toast = document.getElementById('tg-saver-toast');
 
       if (wrapper) {
-        // Minimalist mode - hide wrapper and show simple toast
-        wrapper.style.opacity = '0';
+        // Minimalist mode - morph to "Sending" state, keep wrapper for success animation
+        const wrapperToast = wrapper.querySelector('.tg-saver-toast');
+        const currentWidth = wrapperToast ? wrapperToast.offsetWidth : 168;
+        const targetWidth = 168;
+
+        // Fade out tags
+        const tagsContainer = wrapper.querySelector('.tg-saver-tags-container');
+        if (tagsContainer) {
+          tagsContainer.style.opacity = '0';
+        }
+
         setTimeout(() => {
-          wrapper.remove();
-          showSimpleToast('pending', 'Sending');
+          if (wrapperToast) {
+            // Set starting width via CSS variable BEFORE removing classes
+            wrapperToast.style.setProperty('--tg-toast-width', currentWidth + 'px');
+            wrapperToast.classList.add('tg-saver-animating-width');
+
+            // Now remove minimalist classes
+            wrapperToast.classList.remove('tg-saver-with-tags', 'tg-saver-minimalist');
+            wrapperToast.classList.add('tg-saver-visible');
+
+            // Replace with "Sending" content
+            wrapperToast.innerHTML = `<span class="tg-saver-icon tg-saver-visible-content">↑</span><span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
+
+            // Force reflow to apply starting width
+            wrapperToast.offsetWidth;
+
+            // Animate to target width
+            requestAnimationFrame(() => {
+              wrapperToast.style.setProperty('--tg-toast-width', targetWidth + 'px');
+
+              // Remove animating class after transition completes
+              setTimeout(() => {
+                wrapperToast.classList.remove('tg-saver-animating-width');
+              }, 300);
+            });
+          }
           doSend(requestId, null);
-        }, 200);
+        }, 150);
       } else if (toast) {
         // Normal mode - morph animation
         // Fix current height for smooth morph to min-height
