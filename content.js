@@ -90,23 +90,32 @@ function showSimpleToast(state, message) {
       const wrapperToast = wrapper.querySelector('.tg-saver-toast');
 
       if (wrapperToast) {
-        // Fade out current content
-        const currentIcon = wrapperToast.querySelector('.tg-saver-icon');
-        const currentText = wrapperToast.querySelector('.tg-saver-text');
-        if (currentIcon) currentIcon.classList.remove('tg-saver-visible-content');
-        if (currentText) currentText.classList.remove('tg-saver-visible-content');
+        // Crossfade: fade out old text while fading in new text
+        const oldText = wrapperToast.querySelector('.tg-saver-text');
+        if (oldText) oldText.classList.remove('tg-saver-visible-content');
 
-        setTimeout(() => {
-          // Replace with success content
-          wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
-          wrapperToast.classList.add('tg-saver-success');
+        // Add new text on top immediately
+        const newText = document.createElement('span');
+        newText.className = 'tg-saver-text tg-saver-crossfade-text';
+        newText.textContent = message;
+        wrapperToast.appendChild(newText);
+        wrapperToast.classList.add('tg-saver-success');
 
-          // After display time, fade out
+        // Fade in new text
+        requestAnimationFrame(() => {
+          newText.classList.add('tg-saver-visible-content');
+
+          // Remove old text after fade out
           setTimeout(() => {
-            wrapper.classList.add('tg-saver-fade-out');
-            setTimeout(() => wrapper.remove(), 400);
-          }, 1500);
-        }, 150);
+            if (oldText) oldText.remove();
+          }, 150);
+        });
+
+        // After display time, fade out
+        setTimeout(() => {
+          wrapper.classList.add('tg-saver-fade-out');
+          setTimeout(() => wrapper.remove(), 400);
+        }, 1500);
       }
     } else {
       // Normal mode - existing behavior
@@ -118,33 +127,34 @@ function showSimpleToast(state, message) {
         document.body.appendChild(toast);
       }
 
-      // Fade out current content if any
-      const currentIcon = toast.querySelector('.tg-saver-icon');
-      const currentText = toast.querySelector('.tg-saver-text');
-      if (currentIcon) currentIcon.classList.remove('tg-saver-visible-content');
-      if (currentText) currentText.classList.remove('tg-saver-visible-content');
+      // Crossfade: fade out old text while fading in new text
+      const oldText = toast.querySelector('.tg-saver-text');
+      if (oldText) oldText.classList.remove('tg-saver-visible-content');
 
-      // Wait for fade out, then change content
+      // Add new text on top immediately
+      const newText = document.createElement('span');
+      newText.className = 'tg-saver-text tg-saver-crossfade-text';
+      newText.textContent = message;
+      toast.appendChild(newText);
+      toast.classList.add('tg-saver-success');
+      toast.classList.remove('tg-saver-with-tags');
+      toast.classList.add('tg-saver-visible');
+
+      // Fade in new text
+      requestAnimationFrame(() => {
+        newText.classList.add('tg-saver-visible-content');
+
+        // Remove old text after fade out
+        setTimeout(() => {
+          if (oldText) oldText.remove();
+        }, 150);
+      });
+
+      // Keep success message visible for exactly 1500ms
       setTimeout(() => {
-        toast.innerHTML = `<span class="tg-saver-text">${message}</span>`;
-        toast.classList.add('tg-saver-success');
-        toast.classList.remove('tg-saver-with-tags');
-
-        // Ensure toast is visible and fade in new content
-        requestAnimationFrame(() => {
-          toast.classList.add('tg-saver-visible');
-          const icon = toast.querySelector('.tg-saver-icon');
-          const text = toast.querySelector('.tg-saver-text');
-          if (icon) icon.classList.add('tg-saver-visible-content');
-          if (text) text.classList.add('tg-saver-visible-content');
-
-          // Keep success message visible for exactly 1500ms
-          setTimeout(() => {
-            toast.classList.remove('tg-saver-visible');
-            setTimeout(() => toast.remove(), 400);
-          }, 1500);
-        });
-      }, 150);
+        toast.classList.remove('tg-saver-visible');
+        setTimeout(() => toast.remove(), 400);
+      }, 1500);
     }
   }
 }
