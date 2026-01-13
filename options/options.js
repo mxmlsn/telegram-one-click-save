@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   timerDuration: 4,
   emojiPack: 'circle',
   toastStyle: 'normal',
+  themeLight: false,
   isConnected: false,
   customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
   // Fixed 7 tags

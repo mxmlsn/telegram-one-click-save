@@ -12,7 +12,8 @@ chrome.storage.local.get({
   enableQuickTags: true,
   timerDuration: 4,
   toastStyle: 'normal',
-  iconColor: 'circle1'
+  iconColor: 'circle1',
+  themeLight: false
 }, (result) => {
   cachedContentSettings = result;
   window.__TG_Settings = result;
@@ -69,6 +70,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 function showSimpleToast(state, message) {
   let toast = document.getElementById('tg-saver-toast');
+  const themeLight = cachedContentSettings?.themeLight || false;
+  const lightClass = themeLight ? ' tg-saver-light' : '';
 
   if (state === 'pending') {
     if (toast) toast.remove();
@@ -76,7 +79,7 @@ function showSimpleToast(state, message) {
 
     toast = document.createElement('div');
     toast.id = 'tg-saver-toast';
-    toast.className = 'tg-saver-toast';
+    toast.className = 'tg-saver-toast' + lightClass;
     toast.innerHTML = `<span class="tg-saver-text">${message}</span>`;
     document.body.appendChild(toast);
 
@@ -132,7 +135,7 @@ function showSimpleToast(state, message) {
       if (!toast) {
         toast = document.createElement('div');
         toast.id = 'tg-saver-toast';
-        toast.className = 'tg-saver-toast';
+        toast.className = 'tg-saver-toast' + lightClass;
         document.body.appendChild(toast);
       }
 
@@ -198,13 +201,15 @@ function showTagSelectionToast(customTags, requestId) {
   // Use cached settings (already loaded synchronously)
   const timerDuration = cachedContentSettings?.timerDuration || 4;
   const toastStyle = cachedContentSettings?.toastStyle || 'normal';
+  const themeLight = cachedContentSettings?.themeLight || false;
 
   ToastState.timeLeft = timerDuration * 1000;
   const isMinimalist = toastStyle === 'minimalist';
+  const lightClass = themeLight ? ' tg-saver-light' : '';
 
   const toast = document.createElement('div');
   toast.id = 'tg-saver-toast';
-  toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '');
+  toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '') + lightClass;
   toast.dataset.requestId = requestId;
 
   // Build tags HTML
@@ -225,7 +230,7 @@ function showTagSelectionToast(customTags, requestId) {
   if (isMinimalist) {
     // Create wrapper for minimalist mode to handle close button outside
     const wrapper = document.createElement('div');
-    wrapper.className = 'tg-saver-minimalist-wrapper';
+    wrapper.className = 'tg-saver-minimalist-wrapper' + lightClass;
     wrapper.id = 'tg-saver-toast-wrapper';
 
     toast.innerHTML = `

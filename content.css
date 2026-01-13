@@ -31,7 +31,7 @@
   font-style: normal !important;
 
   /* Visual */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: none !important;
   opacity: 0 !important;
   background: rgba(51, 51, 51, 0.9) !important;
   backdrop-filter: blur(8px) !important;
@@ -466,7 +466,7 @@
   justify-content: center !important;
   transition: all 0.15s ease !important;
   color: rgba(255, 255, 255, 0.5) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: none !important;
   padding: 0 !important;
   margin: 0 !important;
   box-sizing: border-box !important;
@@ -578,4 +578,102 @@
   margin: 0 !important;
   padding: 0 !important;
   display: block !important;
+}
+
+/* ============ LIGHT THEME ============ */
+
+/* Normal toast - light theme */
+.tg-saver-toast.tg-saver- light {
+  background: rgba(218, 218, 218, 0.75) !important;
+  backdrop-filter: blur(7px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-text {
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Toast with tags - light theme */
+.tg-saver-toast.tg-saver-light.tg-saver-with-tags {
+  background: rgba(218, 218, 218, 0.65) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-toast-title {
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-cancel-btn {
+  color: rgba(0, 0, 0, 0.2) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-cancel-btn:hover {
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Tag buttons - light theme */
+.tg-saver-toast.tg-saver-light .tg-saver-tag-btn {
+  background: rgba(198, 198, 198, 0.41) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-tag-btn:hover {
+  background: rgba(137, 137, 137, 0.9) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-tag-name {
+  color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Skip button - light theme */
+.tg-saver-toast.tg-saver-light .tg-saver-skip-btn {
+  background: rgba(198, 198, 198, 0.41) !important;
+  color: rgba(0, 0, 0, 0.8) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-skip-btn:hover {
+  background: rgba(198, 198, 198, 0.6) !important;
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Timer loader - light theme */
+.tg-saver-toast.tg-saver-light .tg-saver-skip-btn .tg-saver-timer-loader {
+  background: rgba(137, 137, 137, 0.9) !important;
+}
+
+/* Success state - light theme (same green as dark) */
+.tg-saver-toast.tg-saver-light.tg-saver-success {
+  background: #22c55e !important;
+  color: white !important;
+}
+
+.tg-saver-toast.tg-saver-light.tg-saver-success .tg-saver-text {
+  color: white !important;
+}
+
+/* ============ MINIMALIST LIGHT THEME ============ */
+
+/* Wrapper close button - light theme */
+.tg-saver-minimalist-wrapper.tg-saver-light .tg-saver-minimalist-close-btn {
+  background: rgba(218, 218, 218, 0.75) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  color: rgba(0, 0, 0, 0.5) !important;
+}
+
+.tg-saver-minimalist-wrapper.tg-saver-light .tg-saver-minimalist-close-btn:hover {
+  background: rgba(137, 137, 137, 0.9) !important;
+  color: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Minimalist no-tag button border - light theme */
+.tg-saver-toast.tg-saver-light.tg-saver-minimalist .tg-saver-no-tag-btn {
+  border-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+.tg-saver-toast.tg-saver-light.tg-saver-minimalist .tg-saver-no-tag-btn:hover {
+  border-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+.tg-saver-toast.tg-saver-light .tg-saver-no-tag-circle::before {
+  background: rgba(0, 0, 0, 0.35) !important;
 }
