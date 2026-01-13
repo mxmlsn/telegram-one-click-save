@@ -47,7 +47,7 @@
   width: 168px !important;
   min-width: 168px !important;
   max-width: 168px !important;
-  min-height: 44px !important;
+  min-height: 52px !important;
   box-sizing: border-box !important;
 
   /* Reset margins and padding */
@@ -59,7 +59,7 @@
   flex-direction: row !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 12px 10px !important;
+  padding: 16px 10px !important;
   justify-content: center !important;
   width: 168px !important;
   min-width: 168px !important;
@@ -419,7 +419,7 @@
   position: absolute !important;
   width: 24px !important;
   height: 1.5px !important;
-  background: rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.35) !important;
   transform: rotate(45deg) !important;
   border-radius: 2px !important;
 }

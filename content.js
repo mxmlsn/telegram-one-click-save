@@ -292,9 +292,9 @@ function showTagSelectionToast(customTags, requestId) {
           content.style.opacity = '0';
         }
 
-        // Shrink to min-height (44px)
+        // Shrink to min-height (52px)
         requestAnimationFrame(() => {
-          toast.style.height = '44px';
+          toast.style.height = '52px';
 
           // Wait for animation, then change content
           setTimeout(() => {
@@ -323,7 +323,9 @@ function showTagSelectionToast(customTags, requestId) {
       const btn = e.target.closest('.tg-saver-tag-btn');
       if (!btn) return;
 
-      const tagName = btn.getAttribute('data-tag-name');
+      // Get tag name or "no tags" for the no-tag button
+      const tagName = btn.getAttribute('data-tag-name') ||
+                      (btn.classList.contains('tg-saver-no-tag-btn') ? 'no tags' : null);
       if (!tagName) return;
 
       let tooltip = document.getElementById('tg-saver-tag-tooltip');
@@ -464,9 +466,9 @@ function startCountdown(requestId) {
           content.style.opacity = '0';
         }
 
-        // Shrink to min-height (44px)
+        // Shrink to min-height (52px)
         requestAnimationFrame(() => {
-          toast.style.height = '44px';
+          toast.style.height = '52px';
 
           // Wait for animation, then change content
           setTimeout(() => {
