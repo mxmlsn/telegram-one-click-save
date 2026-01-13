@@ -259,7 +259,9 @@ h3 {
 }
 
 .howto-section.collapsed {
-  height: 103px;
+  height: 72px;
+  padding-top: 20px !important;
+  padding-bottom: 20px !important;
 }
 
 .howto-layout {
@@ -304,12 +306,22 @@ h3 {
   margin-bottom: 16px;
 }
 
+.howto-section.collapsed .howto-header {
+  margin-bottom: 0;
+  align-items: center;
+}
+
 .howto-header h2 {
   font-size: 23px;
   line-height: 1.2;
   max-width: 180px;
   margin-bottom: 0;
   transition: opacity 0.2s ease;
+}
+
+.howto-section.collapsed .howto-header h2 {
+  max-width: none;
+  white-space: nowrap;
 }
 
 .howto-section.collapsing .howto-header h2 {
