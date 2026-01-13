@@ -583,7 +583,7 @@
 /* ============ LIGHT THEME ============ */
 
 /* Normal toast - light theme */
-.tg-saver-toast.tg-saver- light {
+.tg-saver-toast.tg-saver-light {
   background: rgba(218, 218, 218, 0.75) !important;
   backdrop-filter: blur(7px) !important;
   -webkit-backdrop-filter: blur(6px) !important;
@@ -640,14 +640,13 @@
   background: rgba(137, 137, 137, 0.9) !important;
 }
 
-/* Success state - light theme (same green as dark) */
+/* Success state - light theme (green background, black text) */
 .tg-saver-toast.tg-saver-light.tg-saver-success {
   background: #22c55e !important;
-  color: white !important;
 }
 
 .tg-saver-toast.tg-saver-light.tg-saver-success .tg-saver-text {
-  color: white !important;
+  color: rgba(0, 0, 0, 0.9) !important;
 }
 
 /* ============ MINIMALIST LIGHT THEME ============ */
