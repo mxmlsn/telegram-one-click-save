@@ -11,7 +11,8 @@ chrome.storage.local.get({
   customTags: [],
   enableQuickTags: true,
   timerDuration: 4,
-  toastStyle: 'normal'
+  toastStyle: 'normal',
+  iconColor: 'circle1'
 }, (result) => {
   cachedContentSettings = result;
   window.__TG_Settings = result;
@@ -161,7 +162,7 @@ function showSimpleToast(state, message) {
 
 // Pre-show toast using LOCAL cache (called when we just need to show UI fast)
 // Exposed on window for executeScript access
-window.preShowTagSelection = function(requestId) {
+window.preShowTagSelection = function (requestId) {
   // Use locally cached tags - no network call!
   const tags = cachedContentSettings?.customTags || [];
   const hasNonEmptyTags = tags.some(t => t.name && t.name.trim());
@@ -374,7 +375,7 @@ function showTagSelectionToast(customTags, requestId) {
 
       // Get tag name or "no tags" for the no-tag button
       const tagName = btn.getAttribute('data-tag-name') ||
-                      (btn.classList.contains('tg-saver-no-tag-btn') ? 'no tags' : null);
+        (btn.classList.contains('tg-saver-no-tag-btn') ? 'no tags' : null);
       if (!tagName) return;
 
       let tooltip = document.getElementById('tg-saver-tag-tooltip');
@@ -647,12 +648,13 @@ chrome.storage.onChanged.addListener((changes) => {
 function createSelectionIcon() {
   if (selectionIcon) return selectionIcon;
 
+  const color = cachedContentSettings?.iconColor || 'circle1';
+  const iconUrl = chrome.runtime.getURL(`icons/icon-${color}-128.png`);
+
   selectionIcon = document.createElement('div');
   selectionIcon.id = 'tg-saver-selection-icon';
   selectionIcon.innerHTML = `
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-    </svg>
+    <img src="${iconUrl}" style="width: 100%; height: 100%; display: block;">
   `;
   selectionIcon.title = 'Send to Telegram';
 

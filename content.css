@@ -251,9 +251,12 @@
 }
 
 @keyframes tg-saver-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     background: rgba(156, 163, 175, 0.2);
   }
+
   50% {
     background: rgba(156, 163, 175, 0.5);
   }
@@ -317,6 +320,7 @@
   from {
     transform: scaleX(1);
   }
+
   to {
     transform: scaleX(0);
   }
@@ -535,13 +539,13 @@
   z-index: 2147483647 !important;
   width: 32px !important;
   height: 32px !important;
-  background: #0088cc !important;
+  background: none !important;
   border-radius: 50% !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
-  box-shadow: 0 2px 8px rgba(0, 136, 204, 0.4) !important;
+  box-shadow: none !important;
   opacity: 0 !important;
   transform: scale(0.5) !important;
   transition: opacity 0.15s ease, transform 0.15s ease !important;
@@ -561,7 +565,6 @@
 }
 
 #tg-saver-selection-icon:hover {
-  background: #0077b3 !important;
   transform: scale(1.1) !important;
 }
 
