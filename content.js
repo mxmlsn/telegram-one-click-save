@@ -7,8 +7,17 @@ document.addEventListener('contextmenu', (e) => {
 let cachedContentSettings = null;
 
 // Load settings on script init
+// Load settings on script init - match defaults with options.js
 chrome.storage.local.get({
-  customTags: [],
+  customTags: [
+    { name: 'work', color: '#E64541', id: 'red' },
+    { name: 'study', color: '#FFDE42', id: 'yellow' },
+    { name: 'refs', color: '#4ED345', id: 'green' },
+    { name: 'project1', color: '#377CDE', id: 'blue' },
+    { name: '', color: '#BB4FFF', id: 'purple' },
+    { name: '', color: '#3D3D3B', id: 'black' },
+    { name: '', color: '#DEDEDE', id: 'white' }
+  ],
   enableQuickTags: true,
   timerDuration: 4,
   toastStyle: 'normal',
@@ -53,16 +62,18 @@ const ToastState = window.__TG_ToastState;
 
 // Listen for messages from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[TG Saver] Content script received message:', message.action, message);
+
   if (message.action === 'showToast') {
     showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
-    // Use LOCAL cached settings for instant display (no async!)
-    showTagSelectionToast(message.customTags, message.requestId);
+    // Use DIRECTLY passed tags if available, otherwise fallback to cache
+    showTagSelectionToast(message.customTags || cachedContentSettings?.customTags, message.requestId);
     sendResponse({ received: true });
     return true;
   } else if (message.action === 'preShowToast') {
-    // Pre-show toast instantly from background signal
-    preShowTagSelection(message.requestId);
+    // Pre-show toast instantly using tags from background if provided
+    preShowTagSelection(message.requestId, message.customTags);
     sendResponse({ received: true });
     return true;
   }
@@ -168,24 +179,70 @@ function showSimpleToast(state, message) {
         setTimeout(() => toast.remove(), 400);
       }, 1500);
     }
+  } else if (state === 'error') {
+    killTimer();
+    const wrapper = document.getElementById('tg-saver-toast-wrapper');
+    const displayToast = wrapper ? wrapper.querySelector('.tg-saver-toast') : toast;
+
+    if (displayToast) {
+      displayToast.classList.add('tg-saver-error');
+      displayToast.classList.remove('tg-saver-with-tags');
+      displayToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
+
+      // Error stays longer (3s)
+      setTimeout(() => {
+        if (wrapper) {
+          wrapper.classList.add('tg-saver-fade-out');
+          setTimeout(() => wrapper.remove(), 400);
+        } else {
+          displayToast.classList.remove('tg-saver-visible');
+          setTimeout(() => displayToast.remove(), 400);
+        }
+      }, 3000);
+    }
   }
 }
 
-// Pre-show toast using LOCAL cache (called when we just need to show UI fast)
+// Pre-show toast using passed tags or LOCAL cache
 // Exposed on window for executeScript access
-window.preShowTagSelection = function (requestId) {
-  // Use locally cached tags - no network call!
-  const tags = cachedContentSettings?.customTags || [];
+window.preShowTagSelection = function (requestId, passedTags = null) {
+  console.log('[TG Saver] preShowTagSelection called for request:', requestId, 'Passed tags:', passedTags?.length);
+
+  // Prioritize tags passed from background. If none, try cache.
+  const tags = passedTags || cachedContentSettings?.customTags || [];
+
+  // If we still have nothing and background actually expected tags, we might be in trouble
+  // But if background passed tags (even empty ones), we follow that.
+
   const hasNonEmptyTags = tags.some(t => t.name && t.name.trim());
+
+  console.log('[TG Saver] Has non-empty tags:', hasNonEmptyTags);
 
   if (hasNonEmptyTags) {
     showTagSelectionToast(tags, requestId);
   } else {
+    // If we have no tags but were told to show something, show simple "Sending"
     showSimpleToast('pending', 'Sending');
+
+    // Only resolve as "no-tag" if we are absolutely sure there are no tags to show
+    // actually background already handles the no-tags case by calling showToast('pending')
+    // but if we got here, it's a preShowToast signal.
+    if (!passedTags && !cachedContentSettings) {
+      console.log('[TG Saver] Waiting for settings to pop up...');
+      // Don't send tagSelected:null yet, maybe settings will load?
+      // Actually, with passedTags this shouldn't happen.
+    } else if (!hasNonEmptyTags) {
+      chrome.runtime.sendMessage({
+        action: 'tagSelected',
+        requestId: requestId,
+        selectedTag: null
+      });
+    }
   }
 };
 
 function showTagSelectionToast(customTags, requestId) {
+  console.log('[TG Saver] showTagSelectionToast called', { requestId });
   // Remove existing toast or wrapper
   const existingWrapper = document.getElementById('tg-saver-toast-wrapper');
   const existingToast = document.getElementById('tg-saver-toast');
@@ -211,6 +268,8 @@ function showTagSelectionToast(customTags, requestId) {
   toast.id = 'tg-saver-toast';
   toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '') + lightClass;
   toast.dataset.requestId = requestId;
+
+  console.log('[TG Saver] Rendering toast with style:', toastStyle);
 
   // Build tags HTML
   let tagsHtml = '';
