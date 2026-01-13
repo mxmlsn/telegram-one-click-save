@@ -1450,6 +1450,7 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  background: #0E0E0E !important;
 }
 
 .preview-messages {
@@ -1466,6 +1467,7 @@ input:checked+.slider:before {
   transform-origin: top left;
   width: 100%;
   margin-bottom: 20px;
+  position: relative;
 }
 
 .preview-message-row {
@@ -1597,7 +1599,7 @@ input:checked+.slider:before {
 
 .mono-font {
   font-family: 'MartianMono', monospace;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* Tags Footer */
@@ -1620,33 +1622,17 @@ input:checked+.slider:before {
 
 /* Toast Preview */
 .preview-toast-container {
-  background: #1A1A1A;
-  /* Match section background to blend in, or slightly different? */
-  border-radius: 12px;
-  /* padding: 16px; */
-  /* min-height: 100px; */
-  display: flex;
-  flex-direction: column;
-  /* align-items: center; */
-  /* justify-content: center; */
-  /* Increased by ~20% (reversing previous scale 0.8 to 1.0) */
-  transform: scale(1.0);
-  transform-origin: top left;
-  width: 100%;
-  margin-top: 20px;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  pointer-events: none;
 }
 
 .preview-toast-wrapper {
   position: relative;
-  width: 100%;
-  height: 120px;
-  /* Enough space for toast */
-  background-image: linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-  background-color: #000;
-  /* Checkerboard pattern to show transparency */
-  border-radius: 12px;
+  width: auto;
+  height: auto;
   display: flex;
   align-items: center;
   justify-content: center;
