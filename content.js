@@ -690,8 +690,8 @@ function showSelectionIconAt(x, y, text) {
   savedSelectionText = text;
   const icon = createSelectionIcon();
 
-  icon.style.left = `${x}px`;
-  icon.style.top = `${y - 40}px`;
+  icon.style.left = `${x - 4}px`;
+  icon.style.top = `${y - 26}px`;
 
   requestAnimationFrame(() => {
     icon.classList.add('tg-saver-selection-visible');
@@ -707,21 +707,28 @@ function hideSelectionIcon() {
 document.addEventListener('mouseup', (e) => {
   if (e.target.closest('#tg-saver-selection-icon')) return;
 
-  const selection = window.getSelection();
-  const selectedText = selection.toString().trim();
+  // Use a tiny timeout to let the selection settle
+  setTimeout(() => {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
 
-  if (selectedText.length > 0) {
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    if (selectedText.length > 0 && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
 
-    showSelectionIconAt(
-      rect.right + window.scrollX,
-      rect.top + window.scrollY,
-      selectedText
-    );
-  } else {
-    hideSelectionIcon();
-  }
+      if (rect.width > 0 && rect.height > 0) {
+        showSelectionIconAt(
+          rect.right + window.scrollX,
+          rect.top + window.scrollY,
+          selectedText
+        );
+      } else {
+        hideSelectionIcon();
+      }
+    } else {
+      hideSelectionIcon();
+    }
+  }, 10);
 });
 
 document.addEventListener('mousedown', (e) => {
