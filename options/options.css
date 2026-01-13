@@ -1461,6 +1461,13 @@ input:checked+.slider:before {
   border-radius: 12px;
   padding: 16px;
   min-height: 200px;
+  /* Scale down by 20% */
+  transform: scale(0.8);
+  transform-origin: top left;
+  width: 125%;
+  /* Compensate for scale */
+  margin-bottom: -40px;
+  /* Compensate for vertical space loss approx */
 }
 
 .preview-message-row {
@@ -1517,7 +1524,11 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 300px;
+  max-width: 100%;
+  /* Fill bubble width */
+  border-radius: 4px;
+  /* Slight radius for card inside bubble */
+  overflow: hidden;
 }
 
 .preview-link-image {
@@ -1565,6 +1576,9 @@ input:checked+.slider:before {
 /* Link Text Only Style */
 .preview-link-text-only {
   padding: 8px 12px;
+  /* Ensure word break */
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .preview-link-url {
@@ -1616,6 +1630,12 @@ input:checked+.slider:before {
   flex-direction: column;
   /* align-items: center; */
   /* justify-content: center; */
+  /* Scale down by 20% */
+  transform: scale(0.8);
+  transform-origin: top left;
+  width: 125%;
+  /* Compensate for scale */
+  margin-top: -20px;
 }
 
 .preview-toast-wrapper {

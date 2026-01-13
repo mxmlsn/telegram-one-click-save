@@ -972,14 +972,22 @@ async function updateLivePreview() {
 
   // Signature Construction Function
   const buildSignature = (contentTypeTag) => {
-    const parts = [];
-    if (emoji) parts.push(emoji);
-    if (themeTagName) parts.push(themeTagName);
-    if (contentTypeTag) parts.push(contentTypeTag);
-    // Note: Link/Domain is added separately depending on context
+    let signature = '';
 
-    // Join with " | "
-    return parts.join(' | ');
+    // 1. Emoji + Theme Tag
+    if (emoji) signature += emoji;
+    if (themeTagName) {
+      if (emoji) signature += ' '; // space between emoji and tag
+      signature += themeTagName;
+    }
+
+    // 2. Separator + Content Tag
+    if (contentTypeTag) {
+      if (signature) signature += ' | ';
+      signature += contentTypeTag;
+    }
+
+    return signature;
   };
 
   // 2. Update Image Message
@@ -993,96 +1001,94 @@ async function updateLivePreview() {
   const previewLinkBubble = document.getElementById('previewLinkBubble');
   if (previewLinkBubble) {
     previewLinkBubble.innerHTML = '';
+    previewLinkBubble.className = 'preview-message-bubble preview-link-bubble'; // Reset class
 
     if (addScreenshot) {
-      // CARD VIEW
-      const card = document.createElement('div');
-      card.className = 'preview-link-card';
+      // SCREENSHOT VIEW (Like Image Message)
+      previewLinkBubble.classList.add('preview-image-bubble');
 
-      // Image
-      const imgDiv = document.createElement('div');
-      imgDiv.className = 'preview-link-image';
-      card.appendChild(imgDiv);
+      const imgContainer = document.createElement('div');
+      imgContainer.className = 'preview-image-container';
+      const img = document.createElement('img');
+      img.src = '../icons/save.png'; // Placeholder
+      imgContainer.appendChild(img);
 
-      // Content
-      const contentDiv = document.createElement('div');
-      contentDiv.className = 'preview-link-content';
+      previewLinkBubble.appendChild(imgContainer);
 
-      const title = document.createElement('div');
-      title.className = 'preview-link-title';
-      title.textContent = 'Wikipedia, the free encyclopedia';
-      contentDiv.appendChild(title);
-
-      const desc = document.createElement('div');
-      desc.className = 'preview-link-desc';
-      desc.textContent = 'Wikipedia is a free online encyclopedia, created and edited by volunteers around the world.';
-      contentDiv.appendChild(desc);
-
-      const domain = document.createElement('div');
-      domain.className = 'preview-link-domain';
-      domain.textContent = 'wikipedia.org';
-      contentDiv.appendChild(domain);
-
-      card.appendChild(contentDiv);
-
-      // Footer with signature + link?
-      // "пример как выглядит подпись со всеми тоглами 🟡 #study | #link | wikipedia.org"
-      // Wait, user said: "но если тогл Add page screenshot to link выключен то ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется"
-      // So if ON, it IS duplicated? Or just the signature?
-      // Usually with screenshot (photo), caption is signature + link.
+      // Footer (Caption)
       const footer = document.createElement('div');
       footer.className = 'preview-bubble-footer';
-
       const sigLine = document.createElement('div');
       sigLine.className = 'preview-tags-line';
+
+      // Signature + Domain
       const sigBase = buildSignature(tagLink);
       sigLine.textContent = sigBase ? `${sigBase} | wikipedia.org` : 'wikipedia.org';
 
       footer.appendChild(sigLine);
-      card.appendChild(footer);
+      previewLinkBubble.appendChild(footer);
 
-      previewLinkBubble.appendChild(card);
     } else {
-      // TEXT ONLY VIEW
+      // TEXT VIEW + Optional Native Preview
       const container = document.createElement('div');
       container.className = 'preview-link-text-only';
-
-      // "ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется"
-      // User example of signature: 🟡 #study | #link | wikipedia.org
-      // So we display: https://wikipedia.org...
-      // And then signature?
-      // If "рядом с тегами не дублируется" means the link is NOT in the signature line if it's in the body?
-      // Let's assume:
-      // Body: https://wikipedia.org/wiki/Main_Page
-      // Footer: 🟡 #study | #link
 
       const linkUrl = document.createElement('a');
       linkUrl.className = 'preview-link-url';
       linkUrl.href = '#';
       linkUrl.textContent = 'https://wikipedia.org/wiki/Main_Page';
-
-      if (showLinkPreview) {
-        // If social preview is enabled, Telegram shows a small preview below text.
-        // We can simulate this simply by keeping text separate.
-      }
-
       container.appendChild(linkUrl);
 
-      // Footer
+      // Native Preview Card
+      if (showLinkPreview) {
+        // Reuse card style but append below text or inside bubble
+        const cardWrapper = document.createElement('div');
+        cardWrapper.className = 'preview-link-card';
+        cardWrapper.style.marginTop = '6px';
+        cardWrapper.style.maxWidth = '100%';
+
+        const imgDiv = document.createElement('div');
+        imgDiv.className = 'preview-link-image';
+        cardWrapper.appendChild(imgDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'preview-link-content';
+
+        const title = document.createElement('div');
+        title.className = 'preview-link-title';
+        title.textContent = 'Wikipedia, the free encyclopedia';
+        contentDiv.appendChild(title);
+
+        const desc = document.createElement('div');
+        desc.className = 'preview-link-desc';
+        desc.textContent = 'Wikipedia is a free online encyclopedia, created and edited by volunteers around the world.';
+        contentDiv.appendChild(desc);
+
+        const domain = document.createElement('div');
+        domain.className = 'preview-link-domain';
+        domain.textContent = 'wikipedia.org';
+        contentDiv.appendChild(domain);
+
+        cardWrapper.appendChild(contentDiv);
+
+        previewLinkBubble.appendChild(container); // Add link text
+        previewLinkBubble.appendChild(cardWrapper); // Add preview card below
+      } else {
+        previewLinkBubble.appendChild(container); // Just link text
+      }
+
+      // Footer (Signature Only)
       const footer = document.createElement('div');
       footer.className = 'preview-bubble-footer';
 
       const sigLine = document.createElement('div');
       sigLine.className = 'preview-tags-line';
-      // Build signature WITHOUT domain, because it's already in the body?
-      // "ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется" -> implies link is NOT in tags line.
+      // "ссылка пишется целиком в теле сообщения и рядом с тегами не дублируется" -> implies link is not in footer
       const sigBase = buildSignature(tagLink);
       sigLine.textContent = sigBase;
 
       footer.appendChild(sigLine);
-      container.appendChild(footer);
-
-      previewLinkBubble.appendChild(container);
+      previewLinkBubble.appendChild(footer);
     }
   }
 
@@ -1233,5 +1239,3 @@ function renderToastPreview(settings) {
     wrapper.appendChild(toast);
   }
 }
-
-
