@@ -40,7 +40,7 @@
   border: none !important;
 
   /* Animation */
-  transition: opacity 0.2s ease, background-color 0.4s ease !important;
+  transition: opacity 0.4s ease, background-color 0.4s ease !important;
 
   /* Size */
   overflow: hidden !important;
@@ -64,7 +64,7 @@
   width: 168px !important;
   min-width: 168px !important;
   max-width: 168px !important;
-  transition: padding 0.2s ease !important;
+  transition: padding 0.2s ease, opacity 0.4s ease, background-color 0.4s ease !important;
 }
 
 /* Override for width animation - allows custom width during transition */

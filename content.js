@@ -141,7 +141,7 @@ function showSimpleToast(state, message) {
           // Keep success message visible for exactly 1500ms
           setTimeout(() => {
             toast.classList.remove('tg-saver-visible');
-            setTimeout(() => toast.remove(), 200);
+            setTimeout(() => toast.remove(), 400);
           }, 1500);
         });
       }, 150);
