@@ -553,7 +553,7 @@ function renderCustomTags() {
     tagEl.innerHTML = `
       <span class="drag-handle">⠿</span>
       <span class="tag-color-dot" style="background: ${tag.color}"></span>
-      <input type="text" class="tag-input" value="${tag.name}" placeholder="" maxlength="12">
+      <input type="text" class="tag-input" value="${tag.name}" placeholder="" maxlength="10">
     `;
 
     const input = tagEl.querySelector('input');

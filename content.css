@@ -537,8 +537,8 @@
   all: initial;
   position: absolute !important;
   z-index: 2147483647 !important;
-  width: 32px !important;
-  height: 32px !important;
+  width: 22px !important;
+  height: 22px !important;
   background: none !important;
   border-radius: 50% !important;
   display: flex !important;
