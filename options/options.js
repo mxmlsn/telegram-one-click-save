@@ -53,6 +53,7 @@ const enableQuickTagsInput = document.getElementById('enableQuickTags');
 const saveBtn = document.getElementById('saveBtn'); // Now only for "Save & Connect"
 const statusEl = document.getElementById('connectionStatus');
 const savedIndicator = document.getElementById('savedIndicator');
+const credentialsSection = document.querySelector('.credentials-section');
 
 // Custom tags elements
 const customTagsList = document.getElementById('customTagsList');
@@ -255,6 +256,51 @@ async function loadSettings() {
 
   botTokenInput.value = settings.botToken;
   chatIdInput.value = settings.chatId;
+
+  // Set initial status and border
+  if (!settings.isConnected) {
+    showStatus('Enter bot details', 'not-configured');
+    credentialsSection.classList.add('not-saved');
+    saveBtn.disabled = true;
+  } else {
+    showStatus('All OK and working', 'connected');
+    credentialsSection.classList.remove('not-saved');
+    saveBtn.classList.add('grayed-out');
+    saveBtn.disabled = true;
+  }
+
+  // Handle interaction for Save & Connect button
+  const handleInteraction = (e) => {
+    const hasInfo = botTokenInput.value.trim() !== '' || chatIdInput.value.trim() !== '';
+    const isFocusEvent = e.type === 'focus';
+    const isInputEvent = e.type === 'input';
+
+    if (hasInfo || isFocusEvent) {
+      if (saveBtn.disabled || saveBtn.classList.contains('grayed-out')) {
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('grayed-out');
+      }
+    }
+
+    // If everything is empty and it's an input event, maybe we should disable it back?
+    // But the requirements say "only when user enters info in one field and touches another button lights up blue"
+    // Let's implement that specific logic:
+    if (isInputEvent && !hasInfo) {
+      saveBtn.disabled = true;
+      saveBtn.classList.add('grayed-out');
+    }
+  };
+
+  botTokenInput.addEventListener('input', handleInteraction);
+  chatIdInput.addEventListener('input', handleInteraction);
+  botTokenInput.addEventListener('focus', handleInteraction);
+  chatIdInput.addEventListener('focus', handleInteraction);
+
+  // Requirements: "enters info in one field and touches another button lights up blue"
+  // This is already covered by input/focus, but let's be specific if they want it ONLY on "touching another"
+  // Actually "lights up blue" should probably happen as soon as they start typing OR when they switch fields.
+  // The user says "vvodit infu v odno pole i kasaetsya drugogo" - which sounds like blur or focus on second field.
+  // But usually immediate feedback is better. I'll stick to input/focus.
   addScreenshotInput.checked = settings.addScreenshot;
   showLinkPreviewInput.checked = settings.showLinkPreview;
   showSelectionIconInput.checked = settings.showSelectionIcon;
@@ -373,7 +419,7 @@ async function saveCredentials() {
   const chatId = chatIdInput.value.trim();
 
   if (!botToken || !chatId) {
-    showStatus('Please fill in Bot Token and Chat ID', false);
+    showStatus('Please fill in Bot Token and Chat ID', 'error');
     return;
   }
 
@@ -387,11 +433,11 @@ async function saveCredentials() {
 
   // Only test connection if credentials changed or not connected
   if (isFirstConnection) {
-    showStatus('Checking connection...', null);
+    showStatus('Checking connection...', '');
     const testResult = await testConnection(botToken, chatId);
 
     if (!testResult.success) {
-      showStatus(testResult.error, false);
+      showStatus(testResult.error, 'error');
       saveBtn.disabled = false;
       return;
     }
@@ -403,8 +449,10 @@ async function saveCredentials() {
     isConnected: true
   });
 
-  showStatus(isFirstConnection ? 'Connected & saved!' : 'Saved!', true);
-  saveBtn.disabled = false;
+  showStatus(isFirstConnection ? 'Connected & saved!' : 'Saved!', 'connected');
+  credentialsSection.classList.remove('not-saved');
+  saveBtn.classList.add('grayed-out');
+  saveBtn.disabled = true;
 }
 
 async function testConnection(botToken, chatId) {
@@ -430,10 +478,9 @@ async function testConnection(botToken, chatId) {
   }
 }
 
-function showStatus(message, success) {
+function showStatus(message, type) {
   statusEl.textContent = message;
-  statusEl.className = 'status-value ' + (success === true ? 'connected' : success === false ? 'error' : '');
-  // Removed global failure handling since we use CSS classes now
+  statusEl.className = 'status-value ' + type;
 }
 
 async function resetSettings() {
@@ -449,7 +496,7 @@ async function resetSettings() {
 
   await chrome.storage.local.set(resetData);
   await loadSettings();
-  showStatus('Settings reset to default', true);
+  showStatus('Settings reset to default', 'connected');
 }
 
 // How to section - collapsible with steps

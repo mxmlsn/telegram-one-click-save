@@ -57,7 +57,7 @@ h1 {
 }
 
 .status-value.not-configured {
-  color: rgba(255, 255, 255, 0.5);
+  color: #B0F724;
 }
 
 .status-value.error {
@@ -65,7 +65,7 @@ h1 {
 }
 
 .status-value.connected {
-  color: #4ED345;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .two-columns {
@@ -113,6 +113,11 @@ h1 {
 
 .column-second .section {
   background: #1A1A1A;
+  transition: box-shadow 0.3s ease;
+}
+
+.credentials-section.not-saved {
+  box-shadow: inset 0 0 0 1px #B0F724;
 }
 
 .column-third .section {
@@ -700,8 +705,14 @@ button.primary:active {
 }
 
 button.primary:disabled {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
   cursor: not-allowed;
+}
+
+button.primary.grayed-out {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 button.secondary {
