@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS = {
   showLinkPreview: false,
   showSelectionIcon: true,
   quoteMonospace: true,
-  iconColor: 'circle1',
+  iconColor: 'clip1',
   useHashtags: true,
   tagImage: '#image',
   tagLink: '#link',

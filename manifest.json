@@ -4,14 +4,14 @@
   "version": "1.0.0",
   "description": "Save screenshots, images, and quotes to Telegram in one click",
   "icons": {
-    "16": "icons/icon-circle1-16.png",
-    "48": "icons/icon-circle1-48.png",
-    "128": "icons/icon-circle1-128.png"
+    "16": "icons/icon-clip1-16.png",
+    "48": "icons/icon-clip1-48.png",
+    "128": "icons/icon-clip1-128.png"
   },
   "action": {
     "default_icon": {
-      "16": "icons/icon-circle1-16.png",
-      "48": "icons/icon-circle1-48.png"
+      "16": "icons/icon-clip1-16.png",
+      "48": "icons/icon-clip1-48.png"
     },
     "default_title": "Save to Telegram"
   },
