@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   timerDuration: 4,
   emojiPack: 'circle',
   toastStyle: 'normal',
+  popupStyleMinimalist: false,
   themeLight: false,
   isConnected: false,
   customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
@@ -1126,7 +1127,7 @@ function renderToastPreview(settings) {
 
   wrapper.innerHTML = '';
 
-  const isMinimalist = settings.popupStyleMinimalist;
+  const isMinimalist = settings.popupStyleMinimalist || settings.toastStyle === 'minimalist';
   const isLight = settings.themeLight;
 
   // Create toast element
@@ -1150,15 +1151,13 @@ function renderToastPreview(settings) {
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'tg-saver-tags-container';
 
-    // Add up to 3 tags for preview
-    const activeTags = customTags.filter(t => t.name && t.name.trim().length > 0).slice(0, 3);
-    // If no active tags, show "no tag" button?
-    // User said: "порядок и инфа кастомных тегов как в настройках(пустые скрыты)"
+    // Add all active custom tags
+    const activeTags = customTags.filter(t => t.name && t.name.trim().length > 0);
 
     if (activeTags.length === 0) {
       // Only "No Tag" button
       const noTagBtn = document.createElement('button');
-      noTagBtn.className = 'tg-saver-no-tag-btn';
+      noTagBtn.className = 'tg-saver-tag-btn tg-saver-no-tag-btn';
       const circle = document.createElement('div');
       circle.className = 'tg-saver-no-tag-circle';
       noTagBtn.appendChild(circle);
@@ -1173,19 +1172,34 @@ function renderToastPreview(settings) {
         btn.appendChild(dot);
         tagsContainer.appendChild(btn);
       });
+
+      // Add "No Tag" button at the end even with tags
+      const noTagBtn = document.createElement('button');
+      noTagBtn.className = 'tg-saver-tag-btn tg-saver-no-tag-btn';
+      const circle = document.createElement('div');
+      circle.className = 'tg-saver-no-tag-circle';
+      noTagBtn.appendChild(circle);
+      tagsContainer.appendChild(noTagBtn);
     }
 
     content.appendChild(tagsContainer);
     toast.appendChild(content);
 
-    // Add close button to WRAPPER, not toast (in minimalist mode)
+    // Add minimalist loader at the bottom (60% remaining)
+    const loader = document.createElement('div');
+    loader.className = 'tg-saver-minimalist-loader';
+    loader.style.width = '100%';
+    loader.style.transform = 'scaleX(0.6)';
+    toast.appendChild(loader);
+
+    // Add close button to WRAPPER
     const closeBtn = document.createElement('button');
     closeBtn.className = 'tg-saver-minimalist-close-btn';
-    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+    closeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
-    // Wrapper needs to be flex row for minimalist
     wrapper.appendChild(toast);
     wrapper.appendChild(closeBtn);
+    wrapper.className = 'tg-saver-minimalist-wrapper' + (isLight ? ' tg-saver-light' : '');
 
   } else {
     // Standard Structure
@@ -1212,15 +1226,21 @@ function renderToastPreview(settings) {
     const tagsContainer = document.createElement('div');
     tagsContainer.className = 'tg-saver-tags-container';
 
-    const activeTags = customTags.filter(t => t.name && t.name.trim().length > 0).slice(0, 3);
+    const activeTags = customTags.filter(t => t.name && t.name.trim().length > 0);
 
     if (activeTags.length === 0) {
-      // Skip button
+      // No tag button with timer
       const skipBtn = document.createElement('button');
       skipBtn.className = 'tg-saver-tag-btn tg-saver-skip-btn';
+      const timerLoader = document.createElement('div');
+      timerLoader.className = 'tg-saver-timer-loader';
+      timerLoader.style.width = '100%';
+      timerLoader.style.transform = 'scaleX(0.6)';
+      skipBtn.appendChild(timerLoader);
+
       const text = document.createElement('span');
       text.className = 'tg-saver-skip-btn-text';
-      text.textContent = 'No tag';
+      text.textContent = 'no tag';
       skipBtn.appendChild(text);
       tagsContainer.appendChild(skipBtn);
     } else {
@@ -1240,6 +1260,21 @@ function renderToastPreview(settings) {
 
         tagsContainer.appendChild(btn);
       });
+
+      // Add "no tag" button with timer
+      const skipBtn = document.createElement('button');
+      skipBtn.className = 'tg-saver-tag-btn tg-saver-skip-btn';
+      const timerLoader = document.createElement('div');
+      timerLoader.className = 'tg-saver-timer-loader';
+      timerLoader.style.width = '100%';
+      timerLoader.style.transform = 'scaleX(0.6)';
+      skipBtn.appendChild(timerLoader);
+
+      const text = document.createElement('span');
+      text.className = 'tg-saver-skip-btn-text';
+      text.textContent = 'no tag';
+      skipBtn.appendChild(text);
+      tagsContainer.appendChild(skipBtn);
     }
 
     content.appendChild(tagsContainer);
