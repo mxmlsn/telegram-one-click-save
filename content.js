@@ -68,7 +68,7 @@ function showSimpleToast(state, message) {
     toast = document.createElement('div');
     toast.id = 'tg-saver-toast';
     toast.className = 'tg-saver-toast';
-    toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">${message}</span>`;
+    toast.innerHTML = `<span class="tg-saver-text">${message}</span>`;
     document.body.appendChild(toast);
 
     requestAnimationFrame(() => {
@@ -98,13 +98,13 @@ function showSimpleToast(state, message) {
 
         setTimeout(() => {
           // Replace with success content
-          wrapperToast.innerHTML = `<span class="tg-saver-icon tg-saver-visible-content">✓</span><span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
+          wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
           wrapperToast.classList.add('tg-saver-success');
 
           // After display time, fade out
           setTimeout(() => {
-            wrapper.style.opacity = '0';
-            setTimeout(() => wrapper.remove(), 200);
+            wrapper.classList.add('tg-saver-fade-out');
+            setTimeout(() => wrapper.remove(), 400);
           }, 1500);
         }, 150);
       }
@@ -126,7 +126,7 @@ function showSimpleToast(state, message) {
 
       // Wait for fade out, then change content
       setTimeout(() => {
-        toast.innerHTML = `<span class="tg-saver-icon">✓</span><span class="tg-saver-text">${message}</span>`;
+        toast.innerHTML = `<span class="tg-saver-text">${message}</span>`;
         toast.classList.add('tg-saver-success');
         toast.classList.remove('tg-saver-with-tags');
 
@@ -302,7 +302,7 @@ function showTagSelectionToast(customTags, requestId) {
             wrapperToast.classList.add('tg-saver-visible');
 
             // Replace with "Sending" content
-            wrapperToast.innerHTML = `<span class="tg-saver-icon tg-saver-visible-content">↑</span><span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
+            wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
 
             // Force reflow to apply starting width
             wrapperToast.offsetWidth;
@@ -337,7 +337,7 @@ function showTagSelectionToast(customTags, requestId) {
 
           // Wait for animation, then change content
           setTimeout(() => {
-            toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
+            toast.innerHTML = `<span class="tg-saver-text">Sending</span>`;
             toast.classList.remove('tg-saver-with-tags');
             toast.style.height = '';
 
@@ -508,7 +508,7 @@ function startCountdown(requestId) {
             wrapperToast.classList.add('tg-saver-visible');
 
             // Replace with "Sending" content
-            wrapperToast.innerHTML = `<span class="tg-saver-icon tg-saver-visible-content">↑</span><span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
+            wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
 
             // Force reflow to apply starting width
             wrapperToast.offsetWidth;
@@ -543,7 +543,7 @@ function startCountdown(requestId) {
 
           // Wait for animation, then change content
           setTimeout(() => {
-            toast.innerHTML = `<span class="tg-saver-icon">↑</span><span class="tg-saver-text">Sending</span>`;
+            toast.innerHTML = `<span class="tg-saver-text">Sending</span>`;
             toast.classList.remove('tg-saver-with-tags');
             toast.style.height = '';
 

@@ -327,7 +327,11 @@
   align-items: center !important;
   gap: 10px !important;
   opacity: 1 !important;
-  transition: opacity 0.2s ease !important;
+  transition: opacity 0.4s ease !important;
+}
+
+.tg-saver-minimalist-wrapper.tg-saver-fade-out {
+  opacity: 0 !important;
 }
 
 .tg-saver-toast.tg-saver-minimalist {
