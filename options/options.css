@@ -156,17 +156,18 @@ h3 {
 .toggle-password-btn {
   position: absolute;
   right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
-  padding: 0;
+  padding: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.5);
   transition: color 0.2s;
-  height: 20px;
-  width: 20px;
+  z-index: 10;
 }
 
 .toggle-password-btn:hover {
@@ -179,6 +180,8 @@ h3 {
 
 .eye-icon {
   display: block;
+  width: 20px;
+  height: 20px;
 }
 
 .toggle-password-btn.showing .eye-open {
@@ -218,7 +221,7 @@ h3 {
   letter-spacing: -0.02em;
 }
 
-.input-with-icon input[type="password"] {
+.input-with-icon input {
   padding-right: 45px;
 }
 
@@ -481,7 +484,7 @@ h3 {
   color: rgba(255, 255, 255, 0.8);
 }
 
-.section-tags > .checkbox-field {
+.section-tags>.checkbox-field {
   margin-bottom: 20px;
 }
 
