@@ -28,10 +28,10 @@ const DEFAULT_SETTINGS = {
   customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
   // Fixed 7 tags
   customTags: [
-    { name: '', color: '#E64541', id: 'red' },
-    { name: '', color: '#FFDE42', id: 'yellow' },
-    { name: '', color: '#4ED345', id: 'green' },
-    { name: '', color: '#377CDE', id: 'blue' },
+    { name: 'work', color: '#E64541', id: 'red' },
+    { name: 'study', color: '#FFDE42', id: 'yellow' },
+    { name: 'refs', color: '#4ED345', id: 'green' },
+    { name: 'project1', color: '#377CDE', id: 'blue' },
     { name: '', color: '#BB4FFF', id: 'purple' },
     { name: '', color: '#3D3D3B', id: 'black' },
     { name: '', color: '#DEDEDE', id: 'white' }
@@ -62,6 +62,8 @@ const timerMinusBtn = document.getElementById('timerMinus');
 const timerPlusBtn = document.getElementById('timerPlus');
 const timerValueDisplay = document.getElementById('timerValue');
 const optimalLabel = document.getElementById('optimalLabel');
+const howtoSection = document.getElementById('howtoSection');
+const columnThird = document.querySelector('.column-third');
 
 
 // Custom tags state
@@ -261,10 +263,14 @@ async function loadSettings() {
   if (!settings.isConnected) {
     showStatus('Enter bot details', 'not-configured');
     credentialsSection.classList.add('not-saved');
+    howtoSection.classList.remove('collapsed'); // Expanded by default
+    columnThird.classList.add('not-connected');
     saveBtn.disabled = true;
   } else {
-    showStatus('All OK and working', 'connected');
+    showStatus('All ok and working', 'connected');
     credentialsSection.classList.remove('not-saved');
+    howtoSection.classList.add('collapsed'); // Collapsed by default
+    columnThird.classList.remove('not-connected');
     saveBtn.classList.add('grayed-out');
     saveBtn.disabled = true;
   }
@@ -451,6 +457,8 @@ async function saveCredentials() {
 
   showStatus(isFirstConnection ? 'Connected & saved!' : 'Saved!', 'connected');
   credentialsSection.classList.remove('not-saved');
+  howtoSection.classList.add('collapsed'); // Collapse after successful connection
+  columnThird.classList.remove('not-connected');
   saveBtn.classList.add('grayed-out');
   saveBtn.disabled = true;
 }
@@ -500,7 +508,6 @@ async function resetSettings() {
 }
 
 // How to section - collapsible with steps
-const howtoSection = document.getElementById('howtoSection');
 const howtoToggle = document.getElementById('howtoToggle');
 const howtoDots = document.getElementById('howtoDots');
 const howtoNext = document.getElementById('howtoNext');

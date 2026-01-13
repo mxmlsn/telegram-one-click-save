@@ -101,6 +101,11 @@ h1 {
   width: 546px;
   flex-shrink: 0;
   gap: 2px;
+  transition: opacity 0.3s ease;
+}
+
+.column-third.not-connected {
+  opacity: 0.5;
 }
 
 .section {
@@ -113,7 +118,7 @@ h1 {
 
 .column-second .section {
   background: #1A1A1A;
-  transition: box-shadow 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .credentials-section.not-saved {
@@ -1039,7 +1044,7 @@ input:checked+.slider:before {
 }
 
 .image-sending-field {
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 /* Checkbox field updated for toggle */
