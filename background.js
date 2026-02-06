@@ -797,13 +797,84 @@ async function sendTextMessage(text, settings) {
   }
 }
 
+// Compress image to fit within Telegram photo size limit (10 MB)
+async function compressImageIfNeeded(blob) {
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+  
+  if (blob.size <= MAX_SIZE) {
+    console.log('[TG Saver] Image size OK:', (blob.size / 1024 / 1024).toFixed(2), 'MB');
+    return blob;
+  }
+
+  console.log('[TG Saver] Image too large:', (blob.size / 1024 / 1024).toFixed(2), 'MB - compressing...');
+
+  // Create image from blob
+  const img = new Image();
+  const imgUrl = URL.createObjectURL(blob);
+  
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = reject;
+    img.src = imgUrl;
+  });
+
+  // Try compression at different quality levels
+  let quality = 0.9;
+  let compressedBlob = blob;
+
+  while (compressedBlob.size > MAX_SIZE && quality > 0.1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    compressedBlob = await new Promise(resolve => {
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    });
+
+    console.log('[TG Saver] Tried quality', quality, '→', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+    quality -= 0.1;
+  }
+
+  // If still too large, reduce dimensions
+  if (compressedBlob.size > MAX_SIZE) {
+    let scale = 0.9;
+    
+    while (compressedBlob.size > MAX_SIZE && scale > 0.3) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(img.width * scale);
+      canvas.height = Math.floor(img.height * scale);
+      
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      compressedBlob = await new Promise(resolve => {
+        canvas.toBlob(resolve, 'image/jpeg', 0.85);
+      });
+
+      console.log('[TG Saver] Tried scale', scale, '→', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+      scale -= 0.1;
+    }
+  }
+
+  URL.revokeObjectURL(imgUrl);
+  
+  console.log('[TG Saver] Final compressed size:', (compressedBlob.size / 1024 / 1024).toFixed(2), 'MB');
+  return compressedBlob;
+}
+
 // Telegram API: send photo
 async function sendPhoto(blob, caption, settings) {
   console.log('[TG Saver] Sending photo to Telegram...');
   try {
+    // Compress if needed to fit 10 MB limit
+    const compressedBlob = await compressImageIfNeeded(blob);
+
     const formData = new FormData();
     formData.append('chat_id', settings.chatId);
-    formData.append('photo', blob, 'screenshot.png');
+    formData.append('photo', compressedBlob, 'screenshot.jpg');
     formData.append('caption', caption);
     formData.append('parse_mode', 'HTML');
 
