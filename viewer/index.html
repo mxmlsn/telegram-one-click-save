@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saves</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
@@ -85,6 +86,8 @@
 <script>
 const STORAGE_KEYS = { notion: 'sv_notion_token', tg: 'sv_tg_token', db: 'sv_db_id' };
 const NOTION_VERSION = '2022-06-28';
+
+window.__colorCache = JSON.parse(localStorage.getItem('sv_colors') || '{}');
 
 function saveAuth() {
   const notion = document.getElementById('input-notion-token').value.trim();
@@ -168,6 +171,7 @@ async function init() {
     console.log('[Saves] loaded', items.length, 'items');
     const imageMap = await resolveAllImages(items, tg);
     renderApp(items, imageMap);
+    processColors(items, imageMap);  // no await — runs in background
   } catch (e) {
     const errEl = document.createElement('p');
     errEl.style.cssText = 'padding:40px;color:#f66';
@@ -198,6 +202,52 @@ async function resolveAllImages(items, tgToken) {
     if (i + BATCH < withImages.length) await new Promise(r => setTimeout(r, 350));
   }
   return map;
+}
+
+function rgbToHue(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (d === 0) return 0;
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return ((h * 60) + 360) % 360;
+}
+
+function rgbToSat(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+function rgbToBaseName([r, g, b]) {
+  const h = rgbToHue(r, g, b);
+  const s = rgbToSat(r, g, b);
+  const v = Math.max(r, g, b) / 255;
+  if (v < 0.15) return 'black';
+  if (s < 0.12) return 'gray';
+  if (h < 15 || h >= 345) return 'red';
+  if (h < 40) return 'orange';
+  if (h < 70) return 'yellow';
+  if (h < 165) return 'green';
+  if (h < 250) return 'blue';
+  if (h < 290) return 'purple';
+  return 'pink';
+}
+
+async function processColors(items, imageMap) {
+  const thief = new ColorThief();
+  const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && !window.__colorCache[i.fileId]);
+  for (const item of toProcess) {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = imageMap[item.fileId];
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+      const color = thief.getColor(img);
+      window.__colorCache[item.fileId] = rgbToBaseName(color);
+    } catch { window.__colorCache[item.fileId] = null; }
+  }
+  localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
+  renderCards();
 }
 
 const BASE_COLORS = [
