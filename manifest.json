@@ -43,6 +43,7 @@
   "host_permissions": [
     "https://api.telegram.org/*",
     "https://api.notion.com/*",
+    "https://generativelanguage.googleapis.com/*",
     "<all_urls>"
   ],
   "web_accessible_resources": [
