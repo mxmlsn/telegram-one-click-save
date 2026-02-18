@@ -19,6 +19,30 @@
     .auth-field input:focus { border-color: #555; }
     .auth-btn { width: 100%; background: #fff; color: #000; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
     .auth-btn:hover { background: #e0e0e0; }
+
+    /* App layout */
+    #app { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+    .toolbar { position: sticky; top: 0; background: #0f0f0f; padding: 16px 0; z-index: 100; border-bottom: 1px solid #1e1e1e; margin-bottom: 24px; }
+    .search-bar { width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px 16px; color: #e0e0e0; font-size: 15px; outline: none; }
+    .search-bar:focus { border-color: #444; }
+
+    .tag-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .tag-pill { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px; padding: 5px 14px; font-size: 12px; cursor: pointer; color: #888; transition: all 0.15s; }
+    .tag-pill.active { background: #fff; color: #000; border-color: #fff; }
+
+    .color-filters { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+    .color-label { font-size: 12px; color: #555; margin-right: 4px; }
+    .color-circle { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #333; cursor: pointer; background: #1a1a1a; position: relative; transition: border-color 0.15s; }
+    .color-circle.filled { border-color: transparent; }
+    .color-circle:hover { border-color: #666; }
+    .color-dropdown { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; z-index: 200; width: 160px; }
+    .color-dropdown.hidden { display: none; }
+    .color-option { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.1s; }
+    .color-option:hover { border-color: #fff; }
+
+    /* Cards grid */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
   </style>
 </head>
 <body>
@@ -162,10 +186,101 @@ async function resolveAllImages(items, tgToken) {
   return map;
 }
 
+const BASE_COLORS = [
+  { name: 'red', hex: '#e74c3c' }, { name: 'orange', hex: '#e67e22' },
+  { name: 'yellow', hex: '#f1c40f' }, { name: 'green', hex: '#2ecc71' },
+  { name: 'blue', hex: '#3498db' }, { name: 'purple', hex: '#9b59b6' },
+  { name: 'pink', hex: '#e91e8c' }, { name: 'brown', hex: '#795548' },
+  { name: 'gray', hex: '#95a5a6' }, { name: 'black', hex: '#1a1a1a' }
+];
+
+const state = { search: '', activeTags: new Set(), activeColors: [null, null, null, null, null, null] };
+
 function renderApp(items, imageMap) {
   window.__allItems = items;
   window.__imageMap = imageMap;
-  document.getElementById('app').innerHTML = `<p style="padding:40px;color:#666">${items.length} items loaded, ${Object.keys(imageMap).length} images resolved</p>`;
+
+  const tags = [...new Set(items.map(i => i.tag).filter(Boolean))];
+
+  document.getElementById('app').innerHTML = `
+    <div class="toolbar">
+      <input class="search-bar" id="search-input" placeholder="Search..." oninput="onSearch(this.value)">
+      <div class="tag-filters" id="tag-filters">
+        ${tags.map(t => `<button class="tag-pill" onclick="toggleTag('${t}')">${t}</button>`).join('')}
+      </div>
+      <div class="color-filters">
+        <span class="color-label">Color</span>
+        ${[0,1,2,3,4,5].map(i => `
+          <div class="color-circle" id="cc-${i}" onclick="toggleColorDropdown(event,${i})">
+            <div class="color-dropdown hidden" id="cd-${i}">
+              ${BASE_COLORS.map(c => `<div class="color-option" style="background:${c.hex}" title="${c.name}" onclick="selectColor(event,${i},'${c.name}','${c.hex}')"></div>`).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="cards-grid" id="cards-grid"></div>
+  `;
+
+  document.addEventListener('click', closeAllDropdowns);
+  renderCards();
+}
+
+function closeAllDropdowns(e) {
+  if (!e.target.closest('.color-circle')) {
+    document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+  }
+}
+
+function onSearch(val) { state.search = val.toLowerCase(); renderCards(); }
+
+function toggleTag(tag) {
+  state.activeTags.has(tag) ? state.activeTags.delete(tag) : state.activeTags.add(tag);
+  document.querySelectorAll('.tag-pill').forEach(p => {
+    p.classList.toggle('active', state.activeTags.has(p.textContent.trim()));
+  });
+  renderCards();
+}
+
+function toggleColorDropdown(e, i) {
+  e.stopPropagation();
+  const dropdown = document.getElementById(`cd-${i}`);
+  const wasHidden = dropdown.classList.contains('hidden');
+  document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+  if (wasHidden) dropdown.classList.remove('hidden');
+}
+
+function selectColor(e, i, name, hex) {
+  e.stopPropagation();
+  state.activeColors[i] = state.activeColors[i] === name ? null : name;
+  const circle = document.getElementById(`cc-${i}`);
+  circle.style.background = state.activeColors[i] ? hex : '';
+  circle.classList.toggle('filled', !!state.activeColors[i]);
+  document.getElementById(`cd-${i}`).classList.add('hidden');
+  renderCards();
+}
+
+function renderCards() {
+  const activeColors = state.activeColors.filter(Boolean);
+  const filtered = (window.__allItems || []).filter(item => {
+    if (state.activeTags.size && !state.activeTags.has(item.tag)) return false;
+    if (state.search) {
+      const hay = (item.content + ' ' + item.url + ' ' + item.sourceUrl + ' ' + (window.__ocrCache?.[item.fileId] || '')).toLowerCase();
+      if (!hay.includes(state.search)) return false;
+    }
+    if (activeColors.length) {
+      const itemColor = window.__colorCache?.[item.fileId];
+      if (!itemColor || !activeColors.includes(itemColor)) return false;
+    }
+    return true;
+  });
+  const grid = document.getElementById('cards-grid');
+  if (!grid) return;
+  if (!filtered.length) {
+    grid.innerHTML = '<p style="color:#444;padding:40px 0;grid-column:1/-1">Nothing here</p>';
+    return;
+  }
+  grid.innerHTML = filtered.map(() => '<div class="card">...</div>').join('');
 }
 </script>
 </body>
