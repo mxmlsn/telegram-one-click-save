@@ -1818,3 +1818,58 @@ input:checked+.slider:before {
 .tg-saver-light .tg-saver-tag-name {
   color: rgba(0, 0, 0, 0.8) !important;
 }
+
+/* AI Section */
+.hidden {
+  display: none !important;
+}
+
+.section-ai h3 {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.section-ai .section-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.section-ai .field input[type="password"],
+.section-ai .field select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  font-family: 'MartianMono', monospace;
+  font-size: 11px;
+  padding: 6px 10px;
+  width: 100%;
+  outline: none;
+}
+
+.section-ai .field input[type="password"]:focus,
+.section-ai .field select:focus {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.section-ai .field select option {
+  background: #222;
+}
+
+.section-ai .ai-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.status-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}

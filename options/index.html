@@ -31,11 +31,15 @@
             <label for="botToken">Bot Token</label>
             <div class="input-with-icon">
               <input type="password" id="botToken" placeholder="123456789:ABC...">
-              <button type="button" class="toggle-password-btn" id="toggleBotToken" aria-label="Toggle password visibility">
-                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <button type="button" class="toggle-password-btn" id="toggleBotToken"
+                aria-label="Toggle password visibility">
+                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path class="eye-open" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle class="eye-open" cx="12" cy="12" r="3"></circle>
-                  <path class="eye-closed" d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" style="display: none;"></path>
+                  <path class="eye-closed"
+                    d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+                    style="display: none;"></path>
                   <line class="eye-closed" x1="1" y1="1" x2="23" y2="23" style="display: none;"></line>
                 </svg>
               </button>
@@ -97,6 +101,51 @@
             </div>
           </div>
         </section>
+
+        <!-- Live Preview Section -->
+        <section class="section preview-section">
+          <h2>Live Preview</h2>
+          <div class="preview-messages">
+            <!-- Image Message -->
+            <div class="preview-message-row">
+              <div class="preview-message-bubble preview-image-bubble">
+                <div class="preview-image-container">
+                  <img src="../icons/save.png" alt="Preview Image">
+                </div>
+                <div class="preview-bubble-footer">
+                  <div class="preview-tags-line" id="previewTagsImage"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Link Message -->
+            <div class="preview-message-row">
+              <div class="preview-message-bubble preview-link-bubble" id="previewLinkBubble">
+                <!-- Content injected via JS -->
+              </div>
+            </div>
+
+            <!-- Text Message -->
+            <div class="preview-message-row">
+              <div class="preview-message-bubble preview-text-bubble">
+                <div class="preview-quote-text" id="previewQuoteText">
+                  "Design is intelligence made visible."
+                </div>
+                <div class="preview-bubble-footer">
+                  <div class="preview-tags-line" id="previewTagsText"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toast Preview -->
+          <div class="preview-toast-container">
+            <h3>Toast Preview</h3>
+            <div class="preview-toast-wrapper" id="previewToastWrapper">
+              <!-- Toast injected via JS -->
+            </div>
+          </div>
+        </section>
       </div>
 
       <!-- Third column: Settings -->
@@ -120,6 +169,26 @@
               </label>
               Show icon near selected text
             </label>
+            <div class="help-hint-wrapper">
+              <button class="help-hint-btn" id="selectionIconHint" type="button" aria-label="See how it works">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </button>
+              <div class="help-hint-demo" id="selectionIconDemo">
+                <span class="demo-text">
+                  Select <span class="demo-text-highlight">any text</span> to save it
+                </span>
+                <div class="demo-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="field checkbox-field">
             <label>
@@ -365,6 +434,62 @@
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 5: AI Analysis -->
+        <section class="section section-ai">
+          <h3>AI Analysis</h3>
+          <p class="section-desc">Connect an AI model to auto-tag and describe every saved item.</p>
+
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="aiEnabled">
+                <span class="slider"></span>
+              </label>
+              Enable AI analysis
+            </label>
+          </div>
+
+          <div id="ai-config" class="hidden">
+            <div class="field">
+              <label for="aiApiKey">API Key</label>
+              <input type="password" id="aiApiKey" placeholder="sk-ant-…" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="aiModel">Model</label>
+              <select id="aiModel">
+                <option value="claude-haiku-4-5-20251001">Haiku (fast, cheap)</option>
+                <option value="claude-sonnet-4-6">Sonnet (smarter)</option>
+              </select>
+            </div>
+
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="aiAutoOnSave">
+                  <span class="slider"></span>
+                </label>
+                Analyze on save
+              </label>
+            </div>
+
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="aiAutoInViewer">
+                  <span class="slider"></span>
+                </label>
+                Analyze in viewer
+              </label>
+            </div>
+
+            <div class="field ai-row-actions">
+              <button id="testAiBtn" class="secondary">Test connection</button>
+              <span id="aiTestStatus" class="status-hint"></span>
             </div>
           </div>
         </section>

@@ -114,7 +114,18 @@ const DEFAULT_SETTINGS = {
     { name: '', color: '#BB4FFF', id: 'purple' },
     { name: '', color: '#3D3D3B', id: 'black' },
     { name: '', color: '#DEDEDE', id: 'white' }
-  ]
+  ],
+  // Notion integration
+  notionEnabled: false,
+  notionToken: '',
+  notionDbId: '',
+  // AI Analysis
+  aiEnabled: false,
+  aiProvider: 'anthropic',
+  aiApiKey: '',
+  aiModel: 'claude-haiku-4-5-20251001',
+  aiAutoOnSave: true,
+  aiAutoInViewer: true
 };
 
 // DOM elements
@@ -418,6 +429,59 @@ async function loadSettings() {
 
   // Toggle hashtags settings visibility based on useHashtags
   toggleHashtagsSettings(settings.useHashtags !== false);
+
+  // AI Analysis settings
+  const aiEnabledInput = document.getElementById('aiEnabled');
+  const aiConfigDiv = document.getElementById('ai-config');
+  const aiApiKeyInput = document.getElementById('aiApiKey');
+  const aiModelInput = document.getElementById('aiModel');
+  const aiAutoOnSaveInput = document.getElementById('aiAutoOnSave');
+  const aiAutoInViewerInput = document.getElementById('aiAutoInViewer');
+
+  if (aiEnabledInput) {
+    aiEnabledInput.checked = settings.aiEnabled || false;
+    aiConfigDiv?.classList.toggle('hidden', !settings.aiEnabled);
+    aiEnabledInput.addEventListener('change', e => {
+      saveSetting('aiEnabled', e.target.checked);
+      aiConfigDiv?.classList.toggle('hidden', !e.target.checked);
+    });
+  }
+  if (aiApiKeyInput) {
+    aiApiKeyInput.value = settings.aiApiKey || '';
+    aiApiKeyInput.addEventListener('change', e => saveSetting('aiApiKey', e.target.value));
+  }
+  if (aiModelInput) {
+    aiModelInput.value = settings.aiModel || 'claude-haiku-4-5-20251001';
+    aiModelInput.addEventListener('change', e => saveSetting('aiModel', e.target.value));
+  }
+  if (aiAutoOnSaveInput) {
+    aiAutoOnSaveInput.checked = settings.aiAutoOnSave !== false;
+    aiAutoOnSaveInput.addEventListener('change', e => saveSetting('aiAutoOnSave', e.target.checked));
+  }
+  if (aiAutoInViewerInput) {
+    aiAutoInViewerInput.checked = settings.aiAutoInViewer !== false;
+    aiAutoInViewerInput.addEventListener('change', e => saveSetting('aiAutoInViewer', e.target.checked));
+  }
+
+  const testAiBtn = document.getElementById('testAiBtn');
+  const aiTestStatus = document.getElementById('aiTestStatus');
+  if (testAiBtn) {
+    testAiBtn.addEventListener('click', async () => {
+      if (aiTestStatus) aiTestStatus.textContent = 'Testing…';
+      const key = aiApiKeyInput?.value;
+      if (!key) { if (aiTestStatus) aiTestStatus.textContent = 'Enter API key first'; return; }
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
+        });
+        if (aiTestStatus) aiTestStatus.textContent = res.ok ? '✓ Connected' : `✗ Error ${res.status}`;
+      } catch (e) {
+        if (aiTestStatus) aiTestStatus.textContent = '✗ Network error';
+      }
+    });
+  }
 
   updateLivePreview();
 }

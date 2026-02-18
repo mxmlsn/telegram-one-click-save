@@ -437,6 +437,62 @@
             </div>
           </div>
         </section>
+
+        <!-- Section 5: AI Analysis -->
+        <section class="section section-ai">
+          <h3>AI Analysis</h3>
+          <p class="section-desc">Connect an AI model to auto-tag and describe every saved item.</p>
+
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="aiEnabled">
+                <span class="slider"></span>
+              </label>
+              Enable AI analysis
+            </label>
+          </div>
+
+          <div id="ai-config" class="hidden">
+            <div class="field">
+              <label for="aiApiKey">API Key</label>
+              <input type="password" id="aiApiKey" placeholder="sk-ant-…" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="aiModel">Model</label>
+              <select id="aiModel">
+                <option value="claude-haiku-4-5-20251001">Haiku (fast, cheap)</option>
+                <option value="claude-sonnet-4-6">Sonnet (smarter)</option>
+              </select>
+            </div>
+
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="aiAutoOnSave">
+                  <span class="slider"></span>
+                </label>
+                Analyze on save
+              </label>
+            </div>
+
+            <div class="field checkbox-field">
+              <label>
+                <label class="switch">
+                  <input type="checkbox" id="aiAutoInViewer">
+                  <span class="slider"></span>
+                </label>
+                Analyze in viewer
+              </label>
+            </div>
+
+            <div class="field ai-row-actions">
+              <button id="testAiBtn" class="secondary">Test connection</button>
+              <span id="aiTestStatus" class="status-hint"></span>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
