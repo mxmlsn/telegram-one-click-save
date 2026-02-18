@@ -11,7 +11,6 @@
     /* Auth modal */
     #auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
     .hidden { display: none; }
-        #auth-modal.hidden { display: none; }
     .auth-box { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 32px; width: 420px; }
     .auth-box h2 { font-size: 18px; margin-bottom: 24px; color: #fff; }
     .auth-field { margin-bottom: 16px; }
@@ -28,16 +27,16 @@
   <div class="auth-box">
     <h2>Connect</h2>
     <div class="auth-field">
-      <label>Notion Token</label>
-      <input type="password" id="input-notion-token" placeholder="ntn_...">
+      <label for="input-notion-token">Notion Token</label>
+      <input type="password" id="input-notion-token" placeholder="ntn_..." autocomplete="off">
     </div>
     <div class="auth-field">
-      <label>Telegram Bot Token</label>
-      <input type="password" id="input-tg-token" placeholder="123456:ABC...">
+      <label for="input-tg-token">Telegram Bot Token</label>
+      <input type="password" id="input-tg-token" placeholder="123456:ABC..." autocomplete="off">
     </div>
     <div class="auth-field">
-      <label>Notion Database ID</label>
-      <input type="text" id="input-db-id" placeholder="30b6081f-..." value="30b6081f-3dc6-8148-871f-dfb6944ac36e">
+      <label for="input-db-id">Notion Database ID</label>
+      <input type="text" id="input-db-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
     </div>
     <button class="auth-btn" onclick="saveAuth()">Connect</button>
   </div>
