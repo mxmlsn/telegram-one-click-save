@@ -323,9 +323,13 @@ async function saveToNotion(data, settings) {
     if (!res.ok) {
       const err = await res.json();
       console.warn('[TG Saver] Notion save failed:', err.message);
+      return null;
     }
+    const page = await res.json();
+    return page.id || null;
   } catch (e) {
     console.warn('[TG Saver] Notion save error:', e);
+    return null;
   }
 }
 
@@ -635,7 +639,12 @@ async function sendScreenshot(tab, settings) {
     if (!settings.addScreenshot) {
       // Send just the link without screenshot
       await sendMessage(tab.url, settings, selectedTag);
-      saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
+      const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
+      if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+        analyzeWithAI({ sourceUrl: tab.url, fileId: null }, settings)
+          .then(r => patchNotionWithAI(notionPageId, r, settings))
+          .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+      }
       await showToast(tab.id, 'success', 'Success');
       return;
     }
@@ -644,7 +653,12 @@ async function sendScreenshot(tab, settings) {
     const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
     const result = await sendPhoto(blob, caption, settings);
-    saveToNotion({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
+    const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
+    if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+      analyzeWithAI({ sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
+        .then(r => patchNotionWithAI(notionPageId, r, settings))
+        .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+    }
     await showToast(tab.id, 'success', 'Success');
   } catch (err) {
     console.error('[TG Saver] Error in sendScreenshot:', err);
@@ -957,7 +971,12 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
 
     const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
     await sendTextMessage(caption, settings);
-    saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
+    const notionPageId = await saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
+    if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+      analyzeWithAI({ sourceUrl: pageUrl, content: text }, settings)
+        .then(r => patchNotionWithAI(notionPageId, r, settings))
+        .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+    }
 
     if (tabId) await showToast(tabId, 'success', 'Success');
   } catch (err) {
@@ -1172,7 +1191,12 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
     await sendDocument(blob, caption, settings, imageUrl);
   }
 
-  saveToNotion({ type: 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name }, settings);
+  const notionPageId = await saveToNotion({ type: 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name }, settings);
+  if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+    analyzeWithAI({ sourceUrl: pageUrl, fileId }, settings)
+      .then(r => patchNotionWithAI(notionPageId, r, settings))
+      .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+  }
 
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
@@ -1181,7 +1205,12 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
 async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
   const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
   await sendTextMessage(caption, settings);
-  saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
+  const notionPageId = await saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
+  if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+    analyzeWithAI({ sourceUrl: pageUrl, content: text }, settings)
+      .then(r => patchNotionWithAI(notionPageId, r, settings))
+      .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+  }
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
@@ -1189,7 +1218,12 @@ async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
 async function sendLinkDirect(linkUrl, pageUrl, settings, tabId, selectedTag) {
   const caption = buildCaption(linkUrl, settings.tagLink, '', settings, selectedTag);
   await sendTextMessage(caption, settings);
-  saveToNotion({ type: 'link', sourceUrl: linkUrl, tagName: selectedTag?.name }, settings);
+  const notionPageId = await saveToNotion({ type: 'link', sourceUrl: linkUrl, tagName: selectedTag?.name }, settings);
+  if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+    analyzeWithAI({ sourceUrl: linkUrl, fileId: null }, settings)
+      .then(r => patchNotionWithAI(notionPageId, r, settings))
+      .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+  }
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
@@ -1278,7 +1312,12 @@ async function sendScreenshotDirect(tab, settings, selectedTag) {
 
   if (!settings.addScreenshot) {
     await sendMessage(tab.url, settings, selectedTag);
-    saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
+    const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
+    if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+      analyzeWithAI({ sourceUrl: tab.url, fileId: null }, settings)
+        .then(r => patchNotionWithAI(notionPageId, r, settings))
+        .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+    }
     await showToast(tab.id, 'success', 'Success');
     return;
   }
@@ -1288,7 +1327,12 @@ async function sendScreenshotDirect(tab, settings, selectedTag) {
   const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
   const result = await sendPhoto(blob, caption, settings);
-  saveToNotion({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
+  const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
+  if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+    analyzeWithAI({ sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
+      .then(r => patchNotionWithAI(notionPageId, r, settings))
+      .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+  }
   await showToast(tab.id, 'success', 'Success');
 }
 
@@ -1299,7 +1343,12 @@ async function sendVideoDirect(tab, settings, selectedTag) {
   const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
 
   const result = await sendPhoto(blob, caption, settings);
-  saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
+  const notionPageId = await saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
+  if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+    analyzeWithAI({ sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
+      .then(r => patchNotionWithAI(notionPageId, r, settings))
+      .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+  }
   await showToast(tab.id, 'success', 'Success');
 }
 
