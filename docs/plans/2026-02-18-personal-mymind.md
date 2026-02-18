@@ -10,16 +10,22 @@
 
 ---
 
-## Task 1: manifest.json — open viewer as extension tab
+## Task 1: manifest.json — register viewer page + context menu entry
 
 **Files:**
 - Modify: `manifest.json`
+- Modify: `background.js`
 
-**Context:** Currently `chrome.action.onClicked` (background.js:193) opens nothing — there's no popup and no tab open. We want a click on the extension icon to open the viewer tab.
+**Context:** The viewer opens via right-click context menu ("Open Viewer"), NOT by clicking the extension icon. The icon click keeps its existing save-page behaviour (background.js:193). The viewer page `viewer/index.html` must be accessible as a bookmarkable URL: `chrome-extension://[id]/viewer/index.html`. No popup is added.
 
-**Step 1: Add viewer to web_accessible_resources and add action click handler**
+**Step 1: Update manifest.json**
 
-Edit `manifest.json`. Change `web_accessible_resources` to also expose viewer files, and remove `default_popup` (there isn't one, confirm it's absent — it is):
+Changes needed:
+- Add `"tabs"` permission (open tab from background)
+- Add `https://api.notion.com/*` and `https://api.anthropic.com/*` to host_permissions
+- Add `viewer/index.html` to web_accessible_resources
+- Keep `default_title` as "Save to Telegram" (icon click = save, unchanged)
+- Version bump to 1.1.0
 
 ```json
 {
@@ -37,7 +43,7 @@ Edit `manifest.json`. Change `web_accessible_resources` to also expose viewer fi
       "16": "icons/icon-clip1-16.png",
       "48": "icons/icon-clip1-48.png"
     },
-    "default_title": "Open Viewer"
+    "default_title": "Save to Telegram"
   },
   "background": {
     "service_worker": "background.js"
@@ -77,26 +83,30 @@ Edit `manifest.json`. Change `web_accessible_resources` to also expose viewer fi
 }
 ```
 
-Key changes:
-- Added `"tabs"` permission (needed to open/focus viewer tab)
-- Added `https://api.notion.com/*` and `https://api.anthropic.com/*` to host_permissions
-- Added `viewer/index.html` to web_accessible_resources
-- Version bump to 1.1.0
+**Step 2: Add "Open Viewer" context menu item in background.js**
 
-**Step 2: Update chrome.action.onClicked in background.js**
+Find where context menus are created in background.js (search for `chrome.contextMenus.create`). Add a separator and viewer item at the end of the menu registration block:
 
-Find line 193 in `background.js`:
 ```js
-chrome.action.onClicked.addListener(async (tab) => {
+chrome.contextMenus.create({
+  id: 'separator-viewer',
+  type: 'separator',
+  contexts: ['all']
+});
+
+chrome.contextMenus.create({
+  id: 'open-viewer',
+  title: 'Open Viewer',
+  contexts: ['all']
+});
 ```
 
-Replace the entire handler (find where it ends — it calls `handleContextMenuSave`) with a viewer-opening handler. First, read what the existing handler does, then add viewer logic BEFORE the existing code:
+**Step 3: Handle "open-viewer" in the contextMenus.onClicked listener**
 
-The existing handler at line 193 triggers save on icon click. We need to change it to open the viewer instead. Find the full handler block and replace with:
+Find the `chrome.contextMenus.onClicked.addListener` block in background.js. Add a handler for the new item at the TOP of the switch/if chain (before existing save handlers):
 
 ```js
-// Open viewer tab on icon click (or focus if already open)
-chrome.action.onClicked.addListener(async (tab) => {
+if (info.menuItemId === 'open-viewer') {
   const viewerUrl = chrome.runtime.getURL('viewer/index.html');
   const existing = await chrome.tabs.query({ url: viewerUrl });
   if (existing.length > 0) {
@@ -105,19 +115,22 @@ chrome.action.onClicked.addListener(async (tab) => {
   } else {
     await chrome.tabs.create({ url: viewerUrl });
   }
-});
+  return;
+}
 ```
 
-**Step 3: Test manually**
-- Load extension in Chrome (`chrome://extensions` → Load unpacked)
-- Click extension icon
-- Confirm viewer tab opens at `chrome-extension://…/viewer/index.html`
-- Click again — confirms same tab is focused, not a duplicate
+**Step 4: Test manually**
+- Load/reload extension in Chrome (`chrome://extensions` → refresh)
+- Right-click any page → confirm "Open Viewer" item appears at bottom of context menu
+- Click "Open Viewer" → viewer tab opens at `chrome-extension://…/viewer/index.html`
+- Right-click again → same tab is focused, not a duplicate
+- Copy the tab URL and bookmark it — confirm it's a valid bookmarkable URL
+- Click extension icon → confirm existing save-page behaviour is unchanged
 
-**Step 4: Commit**
+**Step 5: Commit**
 ```bash
 git add manifest.json background.js
-git commit -m "feat: open viewer tab on extension icon click"
+git commit -m "feat: add Open Viewer context menu item, viewer accessible as bookmarkable URL"
 ```
 
 ---
