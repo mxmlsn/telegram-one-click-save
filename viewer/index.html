@@ -90,6 +90,7 @@ const NOTION_VERSION = '2022-06-28';
 
 window.__colorCache = JSON.parse(localStorage.getItem('sv_colors') || '{}');
 window.__ocrCache = JSON.parse(localStorage.getItem('sv_ocr') || '{}');
+let __ocrRunning = false;
 
 function saveAuth() {
   const notion = document.getElementById('input-notion-token').value.trim();
@@ -179,7 +180,7 @@ async function init() {
     const imageMap = await resolveAllImages(items, tg);
     renderApp(items, imageMap);
     processColors(items, imageMap);  // no await — runs in background
-    processOCR(items, imageMap); // no await — runs in background
+    processOCR(items, imageMap).catch(e => console.warn('[OCR] worker failed:', e)); // no await — runs in background
   } catch (e) {
     const errEl = document.createElement('p');
     errEl.style.cssText = 'padding:40px;color:#f66';
@@ -262,15 +263,23 @@ async function processColors(items, imageMap) {
 async function processOCR(items, imageMap) {
   const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && window.__ocrCache[i.fileId] === undefined);
   if (!toProcess.length) return;
+  if (__ocrRunning) return;
+  __ocrRunning = true;
   const worker = await Tesseract.createWorker('eng');
-  for (const item of toProcess) {
-    try {
-      const { data: { text } } = await worker.recognize(imageMap[item.fileId]);
-      window.__ocrCache[item.fileId] = text.trim();
-    } catch { window.__ocrCache[item.fileId] = ''; }
-    localStorage.setItem('sv_ocr', JSON.stringify(window.__ocrCache));
+  try {
+    for (const item of toProcess) {
+      try {
+        const { data: { text } } = await worker.recognize(imageMap[item.fileId]);
+        window.__ocrCache[item.fileId] = text.trim();
+      } catch {
+        window.__ocrCache[item.fileId] = '';
+      }
+      localStorage.setItem('sv_ocr', JSON.stringify(window.__ocrCache));
+    }
+  } finally {
+    await worker.terminate();
+    __ocrRunning = false;
   }
-  await worker.terminate();
   renderCards();
 }
 
