@@ -129,7 +129,6 @@ async function init() {
     const items = pages.map(parseItem);
     console.log('[Saves] loaded', items.length, 'items');
     const imageMap = await resolveAllImages(items, tg);
-    window.__imageMap = imageMap;
     renderApp(items, imageMap);
   } catch (e) {
     const errEl = document.createElement('p');
@@ -143,18 +142,24 @@ async function resolveFileId(tgToken, fileId) {
   if (!fileId) return null;
   try {
     const res = await fetch(`https://api.telegram.org/bot${tgToken}/getFile?file_id=${fileId}`);
+    if (!res.ok) return null;
     const data = await res.json();
-    if (!data.ok) return null;
+    if (!data.ok || !data.result?.file_path) return null;
     return `https://api.telegram.org/file/bot${tgToken}/${data.result.file_path}`;
   } catch { return null; }
 }
 
 async function resolveAllImages(items, tgToken) {
   const withImages = items.filter(i => i.fileId);
-  const urls = await Promise.all(withImages.map(i => resolveFileId(tgToken, i.fileId)));
   const map = {};
-  withImages.forEach((item, idx) => { if (urls[idx]) map[item.fileId] = urls[idx]; });
-  return map; // fileId → imageUrl
+  const BATCH = 10;
+  for (let i = 0; i < withImages.length; i += BATCH) {
+    const batch = withImages.slice(i, i + BATCH);
+    const urls = await Promise.all(batch.map(item => resolveFileId(tgToken, item.fileId)));
+    batch.forEach((item, idx) => { if (urls[idx]) map[item.fileId] = urls[idx]; });
+    if (i + BATCH < withImages.length) await new Promise(r => setTimeout(r, 350));
+  }
+  return map;
 }
 
 function renderApp(items, imageMap) {
