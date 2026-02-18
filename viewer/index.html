@@ -112,6 +112,11 @@ function getAuth() {
   };
 }
 
+function logout() {
+  Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+  location.reload();
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   const { notion, tg, db } = getAuth();
   if (notion && tg && db) {
@@ -304,6 +309,7 @@ function renderApp(items, imageMap) {
           </div>
         `).join('')}
       </div>
+      <button onclick="logout()" style="background:none;border:1px solid #333;border-radius:6px;padding:5px 12px;color:#555;font-size:12px;cursor:pointer;margin-top:12px;float:right">Disconnect</button>
     </div>
     <div class="cards-grid" id="cards-grid"></div>
   `;
