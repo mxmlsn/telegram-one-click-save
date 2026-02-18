@@ -54,9 +54,9 @@ const DEFAULT_SETTINGS = {
   notionToken: '',
   notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e',
   aiEnabled: false,
-  aiProvider: 'anthropic',
+  aiProvider: 'google',
   aiApiKey: '',
-  aiModel: 'claude-haiku-4-5-20251001',
+  aiModel: 'gemini-2.0-flash',
   aiAutoOnSave: true,
   aiAutoInViewer: true
 };
@@ -352,66 +352,114 @@ Rules:
 - tags: up to 3 short descriptive English words
 - description: plain text, no markdown`;
 
+async function fetchBase64(url) {
+  const res = await fetch(url);
+  const buffer = await res.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function callGemini(prompt, imageBase64OrNull, settings) {
+  const model = settings.aiModel || 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
+  const parts = [];
+  if (imageBase64OrNull) {
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: imageBase64OrNull } });
+  }
+  parts.push({ text: prompt });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }] })
+  });
+  if (!res.ok) {
+    console.warn('[TG Saver] Gemini error:', res.status, await res.text());
+    return null;
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+}
+
+async function callAnthropic(messages, settings) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': settings.aiApiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: settings.aiModel || 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages
+    })
+  });
+  if (!res.ok) {
+    console.warn('[TG Saver] Anthropic error:', res.status);
+    return null;
+  }
+  const data = await res.json();
+  return data.content?.[0]?.text || null;
+}
+
 async function analyzeWithAI(item, settings) {
   if (!settings.aiEnabled || !settings.aiApiKey) return null;
 
   try {
-    const messages = [];
+    const provider = settings.aiProvider || 'google';
+    let responseText = null;
 
     if (item.fileId && settings.botToken) {
-      // Get Telegram image URL first
+      // Get Telegram image
       const fileRes = await fetch(
         `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${item.fileId}`
       );
       const fileData = await fileRes.json();
       if (fileData.ok) {
         const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${fileData.result.file_path}`;
-        messages.push({
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'url', url: imgUrl } },
-            { type: 'text', text: AI_PROMPT }
-          ]
-        });
+
+        if (provider === 'google') {
+          const base64 = await fetchBase64(imgUrl);
+          responseText = await callGemini(AI_PROMPT, base64, settings);
+        } else {
+          // Anthropic accepts image URLs directly
+          const messages = [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'url', url: imgUrl } },
+              { type: 'text', text: AI_PROMPT }
+            ]
+          }];
+          responseText = await callAnthropic(messages, settings);
+        }
       }
     }
 
-    if (messages.length === 0) {
-      // Text/link only
+    if (responseText === null) {
+      // Text/link fallback (no image, or image fetch failed)
       const context = [
         item.sourceUrl ? `URL: ${item.sourceUrl}` : '',
         item.content ? `Content: ${item.content.slice(0, 500)}` : '',
         item.tagName ? `User tag: ${item.tagName}` : ''
       ].filter(Boolean).join('\n');
+      const fullPrompt = `${AI_PROMPT}\n\nContent to analyze:\n${context}`;
 
-      messages.push({
-        role: 'user',
-        content: `${AI_PROMPT}\n\nContent to analyze:\n${context}`
-      });
+      if (provider === 'google') {
+        responseText = await callGemini(fullPrompt, null, settings);
+      } else {
+        responseText = await callAnthropic(
+          [{ role: 'user', content: fullPrompt }],
+          settings
+        );
+      }
     }
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': settings.aiApiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: settings.aiModel || 'claude-haiku-4-5-20251001',
-        max_tokens: 300,
-        messages
-      })
-    });
-
-    if (!res.ok) {
-      console.warn('[TG Saver] AI error:', res.status);
-      return null;
-    }
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
-    return JSON.parse(text);
+    if (!responseText) return null;
+    // Strip markdown code fences if model wrapped JSON in ```json ... ```
+    const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    return JSON.parse(cleaned);
   } catch (e) {
     console.warn('[TG Saver] AI parse error:', e);
     return null;
