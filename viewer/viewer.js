@@ -344,13 +344,26 @@ function setupToolbarEvents() {
 }
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
+// Base types (from TG): image, link, text
+// AI types (content category): article, video, product, xpost
+// Filtering: if base type selected → match item.type
+//            if AI type selected → match item.ai_type
+//            selecting both "link" and "article" shows all links (incl. those with ai_type)
+//            AND logic across base vs AI axes: item must satisfy both if both axes have selection
+const BASE_TYPES = new Set(['image', 'link', 'text']);
+const AI_TYPES = new Set(['article', 'video', 'product', 'xpost']);
+
 function applyFilters() {
   let items = STATE.items;
 
   if (STATE.activeTypes.size > 0) {
+    const activeBase = [...STATE.activeTypes].filter(t => BASE_TYPES.has(t));
+    const activeAI = [...STATE.activeTypes].filter(t => AI_TYPES.has(t));
+
     items = items.filter(item => {
-      const effectiveType = item.ai_type || item.type;
-      return STATE.activeTypes.has(effectiveType);
+      const baseMatch = activeBase.length === 0 || activeBase.includes(item.type);
+      const aiMatch = activeAI.length === 0 || activeAI.includes(item.ai_type);
+      return baseMatch && aiMatch;
     });
   }
 
