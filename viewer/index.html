@@ -128,7 +128,9 @@ async function init() {
     const pages = await fetchNotion(notion, db);
     const items = pages.map(parseItem);
     console.log('[Saves] loaded', items.length, 'items');
-    renderApp(items, tg);
+    const imageMap = await resolveAllImages(items, tg);
+    window.__imageMap = imageMap;
+    renderApp(items, imageMap);
   } catch (e) {
     const errEl = document.createElement('p');
     errEl.style.cssText = 'padding:40px;color:#f66';
@@ -137,10 +139,28 @@ async function init() {
   }
 }
 
-function renderApp(items, tg) {
+async function resolveFileId(tgToken, fileId) {
+  if (!fileId) return null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${tgToken}/getFile?file_id=${fileId}`);
+    const data = await res.json();
+    if (!data.ok) return null;
+    return `https://api.telegram.org/file/bot${tgToken}/${data.result.file_path}`;
+  } catch { return null; }
+}
+
+async function resolveAllImages(items, tgToken) {
+  const withImages = items.filter(i => i.fileId);
+  const urls = await Promise.all(withImages.map(i => resolveFileId(tgToken, i.fileId)));
+  const map = {};
+  withImages.forEach((item, idx) => { if (urls[idx]) map[item.fileId] = urls[idx]; });
+  return map; // fileId → imageUrl
+}
+
+function renderApp(items, imageMap) {
   window.__allItems = items;
-  window.__imageMap = {};
-  document.getElementById('app').innerHTML = `<p style="padding:40px;color:#666">${items.length} items loaded</p>`;
+  window.__imageMap = imageMap;
+  document.getElementById('app').innerHTML = `<p style="padding:40px;color:#666">${items.length} items loaded, ${Object.keys(imageMap).length} images resolved</p>`;
 }
 </script>
 </body>
