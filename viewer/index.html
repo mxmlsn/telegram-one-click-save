@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saves</title>
-  <script src="libs/color-thief.umd.js"></script>
-  <script src="libs/tesseract.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -131,6 +129,9 @@
     }
     .card-image:hover .card-overlay { opacity: 1; }
     .overlay-desc { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4; }
+    .card-colors { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .card-color-tag { font-size: 10px; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 6px; }
+    .card-materials { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 4px; font-style: italic; }
 
     /* Link card */
     .card-link {
@@ -292,7 +293,6 @@
     <button class="type-pill" data-type="video">Videos</button>
   </div>
   <div class="toolbar-right">
-    <div class="color-filters" id="color-filters-wrap"></div>
     <span id="ai-status"></span>
     <button class="settings-btn" id="settings-btn" title="Settings">⚙</button>
   </div>

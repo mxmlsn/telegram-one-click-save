@@ -337,20 +337,24 @@ async function saveToNotion(data, settings) {
 
 const AI_PROMPT = `Analyze this saved content and return ONLY valid JSON, no other text:
 {
-  "type": "article|video|product|x_post",
-  "description": "1-2 sentence summary of what this is",
-  "data": {},
-  "tags": []
+  "type": "photo|screenshot|artwork|link",
+  "description": "detailed description: what is shown, composition, who/what is where, context",
+  "materials": [],
+  "colors": [],
+  "text_on_image": ""
 }
 
 Rules:
-- type must be exactly one of: article, video, product, x_post
-- For product: data = {"price": "$X", "product_name": "..."}
-- For x_post: data = {"tweet_text": "full text", "author": "@handle"}
-- For article: data = {"headline": "..."}
-- For video: data = {"title": "...", "channel": "..."}
-- tags: up to 3 short descriptive English words
-- description: plain text, no markdown`;
+- type must be exactly one of:
+  - "photo" — real photograph (product, person, place, object)
+  - "screenshot" — screenshot of UI, app, website, chat, code
+  - "artwork" — illustration, painting, design, digital art, render
+  - "link" — no image, just a saved URL or text
+- description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific and detailed so the item can be found by memory later.
+- materials: list of textures/materials visible (e.g. ["leather", "denim", "marble", "wood"]). Empty array if none visible or type is "link".
+- colors: 3-6 dominant colors as simple English words (e.g. ["black", "white", "beige", "gold"]). Empty array if type is "link".
+- text_on_image: transcribe ALL visible text from the image verbatim, preserving original language. Empty string if no text or type is "link".
+- All fields must be present. No markdown, no extra fields.`;
 
 async function fetchBase64(url) {
   const res = await fetch(url);
@@ -481,10 +485,15 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
       rich_text: [{ text: { content: aiResult.description.slice(0, 2000) } }]
     };
   }
-  if (aiResult.data || aiResult.tags) {
-    const dataStr = JSON.stringify({ ...aiResult.data, tags: aiResult.tags });
+  const aiDataPayload = {
+    ...(aiResult.data || {}),
+    ...(aiResult.materials !== undefined ? { materials: aiResult.materials } : {}),
+    ...(aiResult.colors !== undefined ? { colors: aiResult.colors } : {}),
+    ...(aiResult.text_on_image !== undefined ? { text_on_image: aiResult.text_on_image } : {})
+  };
+  if (Object.keys(aiDataPayload).length) {
     properties['ai_data'] = {
-      rich_text: [{ text: { content: dataStr.slice(0, 2000) } }]
+      rich_text: [{ text: { content: JSON.stringify(aiDataPayload).slice(0, 2000) } }]
     };
   }
 

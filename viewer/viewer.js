@@ -1,12 +1,5 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 const NOTION_VERSION = '2022-06-28';
-const BASE_COLORS = [
-  { name: 'red', hex: '#e74c3c' }, { name: 'orange', hex: '#e67e22' },
-  { name: 'yellow', hex: '#f1c40f' }, { name: 'green', hex: '#2ecc71' },
-  { name: 'blue', hex: '#3498db' }, { name: 'purple', hex: '#9b59b6' },
-  { name: 'pink', hex: '#e91e8c' }, { name: 'brown', hex: '#795548' },
-  { name: 'gray', hex: '#95a5a6' }, { name: 'black', hex: '#1a1a1a' }
-];
 
 const AI_MODELS = {
   google: [
@@ -31,13 +24,9 @@ const STATE = {
   aiAutoInViewer: false,
   search: '',
   activeType: 'all',
-  activeTags: new Set(),
-  activeColors: [null, null, null, null, null, null]
+  activeTags: new Set()
 };
 
-window.__colorCache = JSON.parse(localStorage.getItem('sv_colors') || '{}');
-window.__ocrCache = JSON.parse(localStorage.getItem('sv_ocr') || '{}');
-let __ocrRunning = false;
 
 // ─── Chrome relay helpers ─────────────────────────────────────────────────────
 function bgFetch(url, options = {}) {
@@ -90,7 +79,6 @@ async function startApp() {
   document.getElementById('grid-wrap').classList.remove('hidden');
   document.getElementById('ai-status').textContent = 'Loading…';
 
-  buildColorFilters();
   setupToolbarEvents();
 
   try {
@@ -100,9 +88,6 @@ async function startApp() {
     applyFilters();
     document.getElementById('ai-status').textContent = '';
 
-    // Background processing (non-blocking)
-    processColors(STATE.items, STATE.imageMap);
-    processOCR(STATE.items, STATE.imageMap).catch(e => console.warn('[OCR] failed:', e));
     if (STATE.aiEnabled && STATE.aiAutoInViewer) {
       runAiBackgroundProcessing();
     }
@@ -193,75 +178,6 @@ async function resolveAllImages(items, tgToken) {
   return map;
 }
 
-// ─── Color extraction (keep exact logic) ─────────────────────────────────────
-function rgbToHue(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  if (d === 0) return 0;
-  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return ((h * 60) + 360) % 360;
-}
-
-function rgbToSat(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  return max === 0 ? 0 : (max - min) / max;
-}
-
-function rgbToBaseName([r, g, b]) {
-  const h = rgbToHue(r, g, b);
-  const s = rgbToSat(r, g, b);
-  const v = Math.max(r, g, b) / 255;
-  if (v < 0.15) return 'black';
-  if (s < 0.12) return 'gray';
-  if (h < 15 || h >= 345) return 'red';
-  if (h < 40 && s < 0.55 && v < 0.55) return 'brown';
-  if (h < 40) return 'orange';
-  if (h < 70) return 'yellow';
-  if (h < 165) return 'green';
-  if (h < 250) return 'blue';
-  if (h < 290) return 'purple';
-  return 'pink';
-}
-
-async function processColors(items, imageMap) {
-  const thief = new ColorThief();
-  const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && !window.__colorCache[i.fileId]);
-  for (const item of toProcess) {
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = imageMap[item.fileId];
-      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-      const color = thief.getColor(img);
-      window.__colorCache[item.fileId] = rgbToBaseName(color);
-    } catch { window.__colorCache[item.fileId] = null; }
-    localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
-  }
-  applyFilters();
-}
-
-async function processOCR(items, imageMap) {
-  const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && window.__ocrCache[i.fileId] === undefined);
-  if (!toProcess.length) return;
-  if (__ocrRunning) return;
-  __ocrRunning = true;
-  const workerPath = chrome.runtime.getURL('viewer/libs/tesseract-worker.min.js');
-  const worker = await Tesseract.createWorker('eng', 1, { workerPath });
-  try {
-    for (const item of toProcess) {
-      try {
-        const { data: { text } } = await worker.recognize(imageMap[item.fileId]);
-        window.__ocrCache[item.fileId] = text.trim();
-      } catch { window.__ocrCache[item.fileId] = ''; }
-      localStorage.setItem('sv_ocr', JSON.stringify(window.__ocrCache));
-    }
-  } finally {
-    await worker.terminate();
-    __ocrRunning = false;
-  }
-  applyFilters();
-}
 
 // ─── Settings panel ───────────────────────────────────────────────────────────
 function populateSpModels(provider, selectedModel) {
@@ -361,56 +277,6 @@ function closeSettingsPanel() {
   document.getElementById('settings-panel')?.classList.add('hidden');
 }
 
-// ─── Color filter UI ─────────────────────────────────────────────────────────
-function buildColorFilters() {
-  const wrap = document.getElementById('color-filters-wrap');
-  wrap.innerHTML = [0,1,2,3,4,5].map(i => `
-    <div class="color-circle" id="cc-${i}" data-slot="${i}">
-      <div class="color-dropdown hidden" id="cd-${i}">
-        ${BASE_COLORS.map(c => `<div class="color-option" style="background:${c.hex}" title="${c.name}" data-color="${c.name}" data-hex="${c.hex}" data-slot="${i}"></div>`).join('')}
-      </div>
-    </div>
-  `).join('');
-
-  document.addEventListener('click', e => {
-    const circle = e.target.closest('.color-circle');
-    const option = e.target.closest('.color-option');
-
-    if (option) {
-      e.stopPropagation();
-      const slot = parseInt(option.dataset.slot);
-      const name = option.dataset.color;
-      const hex = option.dataset.hex;
-      STATE.activeColors[slot] = STATE.activeColors[slot] === name ? null : name;
-      const circleEl = document.getElementById(`cc-${slot}`);
-      circleEl.style.background = STATE.activeColors[slot] ? hex : '';
-      circleEl.classList.toggle('filled', !!STATE.activeColors[slot]);
-      document.getElementById(`cd-${slot}`).classList.add('hidden');
-      applyFilters();
-      return;
-    }
-
-    if (circle) {
-      e.stopPropagation();
-      const slot = parseInt(circle.dataset.slot);
-      if (STATE.activeColors[slot]) {
-        STATE.activeColors[slot] = null;
-        circle.style.background = '';
-        circle.classList.remove('filled');
-        applyFilters();
-        return;
-      }
-      const dropdown = document.getElementById(`cd-${slot}`);
-      const wasHidden = dropdown.classList.contains('hidden');
-      document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-      if (wasHidden) dropdown.classList.remove('hidden');
-      return;
-    }
-
-    document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-  });
-}
-
 // ─── Toolbar events ───────────────────────────────────────────────────────────
 function setupToolbarEvents() {
   document.getElementById('search-input').addEventListener('input', e => {
@@ -446,18 +312,10 @@ function applyFilters() {
       const hay = [
         item.url, item.content, item.sourceUrl,
         item.ai_description,
-        JSON.stringify(item.ai_data),
-        item.fileId ? (window.__ocrCache[item.fileId] || '') : ''
+        item.ai_data?.text_on_image || '',
+        JSON.stringify(item.ai_data)
       ].join(' ').toLowerCase();
       return hay.includes(STATE.search);
-    });
-  }
-
-  const activeColors = STATE.activeColors.filter(Boolean);
-  if (activeColors.length) {
-    items = items.filter(item => {
-      const c = item.fileId ? window.__colorCache[item.fileId] : null;
-      return c && activeColors.includes(c);
     });
   }
 
@@ -476,49 +334,36 @@ function getDomain(url) {
 
 function renderCard(item) {
   const imgUrl = item._resolvedImg || (item.fileId ? STATE.imageMap[item.fileId] : null);
-  const aiType = item.ai_type;
+  const aiType = item.ai_type; // photo | screenshot | artwork | link | null
   const aiData = item.ai_data || {};
   const domain = getDomain(item.sourceUrl || item.url);
 
   const pendingDot = !item.ai_analyzed ? '<div class="badge-pending"></div>' : '';
 
-  // ── Product ──
-  if (aiType === 'product' && imgUrl) {
-    return `<div class="card card-product" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
-      ${pendingDot}
-      <img class="product-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
-      <div class="product-info">
-        <div class="product-name">${escapeHtml(aiData.product_name || item.url || domain)}</div>
-        ${aiData.price ? `<div class="product-price">${escapeHtml(aiData.price)}</div>` : ''}
-      </div>
-    </div>`;
-  }
+  const colors = Array.isArray(aiData.colors) && aiData.colors.length
+    ? `<div class="card-colors">${aiData.colors.slice(0,5).map(c => `<span class="card-color-tag">${escapeHtml(c)}</span>`).join('')}</div>`
+    : '';
+  const materials = Array.isArray(aiData.materials) && aiData.materials.length
+    ? `<div class="card-materials">${escapeHtml(aiData.materials.join(', '))}</div>`
+    : '';
 
-  // ── X Post ──
-  if (aiType === 'x_post') {
-    const text = escapeHtml(aiData.tweet_text || item.content || item.ai_description || '');
-    const author = escapeHtml(aiData.author || '');
-    return `<div class="card card-xpost" data-id="${item.id}" ${item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : ''}>
-      ${pendingDot}
-      ${author ? `<div class="xpost-author">${author}</div>` : ''}
-      <div class="xpost-text">${text}</div>
-    </div>`;
-  }
-
-  // ── Image ──
-  if (item.type === 'image' && imgUrl) {
+  // ── Has image (photo / screenshot / artwork, or any saved image) ──
+  if (imgUrl) {
+    const badge = aiType ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : '';
     return `<div class="card card-image" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
       ${pendingDot}
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       <div class="card-overlay">
         ${item.ai_description ? `<div class="overlay-desc">${escapeHtml(item.ai_description)}</div>` : ''}
+        ${colors}
+        ${materials}
       </div>
-      ${aiType ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : ''}
+      ${badge}
     </div>`;
   }
 
   // ── Link ──
-  if (item.type === 'link') {
+  if (item.type === 'link' || aiType === 'link') {
     return `<div class="card card-link" data-id="${item.id}" onclick="window.open('${escapeHtml(item.sourceUrl || item.url)}','_blank')">
       ${pendingDot}
       <img class="card-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" alt="" onerror="this.style.display='none'">
