@@ -337,23 +337,29 @@ async function saveToNotion(data, settings) {
 
 const AI_PROMPT = `Analyze this saved content and return ONLY valid JSON, no other text:
 {
-  "type": "photo|screenshot|artwork|link",
+  "content_type": null,
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "colors": [],
-  "text_on_image": ""
+  "text_on_image": "",
+  "price": "",
+  "author": "",
+  "tweet_text": ""
 }
 
 Rules:
-- type must be exactly one of:
-  - "photo" — real photograph (product, person, place, object)
-  - "screenshot" — screenshot of UI, app, website, chat, code
-  - "artwork" — illustration, painting, design, digital art, render
-  - "link" — no image, just a saved URL or text
-- description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific and detailed so the item can be found by memory later.
-- materials: list of textures/materials visible (e.g. ["leather", "denim", "marble", "wood"]). Empty array if none visible or type is "link".
-- colors: 3-6 dominant colors as simple English words (e.g. ["black", "white", "beige", "gold"]). Empty array if type is "link".
-- text_on_image: transcribe ALL visible text from the image verbatim, preserving original language. Empty string if no text or type is "link".
+- content_type: set ONLY if confident, otherwise null. Must be one of:
+  - "article" — URL is clearly an article/essay/instruction/journalism piece
+  - "video" — youtube.com/youtu.be/vimeo.com URL, instagram reel URL, OR image shows video player UI (play button, audio icon, progress bar), OR text/hashtags indicate video
+  - "product" — known shop domain (amazon, etsy, aliexpress, ebay, etc.) OR image shows a price (any currency) near a product OR page looks like product listing
+  - "xpost" — URL contains x.com or twitter.com
+- description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
+- materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
+- colors: 3-6 dominant colors as simple English words. Empty array if no image.
+- text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text or no image.
+- price: the main product price from the image with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
+- author: for xpost — @handle from screenshot. Empty string otherwise.
+- tweet_text: for xpost — full tweet text from screenshot. Empty string otherwise.
 - All fields must be present. No markdown, no extra fields.`;
 
 async function fetchBase64(url) {
@@ -477,20 +483,21 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
     'ai_analyzed': { checkbox: true }
   };
 
-  if (aiResult.type) {
-    properties['ai_type'] = { select: { name: aiResult.type } };
+  if (aiResult.content_type) {
+    properties['ai_type'] = { select: { name: aiResult.content_type } };
   }
   if (aiResult.description) {
     properties['ai_description'] = {
       rich_text: [{ text: { content: aiResult.description.slice(0, 2000) } }]
     };
   }
-  const aiDataPayload = {
-    ...(aiResult.data || {}),
-    ...(aiResult.materials !== undefined ? { materials: aiResult.materials } : {}),
-    ...(aiResult.colors !== undefined ? { colors: aiResult.colors } : {}),
-    ...(aiResult.text_on_image !== undefined ? { text_on_image: aiResult.text_on_image } : {})
-  };
+  const aiDataPayload = {};
+  if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
+  if (aiResult.colors?.length) aiDataPayload.colors = aiResult.colors;
+  if (aiResult.text_on_image) aiDataPayload.text_on_image = aiResult.text_on_image;
+  if (aiResult.price) aiDataPayload.price = aiResult.price;
+  if (aiResult.author) aiDataPayload.author = aiResult.author;
+  if (aiResult.tweet_text) aiDataPayload.tweet_text = aiResult.tweet_text;
   if (Object.keys(aiDataPayload).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataPayload).slice(0, 2000) } }]

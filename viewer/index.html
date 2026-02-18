@@ -156,8 +156,8 @@
     .card-product { background: var(--surface); border: 1px solid var(--border); }
     .card-product .product-img { width: 100%; display: block; max-height: 200px; object-fit: cover; }
     .card-product .product-info { padding: 11px 13px; }
-    .card-product .product-name { font-size: 13px; color: var(--text); line-height: 1.4; font-weight: 500; }
-    .card-product .product-price { font-size: 17px; font-weight: 700; color: var(--accent); margin-top: 5px; }
+    .card-product .product-price { font-size: 20px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+    .card-product .product-desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
 
     /* Type badge */
     .type-badge {
@@ -277,6 +277,34 @@
       padding: 9px 14px; color: var(--text-muted); font-size: 12px; cursor: pointer;
     }
     .sp-disconnect-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+    /* ── Filter divider ── */
+    .filter-divider { width: 1px; height: 16px; background: var(--border); margin: 0 4px; align-self: center; }
+
+    /* ── Single color filter ── */
+    .color-filter-wrap { position: relative; }
+    .color-circle-single {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid var(--border); cursor: pointer;
+      background: var(--surface); display: flex; align-items: center; justify-content: center;
+      font-size: 13px; color: var(--text-muted); line-height: 1; transition: border-color 0.15s;
+      user-select: none;
+    }
+    .color-circle-single:hover { border-color: rgba(255,255,255,0.3); }
+    .color-circle-single.filled { border-color: transparent; font-size: 0; }
+    .color-dropdown-single {
+      position: absolute; top: 28px; right: 0;
+      background: var(--surface); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 8px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
+      z-index: 200; width: 136px;
+    }
+    .color-dropdown-single.hidden { display: none; }
+    .color-option-single {
+      width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; transition: border-color 0.1s; box-sizing: border-box;
+    }
+    .color-option-single:hover { border-color: #fff; }
   </style>
 </head>
 <body>
@@ -284,15 +312,34 @@
 <!-- Toolbar -->
 <div id="toolbar" class="hidden">
   <input type="text" id="search-input" placeholder="Search…">
-  <div class="type-filters">
+  <div class="type-filters" id="type-filters">
     <button class="type-pill active" data-type="all">All</button>
-    <button class="type-pill" data-type="image">Images</button>
-    <button class="type-pill" data-type="article">Articles</button>
-    <button class="type-pill" data-type="product">Products</button>
-    <button class="type-pill" data-type="x_post">Posts</button>
-    <button class="type-pill" data-type="video">Videos</button>
+    <button class="type-pill" data-type="image">Image</button>
+    <button class="type-pill" data-type="link">Link</button>
+    <button class="type-pill" data-type="text">Text</button>
+    <div class="filter-divider"></div>
+    <button class="type-pill" data-type="video">Video</button>
+    <button class="type-pill" data-type="product">Product</button>
+    <button class="type-pill" data-type="xpost">X Post</button>
+    <button class="type-pill" data-type="article">Article</button>
   </div>
   <div class="toolbar-right">
+    <div class="color-filter-wrap">
+      <div class="color-circle-single" id="color-filter-btn" title="Filter by color">+</div>
+      <div class="color-dropdown-single hidden" id="color-dropdown">
+        <div class="color-option-single" data-color="red" style="background:#e74c3c"></div>
+        <div class="color-option-single" data-color="orange" style="background:#e67e22"></div>
+        <div class="color-option-single" data-color="yellow" style="background:#f1c40f"></div>
+        <div class="color-option-single" data-color="green" style="background:#2ecc71"></div>
+        <div class="color-option-single" data-color="blue" style="background:#3498db"></div>
+        <div class="color-option-single" data-color="purple" style="background:#9b59b6"></div>
+        <div class="color-option-single" data-color="pink" style="background:#e91e8c"></div>
+        <div class="color-option-single" data-color="brown" style="background:#795548"></div>
+        <div class="color-option-single" data-color="gray" style="background:#95a5a6"></div>
+        <div class="color-option-single" data-color="black" style="background:#1a1a1a"></div>
+        <div class="color-option-single" data-color="white" style="background:#e8e8e8; border: 1px solid rgba(255,255,255,0.2)"></div>
+      </div>
+    </div>
     <span id="ai-status"></span>
     <button class="settings-btn" id="settings-btn" title="Settings">⚙</button>
   </div>

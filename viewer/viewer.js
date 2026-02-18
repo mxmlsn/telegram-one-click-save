@@ -23,8 +23,8 @@ const STATE = {
   aiEnabled: false,
   aiAutoInViewer: false,
   search: '',
-  activeType: 'all',
-  activeTags: new Set()
+  activeTypes: new Set(),
+  activeColor: null
 };
 
 
@@ -286,11 +286,58 @@ function setupToolbarEvents() {
 
   document.querySelectorAll('.type-pill').forEach(pill => {
     pill.addEventListener('click', () => {
-      document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      STATE.activeType = pill.dataset.type;
+      const type = pill.dataset.type;
+      if (type === 'all') {
+        STATE.activeTypes.clear();
+        document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+      } else {
+        document.querySelector('.type-pill[data-type="all"]').classList.remove('active');
+        if (STATE.activeTypes.has(type)) {
+          STATE.activeTypes.delete(type);
+          pill.classList.remove('active');
+          if (STATE.activeTypes.size === 0) {
+            document.querySelector('.type-pill[data-type="all"]').classList.add('active');
+          }
+        } else {
+          STATE.activeTypes.add(type);
+          pill.classList.add('active');
+        }
+      }
       applyFilters();
     });
+  });
+
+  const colorBtn = document.getElementById('color-filter-btn');
+  const colorDropdown = document.getElementById('color-dropdown');
+
+  colorBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (STATE.activeColor) {
+      STATE.activeColor = null;
+      colorBtn.style.background = '';
+      colorBtn.classList.remove('filled');
+      colorBtn.textContent = '+';
+      applyFilters();
+      return;
+    }
+    colorDropdown.classList.toggle('hidden');
+  });
+
+  document.querySelectorAll('.color-option-single').forEach(opt => {
+    opt.addEventListener('click', e => {
+      e.stopPropagation();
+      const color = opt.dataset.color;
+      STATE.activeColor = color;
+      colorBtn.style.background = opt.style.background;
+      colorBtn.classList.add('filled');
+      colorDropdown.classList.add('hidden');
+      applyFilters();
+    });
+  });
+
+  document.addEventListener('click', () => {
+    colorDropdown.classList.add('hidden');
   });
 
   document.getElementById('disconnect-btn')?.addEventListener('click', disconnect);
@@ -300,10 +347,18 @@ function setupToolbarEvents() {
 function applyFilters() {
   let items = STATE.items;
 
-  if (STATE.activeType !== 'all') {
+  if (STATE.activeTypes.size > 0) {
     items = items.filter(item => {
-      if (STATE.activeType === 'image') return item.type === 'image';
-      return item.ai_type === STATE.activeType;
+      const effectiveType = item.ai_type || item.type;
+      return STATE.activeTypes.has(effectiveType);
+    });
+  }
+
+  if (STATE.activeColor) {
+    items = items.filter(item => {
+      const colors = item.ai_data?.colors;
+      if (!Array.isArray(colors)) return false;
+      return colors.some(c => c.toLowerCase().includes(STATE.activeColor));
     });
   }
 
@@ -334,20 +389,45 @@ function getDomain(url) {
 
 function renderCard(item) {
   const imgUrl = item._resolvedImg || (item.fileId ? STATE.imageMap[item.fileId] : null);
-  const aiType = item.ai_type; // photo | screenshot | artwork | link | null
+  const aiType = item.ai_type; // article | video | product | xpost | null
   const aiData = item.ai_data || {};
   const domain = getDomain(item.sourceUrl || item.url);
+  const effectiveType = aiType || item.type;
 
   const pendingDot = !item.ai_analyzed ? '<div class="badge-pending"></div>' : '';
 
-  const colors = Array.isArray(aiData.colors) && aiData.colors.length
+  const colorsHtml = Array.isArray(aiData.colors) && aiData.colors.length
     ? `<div class="card-colors">${aiData.colors.slice(0,5).map(c => `<span class="card-color-tag">${escapeHtml(c)}</span>`).join('')}</div>`
     : '';
-  const materials = Array.isArray(aiData.materials) && aiData.materials.length
+  const materialsHtml = Array.isArray(aiData.materials) && aiData.materials.length
     ? `<div class="card-materials">${escapeHtml(aiData.materials.join(', '))}</div>`
     : '';
 
-  // ── Has image (photo / screenshot / artwork, or any saved image) ──
+  // ── Product with image ──
+  if (effectiveType === 'product' && imgUrl) {
+    return `<div class="card card-product" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
+      ${pendingDot}
+      <img class="product-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+      <div class="product-info">
+        ${aiData.price ? `<div class="product-price">${escapeHtml(aiData.price)}</div>` : ''}
+        <div class="product-desc">${escapeHtml(item.ai_description || item.url || domain)}</div>
+      </div>
+    </div>`;
+  }
+
+  // ── X Post ──
+  if (effectiveType === 'xpost') {
+    const text = escapeHtml(aiData.tweet_text || item.content || item.ai_description || '');
+    const author = escapeHtml(aiData.author || '');
+    return `<div class="card card-xpost" data-id="${item.id}" ${item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : ''}>
+      ${pendingDot}
+      ${author ? `<div class="xpost-author">${author}</div>` : ''}
+      <div class="xpost-text">${text}</div>
+      ${item.sourceUrl ? `<div class="card-source">${escapeHtml(domain)}</div>` : ''}
+    </div>`;
+  }
+
+  // ── Has image ──
   if (imgUrl) {
     const badge = aiType ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : '';
     return `<div class="card card-image" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
@@ -355,8 +435,8 @@ function renderCard(item) {
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       <div class="card-overlay">
         ${item.ai_description ? `<div class="overlay-desc">${escapeHtml(item.ai_description)}</div>` : ''}
-        ${colors}
-        ${materials}
+        ${colorsHtml}
+        ${materialsHtml}
       </div>
       ${badge}
     </div>`;
@@ -454,9 +534,17 @@ async function runAiBackgroundProcessing() {
       }, response => {
         if (chrome.runtime.lastError) { resolve(); return; }
         if (response?.ok && response.result) {
-          item.ai_type = response.result.type || item.ai_type;
+          item.ai_type = response.result.content_type || item.ai_type;
           item.ai_description = response.result.description || item.ai_description;
-          item.ai_data = { ...response.result.data, tags: response.result.tags };
+          const r = response.result;
+          const aiDataPayload = {};
+          if (r.materials?.length) aiDataPayload.materials = r.materials;
+          if (r.colors?.length) aiDataPayload.colors = r.colors;
+          if (r.text_on_image) aiDataPayload.text_on_image = r.text_on_image;
+          if (r.price) aiDataPayload.price = r.price;
+          if (r.author) aiDataPayload.author = r.author;
+          if (r.tweet_text) aiDataPayload.tweet_text = r.tweet_text;
+          item.ai_data = aiDataPayload;
           item.ai_analyzed = true;
           // Re-query fresh (applyFilters may have replaced innerHTML while batch was in-flight)
           const freshCard = document.querySelector(`.card[data-id="${item.id}"]`);
