@@ -436,6 +436,43 @@
             </div>
           </div>
         </section>
+      <!-- Notion integration section -->
+      <div class="column column-second" style="margin-top: 24px;">
+        <section class="section credentials-section">
+          <div class="section-content">
+            <div class="setting-row">
+              <div class="setting-label">
+                <span class="setting-name">Notion Integration</span>
+                <span class="setting-description">Save to Notion database in parallel</span>
+              </div>
+              <div class="setting-control">
+                <label class="toggle">
+                  <input type="checkbox" id="notionEnabled">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+            <div id="notionFields" style="display:none;">
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-name">Notion Token</span>
+                </div>
+                <div class="setting-control">
+                  <input type="password" id="notionToken" class="text-input" placeholder="secret_...">
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-label">
+                  <span class="setting-name">Database ID</span>
+                </div>
+                <div class="setting-control">
+                  <input type="text" id="notionDbId" class="text-input" placeholder="xxx-xxx-xxx">
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
       </div>
     </div>
   </div>

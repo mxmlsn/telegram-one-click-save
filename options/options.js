@@ -36,7 +36,11 @@ const DEFAULT_SETTINGS = {
     { name: '', color: '#BB4FFF', id: 'purple' },
     { name: '', color: '#3D3D3B', id: 'black' },
     { name: '', color: '#DEDEDE', id: 'white' }
-  ]
+  ],
+  // Notion integration
+  notionEnabled: false,
+  notionToken: '',
+  notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e'
 };
 
 // DOM elements
@@ -388,6 +392,40 @@ async function loadSettings() {
 
   // Toggle hashtags settings visibility based on useHashtags
   toggleHashtagsSettings(settings.useHashtags !== false);
+
+  // Notion integration settings
+  const notionEnabledEl = document.getElementById('notionEnabled');
+  const notionTokenEl = document.getElementById('notionToken');
+  const notionDbIdEl = document.getElementById('notionDbId');
+  const notionFieldsEl = document.getElementById('notionFields');
+
+  if (notionEnabledEl) {
+    notionEnabledEl.checked = settings.notionEnabled || false;
+    if (notionFieldsEl) notionFieldsEl.style.display = settings.notionEnabled ? 'block' : 'none';
+
+    notionEnabledEl.addEventListener('change', async () => {
+      const enabled = notionEnabledEl.checked;
+      if (notionFieldsEl) notionFieldsEl.style.display = enabled ? 'block' : 'none';
+      await chrome.storage.local.set({ notionEnabled: enabled });
+      showSavedIndicator();
+    });
+  }
+
+  if (notionTokenEl) {
+    notionTokenEl.value = settings.notionToken || '';
+    notionTokenEl.addEventListener('input', async () => {
+      await chrome.storage.local.set({ notionToken: notionTokenEl.value.trim() });
+      showSavedIndicator();
+    });
+  }
+
+  if (notionDbIdEl) {
+    notionDbIdEl.value = settings.notionDbId || '';
+    notionDbIdEl.addEventListener('input', async () => {
+      await chrome.storage.local.set({ notionDbId: notionDbIdEl.value.trim() });
+      showSavedIndicator();
+    });
+  }
 
   updateLivePreview();
 }
