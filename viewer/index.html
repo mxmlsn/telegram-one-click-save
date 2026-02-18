@@ -77,8 +77,61 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-function init() {
-  document.getElementById('app').innerHTML = '<p style="padding:40px;color:#666">Loading...</p>';
+async function fetchNotion(notionToken, dbId) {
+  let results = [];
+  let cursor = undefined;
+  do {
+    const body = { page_size: 100, sorts: [{ property: 'Date', direction: 'descending' }] };
+    if (cursor) body.start_cursor = cursor;
+    const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${notionToken}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Notion fetch failed');
+    results = results.concat(data.results);
+    cursor = data.has_more ? data.next_cursor : undefined;
+  } while (cursor);
+  return results;
+}
+
+function parseItem(page) {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: p['URL']?.title?.[0]?.text?.content || '',
+    type: p['Type']?.select?.name || 'link',
+    tag: p['Tag']?.select?.name || '',
+    content: p['Content']?.rich_text?.[0]?.text?.content || '',
+    fileId: p['File ID']?.rich_text?.[0]?.text?.content || '',
+    sourceUrl: p['Source URL']?.url || '',
+    date: p['Date']?.date?.start || ''
+  };
+}
+
+async function init() {
+  const { notion, tg, db } = getAuth();
+  document.getElementById('app').innerHTML = '<p style="padding:40px;color:#666">Fetching...</p>';
+  try {
+    const pages = await fetchNotion(notion, db);
+    const items = pages.map(parseItem);
+    console.log('[Saves] loaded', items.length, 'items');
+    window.__items = items;
+    renderApp(items, tg);
+  } catch (e) {
+    document.getElementById('app').innerHTML = `<p style="padding:40px;color:#f66">Error: ${e.message}</p>`;
+  }
+}
+
+function renderApp(items, tg) {
+  window.__allItems = items;
+  window.__imageMap = {};
+  document.getElementById('app').innerHTML = `<p style="padding:40px;color:#666">${items.length} items loaded</p>`;
 }
 </script>
 </body>
