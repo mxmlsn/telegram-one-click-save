@@ -8,140 +8,404 @@
   <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
 
-    /* Auth modal */
-    #auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    :root {
+      --bg: #080808;
+      --surface: #111111;
+      --surface2: #161616;
+      --border: rgba(255,255,255,0.06);
+      --text: #e8e8e8;
+      --text-muted: #666;
+      --text-dim: #3a3a3a;
+      --accent: #ffffff;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overscroll-behavior: none;
+    }
+
+    /* ── Auth modal ── */
+    #auth-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+    }
     #auth-modal.hidden { display: none; }
-    .hidden { display: none; }
-    .auth-box { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 32px; width: 420px; }
-    .auth-box h2 { font-size: 18px; margin-bottom: 24px; color: #fff; }
-    .auth-field { margin-bottom: 16px; }
-    .auth-field label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .auth-field input { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px 12px; color: #e0e0e0; font-size: 14px; outline: none; }
-    .auth-field input:focus { border-color: #555; }
-    .auth-btn { width: 100%; background: #fff; color: #000; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
-    .auth-btn:hover { background: #e0e0e0; }
+    .auth-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      width: 360px;
+      max-width: 90vw;
+    }
+    .auth-box h2 { font-size: 16px; font-weight: 600; margin-bottom: 20px; color: var(--text); }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .auth-field input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 13px; outline: none;
+    }
+    .auth-field input:focus { border-color: rgba(255,255,255,0.2); }
+    .auth-btn {
+      width: 100%; background: var(--accent); color: #000; border: none;
+      border-radius: 8px; padding: 11px; font-size: 13px; font-weight: 600; cursor: pointer; margin-top: 6px;
+    }
+    .auth-btn:hover { opacity: 0.9; }
+    .auth-note { font-size: 11px; color: var(--text-dim); margin-top: 10px; text-align: center; }
 
-    /* App layout */
-    #app { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+    /* ── Toolbar ── */
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 52px;
+      background: rgba(8,8,8,0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 18px;
+      z-index: 100;
+    }
+    #toolbar.hidden { display: none; }
 
-    .toolbar { position: sticky; top: 0; background: #0f0f0f; padding: 16px 0; z-index: 100; border-bottom: 1px solid #1e1e1e; margin-bottom: 24px; }
-    .search-bar { width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px 16px; color: #e0e0e0; font-size: 15px; outline: none; }
-    .search-bar:focus { border-color: #444; }
+    #search-input {
+      flex: 0 0 220px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 11px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    #search-input:focus { border-color: rgba(255,255,255,0.18); }
+    #search-input::placeholder { color: var(--text-dim); }
 
-    .tag-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-    .tag-pill { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px; padding: 5px 14px; font-size: 12px; cursor: pointer; color: #888; transition: all 0.15s; }
-    .tag-pill.active { background: #fff; color: #000; border-color: #fff; }
+    .type-filters { display: flex; gap: 4px; }
+    .type-pill {
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 11px;
+      font-size: 11px; color: var(--text-muted); cursor: pointer;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .type-pill:hover { border-color: rgba(255,255,255,0.18); color: var(--text); }
+    .type-pill.active { background: var(--accent); color: #000; border-color: var(--accent); }
 
-    .color-filters { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
-    .color-label { font-size: 12px; color: #555; margin-right: 4px; }
-    .color-circle { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #333; cursor: pointer; background: #1a1a1a; position: relative; transition: border-color 0.15s; }
+    .toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+    /* Color filters (keep existing 6-slot style) */
+    .color-filters { display: flex; gap: 8px; align-items: center; }
+    .color-circle {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid var(--border); cursor: pointer;
+      background: var(--surface); position: relative; transition: border-color 0.15s;
+    }
     .color-circle.filled { border-color: transparent; }
-    .color-circle:hover { border-color: #666; }
-    .color-dropdown { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; z-index: 200; width: 160px; }
+    .color-circle:hover { border-color: rgba(255,255,255,0.3); }
+    .color-dropdown {
+      position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+      background: var(--surface); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 8px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
+      z-index: 200; width: 148px;
+    }
     .color-dropdown.hidden { display: none; }
-    .color-option { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.1s; }
+    .color-option {
+      width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+      border: 2px solid transparent; transition: border-color 0.1s;
+    }
     .color-option:hover { border-color: #fff; }
 
-    /* Cards grid */
-    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    #ai-status { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 
-    /* Cards */
-    .card { background: #1a1a1a; border: 1px solid #222; border-radius: 12px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
-    .card:hover { border-color: #444; }
-    .card-wrap { position: relative; }
-    .card-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #111; }
-    .card-body { padding: 12px; }
-    .card-domain { font-size: 13px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .card-text { font-size: 13px; color: #aaa; line-height: 1.5; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-    .card-text.expanded { display: block; -webkit-line-clamp: none; }
-    .card-source { font-size: 11px; color: #555; margin-top: 8px; }
-    .card-source a { color: #555; text-decoration: none; }
-    .card-source a:hover { color: #888; }
-    .card-tag { display: inline-block; font-size: 11px; color: #666; background: #111; border-radius: 4px; padding: 2px 7px; margin-top: 8px; }
+    .disconnect-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 10px; color: var(--text-muted); font-size: 11px; cursor: pointer;
+    }
+    .disconnect-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+
+    /* ── Masonry grid ── */
+    #grid-wrap { padding: 68px 14px 40px; }
+
+    #masonry { columns: 5; column-gap: 10px; }
+    @media (max-width: 1400px) { #masonry { columns: 4; } }
+    @media (max-width: 1100px) { #masonry { columns: 3; } }
+    @media (max-width: 750px)  { #masonry { columns: 2; } }
+    @media (max-width: 480px)  { #masonry { columns: 1; } }
+
+    /* ── Cards ── */
+    .card {
+      break-inside: avoid;
+      margin-bottom: 10px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.55); }
+
+    /* Image card */
+    .card-image .card-img { width: 100%; display: block; border-radius: var(--radius); }
+    .card-image .card-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, transparent 50%);
+      border-radius: var(--radius);
+      opacity: 0; transition: opacity 0.2s;
+      display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
+    }
+    .card-image:hover .card-overlay { opacity: 1; }
+    .overlay-desc { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4; }
+
+    /* Link card */
+    .card-link {
+      background: var(--surface); border: 1px solid var(--border); padding: 13px;
+    }
+    .card-link .card-favicon { width: 15px; height: 15px; border-radius: 3px; margin-bottom: 7px; display: block; }
+    .card-link .card-domain { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; display: block; }
+    .card-link .card-title { font-size: 13px; color: var(--text); line-height: 1.45; font-weight: 500; }
+    .card-link .card-desc { font-size: 12px; color: var(--text-muted); margin-top: 5px; line-height: 1.45; }
+
+    /* Text / quote card */
+    .card-text-item { background: var(--surface2); border: 1px solid var(--border); padding: 15px; }
+    .card-text-item .card-quote { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .card-text-item .card-source { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+    /* X post card */
+    .card-xpost { background: #0c0c0c; border: 1px solid rgba(29,155,240,0.12); padding: 15px; }
+    .card-xpost .xpost-author { font-size: 12px; color: #1d9bf0; margin-bottom: 7px; font-weight: 500; }
+    .card-xpost .xpost-text { font-size: 14px; line-height: 1.6; color: var(--text); }
+
+    /* Product card */
+    .card-product { background: var(--surface); border: 1px solid var(--border); }
+    .card-product .product-img { width: 100%; display: block; max-height: 200px; object-fit: cover; }
+    .card-product .product-info { padding: 11px 13px; }
+    .card-product .product-name { font-size: 13px; color: var(--text); line-height: 1.4; font-weight: 500; }
+    .card-product .product-price { font-size: 17px; font-weight: 700; color: var(--accent); margin-top: 5px; }
+
+    /* Type badge */
+    .type-badge {
+      position: absolute; top: 9px; right: 9px;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(6px);
+      border-radius: 5px; padding: 3px 7px;
+      font-size: 10px; color: rgba(255,255,255,0.65);
+      font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase;
+    }
+
+    /* AI pending dot */
+    .badge-pending {
+      width: 5px; height: 5px; background: var(--text-dim);
+      border-radius: 50%; position: absolute; top: 9px; left: 9px;
+    }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500; cursor: zoom-out;
+    }
+    #lightbox.hidden { display: none; }
+    #lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 10px; object-fit: contain; }
+    #lightbox-link { color: #888; font-size: 13px; margin-top: 14px; text-decoration: none; position: absolute; bottom: 28px; }
+
+    /* ── Empty / loading states ── */
+    #empty-state {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; color: var(--text-dim);
+      font-size: 14px; gap: 8px; pointer-events: none;
+    }
+    #empty-state.hidden { display: none; }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-<div id="auth-modal">
+<!-- Auth modal (fallback if chrome.storage has no credentials) -->
+<div id="auth-modal" class="hidden">
   <div class="auth-box">
-    <h2>Connect</h2>
+    <h2>Connect workspace</h2>
     <div class="auth-field">
-      <label for="input-notion-token">Notion Token</label>
-      <input type="password" id="input-notion-token" placeholder="ntn_..." autocomplete="off">
+      <label>Notion Token</label>
+      <input type="password" id="input-notion-token" placeholder="ntn_…" autocomplete="off">
     </div>
     <div class="auth-field">
-      <label for="input-tg-token">Telegram Bot Token</label>
-      <input type="password" id="input-tg-token" placeholder="123456:ABC..." autocomplete="off">
+      <label>Notion Database ID</label>
+      <input type="text" id="input-db-id" placeholder="xxxxxxxx-xxxx-…" autocomplete="off">
     </div>
     <div class="auth-field">
-      <label for="input-db-id">Notion Database ID</label>
-      <input type="text" id="input-db-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+      <label>Telegram Bot Token</label>
+      <input type="password" id="input-tg-token" placeholder="123456:ABC…" autocomplete="off">
     </div>
-    <button class="auth-btn" onclick="saveAuth()">Connect</button>
+    <button class="auth-btn" id="connect-btn">Connect</button>
+    <p class="auth-note">Or configure in extension settings</p>
   </div>
 </div>
 
-<div id="app" class="hidden"></div>
+<!-- Toolbar -->
+<div id="toolbar" class="hidden">
+  <input type="text" id="search-input" placeholder="Search…">
+  <div class="type-filters">
+    <button class="type-pill active" data-type="all">All</button>
+    <button class="type-pill" data-type="image">Images</button>
+    <button class="type-pill" data-type="article">Articles</button>
+    <button class="type-pill" data-type="product">Products</button>
+    <button class="type-pill" data-type="x_post">Posts</button>
+    <button class="type-pill" data-type="video">Videos</button>
+  </div>
+  <div class="toolbar-right">
+    <div class="color-filters" id="color-filters-wrap"></div>
+    <span id="ai-status"></span>
+    <button class="disconnect-btn" id="disconnect-btn">Disconnect</button>
+  </div>
+</div>
+
+<!-- Grid -->
+<div id="grid-wrap" class="hidden">
+  <div id="masonry"></div>
+</div>
+
+<!-- Empty state -->
+<div id="empty-state" class="hidden">
+  <span style="font-size:28px">📭</span>
+  <span>Nothing saved yet</span>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="hidden">
+  <img id="lightbox-img" src="" alt="">
+  <a id="lightbox-link" href="#" target="_blank"></a>
+</div>
 
 <script>
-const STORAGE_KEYS = { notion: 'sv_notion_token', tg: 'sv_tg_token', db: 'sv_db_id' };
+// ─── Constants ────────────────────────────────────────────────────────────────
 const NOTION_VERSION = '2022-06-28';
+const BASE_COLORS = [
+  { name: 'red', hex: '#e74c3c' }, { name: 'orange', hex: '#e67e22' },
+  { name: 'yellow', hex: '#f1c40f' }, { name: 'green', hex: '#2ecc71' },
+  { name: 'blue', hex: '#3498db' }, { name: 'purple', hex: '#9b59b6' },
+  { name: 'pink', hex: '#e91e8c' }, { name: 'brown', hex: '#795548' },
+  { name: 'gray', hex: '#95a5a6' }, { name: 'black', hex: '#1a1a1a' }
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const STATE = {
+  items: [],
+  imageMap: {},
+  notionToken: '',
+  notionDbId: '',
+  botToken: '',
+  aiEnabled: false,
+  aiAutoInViewer: false,
+  search: '',
+  activeType: 'all',
+  activeTags: new Set(),
+  activeColors: [null, null, null, null, null, null]
+};
 
 window.__colorCache = JSON.parse(localStorage.getItem('sv_colors') || '{}');
 window.__ocrCache = JSON.parse(localStorage.getItem('sv_ocr') || '{}');
 let __ocrRunning = false;
 
-function saveAuth() {
-  const notion = document.getElementById('input-notion-token').value.trim();
-  const tg = document.getElementById('input-tg-token').value.trim();
-  const db = document.getElementById('input-db-id').value.trim();
-  if (!notion || !tg || !db) return alert('Fill all fields');
-  localStorage.setItem(STORAGE_KEYS.notion, notion);
-  localStorage.setItem(STORAGE_KEYS.tg, tg);
-  localStorage.setItem(STORAGE_KEYS.db, db);
-  document.getElementById('auth-modal').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  init();
+// ─── Chrome relay helpers ─────────────────────────────────────────────────────
+function bgFetch(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: 'FETCH', url, options }, response => {
+      if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      if (!response) return reject(new Error('No response from background'));
+      resolve({
+        ok: response.ok,
+        status: response.status,
+        json: () => Promise.resolve(JSON.parse(response.body)),
+        text: () => Promise.resolve(response.body)
+      });
+    });
+  });
 }
 
-function getAuth() {
-  return {
-    notion: localStorage.getItem(STORAGE_KEYS.notion),
-    tg: localStorage.getItem(STORAGE_KEYS.tg),
-    db: localStorage.getItem(STORAGE_KEYS.db)
-  };
+function getSettings() {
+  return new Promise(resolve => {
+    chrome.storage.local.get(null, data => resolve(data || {}));
+  });
 }
 
-function logout() {
-  Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+// ─── Auth ────────────────────────────────────────────────────────────────────
+async function init() {
+  const settings = await getSettings();
+  if (settings.notionToken && settings.notionDbId && settings.botToken) {
+    STATE.notionToken = settings.notionToken;
+    STATE.notionDbId = settings.notionDbId;
+    STATE.botToken = settings.botToken;
+    STATE.aiEnabled = !!(settings.aiEnabled && settings.aiApiKey);
+    STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
+    startApp();
+  } else {
+    document.getElementById('auth-modal').classList.remove('hidden');
+    document.getElementById('connect-btn').addEventListener('click', () => {
+      const notion = document.getElementById('input-notion-token').value.trim();
+      const db = document.getElementById('input-db-id').value.trim();
+      const tg = document.getElementById('input-tg-token').value.trim();
+      if (!notion || !db || !tg) return alert('Fill all fields');
+      STATE.notionToken = notion;
+      STATE.notionDbId = db;
+      STATE.botToken = tg;
+      document.getElementById('auth-modal').classList.add('hidden');
+      startApp();
+    });
+  }
+}
+
+function disconnect() {
+  // Clear only viewer-stored fallback (chrome.storage credentials are managed in settings)
   location.reload();
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  const { notion, tg, db } = getAuth();
-  if (notion && tg && db) {
-    document.getElementById('auth-modal').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    init();
-  }
-});
+// ─── App start ────────────────────────────────────────────────────────────────
+async function startApp() {
+  document.getElementById('toolbar').classList.remove('hidden');
+  document.getElementById('grid-wrap').classList.remove('hidden');
+  document.getElementById('ai-status').textContent = 'Loading…';
 
-async function fetchNotion(notionToken, dbId) {
+  buildColorFilters();
+  setupToolbarEvents();
+
+  try {
+    const pages = await fetchNotion();
+    STATE.items = pages.map(parseItem);
+    STATE.imageMap = await resolveAllImages(STATE.items, STATE.botToken);
+    applyFilters();
+    document.getElementById('ai-status').textContent = '';
+
+    // Background processing (non-blocking)
+    processColors(STATE.items, STATE.imageMap);
+    processOCR(STATE.items, STATE.imageMap).catch(e => console.warn('[OCR] failed:', e));
+    if (STATE.aiEnabled && STATE.aiAutoInViewer) {
+      runAiBackgroundProcessing();
+    }
+  } catch (e) {
+    document.getElementById('ai-status').textContent = 'Error: ' + e.message;
+    console.error('[Viewer] load error:', e);
+  }
+}
+
+// ─── Notion fetch ─────────────────────────────────────────────────────────────
+async function fetchNotion() {
   let results = [];
-  let cursor = undefined;
+  let cursor;
   let page = 0;
   do {
     const body = { page_size: 100, sorts: [{ property: 'Date', direction: 'descending' }] };
     if (cursor) body.start_cursor = cursor;
-    const notionBase = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-      ? '/notion-proxy'
-      : 'https://api.notion.com';
-    const res = await fetch(`${notionBase}/v1/databases/${dbId}/query`, {
+    const res = await bgFetch(`https://api.notion.com/v1/databases/${STATE.notionDbId}/query`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${notionToken}`,
+        'Authorization': `Bearer ${STATE.notionToken}`,
         'Notion-Version': NOTION_VERSION,
         'Content-Type': 'application/json'
       },
@@ -149,7 +413,7 @@ async function fetchNotion(notionToken, dbId) {
     });
     if (!res.ok) {
       let msg = 'Notion fetch failed';
-      try { msg = (await res.json()).message || msg; } catch {}
+      try { const d = await res.json(); msg = d.message || msg; } catch {}
       throw new Error(`${res.status}: ${msg}`);
     }
     const data = await res.json();
@@ -162,6 +426,8 @@ async function fetchNotion(notionToken, dbId) {
 
 function parseItem(page) {
   const p = page.properties;
+  let aiData = {};
+  try { aiData = JSON.parse(p['ai_data']?.rich_text?.[0]?.text?.content || '{}'); } catch {}
   return {
     id: page.id,
     url: p['URL']?.title?.[0]?.text?.content || '',
@@ -170,29 +436,16 @@ function parseItem(page) {
     content: p['Content']?.rich_text?.[0]?.text?.content || '',
     fileId: p['File ID']?.rich_text?.[0]?.text?.content || '',
     sourceUrl: p['Source URL']?.url || '',
-    date: p['Date']?.date?.start || ''
+    date: p['Date']?.date?.start || '',
+    ai_type: p['ai_type']?.select?.name || null,
+    ai_description: p['ai_description']?.rich_text?.[0]?.text?.content || '',
+    ai_analyzed: p['ai_analyzed']?.checkbox || false,
+    ai_data: aiData,
+    _resolvedImg: null
   };
 }
 
-async function init() {
-  const { notion, tg, db } = getAuth();
-  document.getElementById('app').innerHTML = '<p style="padding:40px;color:#666">Fetching...</p>';
-  try {
-    const pages = await fetchNotion(notion, db);
-    const items = pages.map(parseItem);
-    console.log('[Saves] loaded', items.length, 'items');
-    const imageMap = await resolveAllImages(items, tg);
-    renderApp(items, imageMap);
-    processColors(items, imageMap);  // no await — runs in background
-    processOCR(items, imageMap).catch(e => console.warn('[OCR] worker failed:', e)); // no await — runs in background
-  } catch (e) {
-    const errEl = document.createElement('p');
-    errEl.style.cssText = 'padding:40px;color:#f66';
-    errEl.textContent = 'Error: ' + e.message;
-    document.getElementById('app').replaceChildren(errEl);
-  }
-}
-
+// ─── Image resolution ─────────────────────────────────────────────────────────
 async function resolveFileId(tgToken, fileId) {
   if (!fileId) return null;
   try {
@@ -211,12 +464,18 @@ async function resolveAllImages(items, tgToken) {
   for (let i = 0; i < withImages.length; i += BATCH) {
     const batch = withImages.slice(i, i + BATCH);
     const urls = await Promise.all(batch.map(item => resolveFileId(tgToken, item.fileId)));
-    batch.forEach((item, idx) => { if (urls[idx]) map[item.fileId] = urls[idx]; });
+    batch.forEach((item, idx) => {
+      if (urls[idx]) {
+        map[item.fileId] = urls[idx];
+        item._resolvedImg = urls[idx];
+      }
+    });
     if (i + BATCH < withImages.length) await new Promise(r => setTimeout(r, 350));
   }
   return map;
 }
 
+// ─── Color extraction (keep exact logic) ─────────────────────────────────────
 function rgbToHue(r, g, b) {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
@@ -261,7 +520,7 @@ async function processColors(items, imageMap) {
     } catch { window.__colorCache[item.fileId] = null; }
     localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
   }
-  renderCards();
+  applyFilters();
 }
 
 async function processOCR(items, imageMap) {
@@ -275,228 +534,286 @@ async function processOCR(items, imageMap) {
       try {
         const { data: { text } } = await worker.recognize(imageMap[item.fileId]);
         window.__ocrCache[item.fileId] = text.trim();
-      } catch {
-        window.__ocrCache[item.fileId] = '';
-      }
+      } catch { window.__ocrCache[item.fileId] = ''; }
       localStorage.setItem('sv_ocr', JSON.stringify(window.__ocrCache));
     }
   } finally {
     await worker.terminate();
     __ocrRunning = false;
   }
-  renderCards();
+  applyFilters();
 }
 
-const BASE_COLORS = [
-  { name: 'red', hex: '#e74c3c' }, { name: 'orange', hex: '#e67e22' },
-  { name: 'yellow', hex: '#f1c40f' }, { name: 'green', hex: '#2ecc71' },
-  { name: 'blue', hex: '#3498db' }, { name: 'purple', hex: '#9b59b6' },
-  { name: 'pink', hex: '#e91e8c' }, { name: 'brown', hex: '#795548' },
-  { name: 'gray', hex: '#95a5a6' }, { name: 'black', hex: '#1a1a1a' }
-];
-
-const state = { search: '', activeTags: new Set(), activeColors: [null, null, null, null, null, null] };
-
-function renderApp(items, imageMap) {
-  state.search = '';
-  state.activeTags = new Set();
-  state.activeColors = [null, null, null, null, null, null];
-  window.__allItems = items;
-  window.__imageMap = imageMap;
-
-  const tags = [...new Set(items.map(i => i.tag).filter(Boolean))];
-
-  document.getElementById('app').innerHTML = `
-    <div class="toolbar">
-      <input class="search-bar" id="search-input" placeholder="Search..." oninput="onSearch(this.value)">
-      <div class="tag-filters" id="tag-filters">
-        ${tags.map(t => `<button class="tag-pill" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}
+// ─── Color filter UI ─────────────────────────────────────────────────────────
+function buildColorFilters() {
+  const wrap = document.getElementById('color-filters-wrap');
+  wrap.innerHTML = [0,1,2,3,4,5].map(i => `
+    <div class="color-circle" id="cc-${i}" data-slot="${i}">
+      <div class="color-dropdown hidden" id="cd-${i}">
+        ${BASE_COLORS.map(c => `<div class="color-option" style="background:${c.hex}" title="${c.name}" data-color="${c.name}" data-hex="${c.hex}" data-slot="${i}"></div>`).join('')}
       </div>
-      <div class="color-filters">
-        <span class="color-label">Color</span>
-        ${[0,1,2,3,4,5].map(i => `
-          <div class="color-circle" id="cc-${i}" onclick="toggleColorDropdown(event,${i})">
-            <div class="color-dropdown hidden" id="cd-${i}">
-              ${BASE_COLORS.map(c => `<div class="color-option" style="background:${c.hex}" title="${c.name}" onclick="selectColor(event,${i},'${c.name}','${c.hex}')"></div>`).join('')}
-            </div>
-          </div>
-        `).join('')}
-      </div>
-      <button onclick="logout()" style="background:none;border:1px solid #333;border-radius:6px;padding:5px 12px;color:#555;font-size:12px;cursor:pointer;margin-top:12px;float:right">Disconnect</button>
     </div>
-    <div class="cards-grid" id="cards-grid"></div>
-  `;
+  `).join('');
 
-  document.getElementById('tag-filters').addEventListener('click', e => {
-    const btn = e.target.closest('.tag-pill');
-    if (btn) toggleTag(btn.dataset.tag);
-  });
-  renderCards();
+  document.addEventListener('click', e => {
+    const circle = e.target.closest('.color-circle');
+    const option = e.target.closest('.color-option');
 
-  // Delegated click handler for cards — attached once here, not inside renderCards()
-  document.getElementById('cards-grid').addEventListener('click', e => {
-    if (e.target.closest('a')) return;
-    const card = e.target.closest('[data-action]');
-    if (!card) return;
-    const action = card.dataset.action;
-    if (action === 'open') {
-      const url = card.dataset.url;
-      if (url) window.open(url, '_blank');
-    } else if (action === 'lightbox') {
-      openLightbox(card.dataset.fileId, card.dataset.sourceUrl);
-    } else if (action === 'expand') {
-      const textEl = card.querySelector('.card-text');
-      if (!textEl) return;
-      textEl.classList.toggle('expanded');
+    if (option) {
+      e.stopPropagation();
+      const slot = parseInt(option.dataset.slot);
+      const name = option.dataset.color;
+      const hex = option.dataset.hex;
+      STATE.activeColors[slot] = STATE.activeColors[slot] === name ? null : name;
+      const circleEl = document.getElementById(`cc-${slot}`);
+      circleEl.style.background = STATE.activeColors[slot] ? hex : '';
+      circleEl.classList.toggle('filled', !!STATE.activeColors[slot]);
+      document.getElementById(`cd-${slot}`).classList.add('hidden');
+      applyFilters();
+      return;
     }
+
+    if (circle) {
+      e.stopPropagation();
+      const slot = parseInt(circle.dataset.slot);
+      if (STATE.activeColors[slot]) {
+        STATE.activeColors[slot] = null;
+        circle.style.background = '';
+        circle.classList.remove('filled');
+        applyFilters();
+        return;
+      }
+      const dropdown = document.getElementById(`cd-${slot}`);
+      const wasHidden = dropdown.classList.contains('hidden');
+      document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+      if (wasHidden) dropdown.classList.remove('hidden');
+      return;
+    }
+
+    document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
   });
 }
 
-function closeAllDropdowns(e) {
-  if (!e.target.closest('.color-circle')) {
-    document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-  }
-}
-document.addEventListener('click', closeAllDropdowns);
-
-function onSearch(val) { state.search = val.toLowerCase(); renderCards(); }
-
-function toggleTag(tag) {
-  state.activeTags.has(tag) ? state.activeTags.delete(tag) : state.activeTags.add(tag);
-  document.querySelectorAll('.tag-pill').forEach(p => {
-    p.classList.toggle('active', state.activeTags.has(p.dataset.tag));
+// ─── Toolbar events ───────────────────────────────────────────────────────────
+function setupToolbarEvents() {
+  document.getElementById('search-input').addEventListener('input', e => {
+    STATE.search = e.target.value.toLowerCase();
+    applyFilters();
   });
-  renderCards();
+
+  document.querySelectorAll('.type-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      STATE.activeType = pill.dataset.type;
+      applyFilters();
+    });
+  });
+
+  document.getElementById('disconnect-btn').addEventListener('click', disconnect);
 }
 
-function toggleColorDropdown(e, i) {
-  e.stopPropagation();
-  // If circle already has a color — clear it directly, no dropdown
-  if (state.activeColors[i]) {
-    state.activeColors[i] = null;
-    const circle = document.getElementById(`cc-${i}`);
-    circle.style.background = '';
-    circle.classList.remove('filled');
-    document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-    renderCards();
-    return;
+// ─── Filtering ────────────────────────────────────────────────────────────────
+function applyFilters() {
+  let items = STATE.items;
+
+  if (STATE.activeType !== 'all') {
+    items = items.filter(item => {
+      if (STATE.activeType === 'image') return item.type === 'image';
+      return item.ai_type === STATE.activeType;
+    });
   }
-  const dropdown = document.getElementById(`cd-${i}`);
-  const wasHidden = dropdown.classList.contains('hidden');
-  document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-  if (wasHidden) dropdown.classList.remove('hidden');
+
+  if (STATE.search) {
+    items = items.filter(item => {
+      const hay = [
+        item.url, item.content, item.sourceUrl,
+        item.ai_description,
+        JSON.stringify(item.ai_data),
+        item.fileId ? (window.__ocrCache[item.fileId] || '') : ''
+      ].join(' ').toLowerCase();
+      return hay.includes(STATE.search);
+    });
+  }
+
+  const activeColors = STATE.activeColors.filter(Boolean);
+  if (activeColors.length) {
+    items = items.filter(item => {
+      const c = item.fileId ? window.__colorCache[item.fileId] : null;
+      return c && activeColors.includes(c);
+    });
+  }
+
+  renderAll(items);
 }
 
-function selectColor(e, i, name, hex) {
-  e.stopPropagation();
-  state.activeColors[i] = state.activeColors[i] === name ? null : name;
-  const circle = document.getElementById(`cc-${i}`);
-  circle.style.background = state.activeColors[i] ? hex : '';
-  circle.classList.toggle('filled', !!state.activeColors[i]);
-  document.getElementById(`cd-${i}`).classList.add('hidden');
-  renderCards();
+// ─── Card rendering ───────────────────────────────────────────────────────────
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function getDomain(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; }
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function buildCard(item) {
-  const imgUrl = item.fileId ? (window.__imageMap?.[item.fileId] || null) : null;
+function renderCard(item) {
+  const imgUrl = item._resolvedImg || (item.fileId ? STATE.imageMap[item.fileId] : null);
+  const aiType = item.ai_type;
+  const aiData = item.ai_data || {};
   const domain = getDomain(item.sourceUrl || item.url);
-  const safeSourceUrl = escapeHtml(item.sourceUrl);
-  const safeDomain = escapeHtml(domain);
 
-  if (item.type === 'image') {
-    return `
-      <div class="card card-wrap" data-action="lightbox" data-file-id="${escapeHtml(item.fileId)}" data-source-url="${safeSourceUrl}">
-        ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy">` : '<div class="card-img"></div>'}
-        <div class="card-body">
-          ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
-          ${domain ? `<div class="card-source"><a href="${safeSourceUrl}" target="_blank">${safeDomain}</a></div>` : ''}
-        </div>
-      </div>`;
-  }
+  const pendingDot = !item.ai_analyzed ? '<div class="badge-pending"></div>' : '';
 
-  if (item.type === 'link') {
-    return `
-      <div class="card card-wrap" data-action="open" data-url="${safeSourceUrl}">
-        ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy">` : ''}
-        <div class="card-body">
-          <div class="card-domain">${safeDomain}</div>
-          ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
-        </div>
-      </div>`;
-  }
-
-  // text — source link always present (visible regardless of expansion state)
-  const sourceHtml = domain ? `<div class="card-source"><a href="${safeSourceUrl}" target="_blank">${safeDomain}</a></div>` : '';
-  return `
-    <div class="card" data-action="expand">
-      <div class="card-body">
-        <div class="card-text">${escapeHtml(item.content)}</div>
-        ${sourceHtml}
-        ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+  // ── Product ──
+  if (aiType === 'product' && imgUrl) {
+    return `<div class="card card-product" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
+      ${pendingDot}
+      <img class="product-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+      <div class="product-info">
+        <div class="product-name">${escapeHtml(aiData.product_name || item.url || domain)}</div>
+        ${aiData.price ? `<div class="product-price">${escapeHtml(aiData.price)}</div>` : ''}
       </div>
     </div>`;
-}
-
-function openLightbox(fileId, sourceUrl) {
-  document.getElementById('lightbox')?.remove();
-  const imgUrl = window.__imageMap?.[fileId];
-  if (!imgUrl) return;
-  const domain = getDomain(sourceUrl);
-  const lb = document.createElement('div');
-  lb.id = 'lightbox';
-  lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:500;cursor:zoom-out';
-  const img = document.createElement('img');
-  img.src = imgUrl;
-  img.style.cssText = 'max-width:90vw;max-height:80vh;border-radius:8px;object-fit:contain';
-  lb.appendChild(img);
-  if (sourceUrl) {
-    const link = document.createElement('a');
-    link.href = /^https?:\/\//i.test(sourceUrl) ? sourceUrl : '#';
-    link.target = '_blank';
-    link.textContent = domain;
-    link.style.cssText = 'color:#888;font-size:13px;margin-top:16px;text-decoration:none';
-    link.addEventListener('click', e => e.stopPropagation());
-    lb.appendChild(link);
   }
-  const onKey = e => {
-    if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', onKey); }
-  };
-  document.addEventListener('keydown', onKey);
-  lb.addEventListener('click', () => { lb.remove(); document.removeEventListener('keydown', onKey); });
-  document.body.appendChild(lb);
+
+  // ── X Post ──
+  if (aiType === 'x_post') {
+    const text = escapeHtml(aiData.tweet_text || item.content || item.ai_description || '');
+    const author = escapeHtml(aiData.author || '');
+    return `<div class="card card-xpost" data-id="${item.id}" ${item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : ''}>
+      ${pendingDot}
+      ${author ? `<div class="xpost-author">${author}</div>` : ''}
+      <div class="xpost-text">${text}</div>
+    </div>`;
+  }
+
+  // ── Image ──
+  if (item.type === 'image' && imgUrl) {
+    return `<div class="card card-image" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
+      ${pendingDot}
+      <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+      <div class="card-overlay">
+        ${item.ai_description ? `<div class="overlay-desc">${escapeHtml(item.ai_description)}</div>` : ''}
+      </div>
+      ${aiType ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : ''}
+    </div>`;
+  }
+
+  // ── Link ──
+  if (item.type === 'link') {
+    return `<div class="card card-link" data-id="${item.id}" onclick="window.open('${escapeHtml(item.sourceUrl || item.url)}','_blank')">
+      ${pendingDot}
+      <img class="card-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" alt="" onerror="this.style.display='none'">
+      <span class="card-domain">${escapeHtml(domain)}</span>
+      <div class="card-title">${escapeHtml(item.url || domain)}</div>
+      ${item.ai_description ? `<div class="card-desc">${escapeHtml(item.ai_description)}</div>` : ''}
+    </div>`;
+  }
+
+  // ── Text / Quote ──
+  return `<div class="card card-text-item" data-id="${item.id}">
+    ${pendingDot}
+    <div class="card-quote">${escapeHtml(item.content || item.ai_description || '')}</div>
+    ${domain ? `<div class="card-source">${escapeHtml(domain)}</div>` : ''}
+  </div>`;
 }
 
-function renderCards() {
-  const activeColors = state.activeColors.filter(Boolean);
-  const filtered = (window.__allItems || []).filter(item => {
-    if (state.activeTags.size && !state.activeTags.has(item.tag)) return false;
-    if (state.search) {
-      const hay = (item.content + ' ' + item.url + ' ' + item.sourceUrl + ' ' + (window.__ocrCache?.[item.fileId] || '')).toLowerCase();
-      if (!hay.includes(state.search)) return false;
-    }
-    if (activeColors.length) {
-      const itemColor = window.__colorCache?.[item.fileId];
-      if (!itemColor || !activeColors.includes(itemColor)) return false;
-    }
-    return true;
-  });
-  const grid = document.getElementById('cards-grid');
-  if (!grid) return;
-  if (!filtered.length) {
-    grid.innerHTML = '<p style="color:#444;padding:40px 0;grid-column:1/-1">Nothing here</p>';
+function renderAll(items) {
+  const masonry = document.getElementById('masonry');
+  const empty = document.getElementById('empty-state');
+  if (!masonry) return;
+  if (!items.length) {
+    masonry.innerHTML = '';
+    empty.classList.remove('hidden');
     return;
   }
-  grid.innerHTML = filtered.map(buildCard).join('');
+  empty.classList.add('hidden');
+  masonry.innerHTML = items.map(renderCard).join('');
 }
+
+// ─── Lightbox ─────────────────────────────────────────────────────────────────
+function openLightbox(imgUrl, sourceUrl) {
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img');
+  const link = document.getElementById('lightbox-link');
+  img.src = imgUrl;
+  if (sourceUrl && /^https?:\/\//i.test(sourceUrl)) {
+    link.href = sourceUrl;
+    link.textContent = getDomain(sourceUrl);
+    link.classList.remove('hidden');
+  } else {
+    link.classList.add('hidden');
+  }
+  lb.classList.remove('hidden');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const lb = document.getElementById('lightbox');
+  lb.addEventListener('click', e => {
+    if (e.target === lb || e.target === document.getElementById('lightbox-img')) {
+      lb.classList.add('hidden');
+      document.getElementById('lightbox-img').src = '';
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      lb.classList.add('hidden');
+      document.getElementById('lightbox-img').src = '';
+    }
+  });
+});
+
+// ─── AI background processing ─────────────────────────────────────────────────
+async function runAiBackgroundProcessing() {
+  const pending = STATE.items.filter(item => !item.ai_analyzed && item.id);
+  if (!pending.length) {
+    document.getElementById('ai-status').textContent = '✓ All analyzed';
+    setTimeout(() => { document.getElementById('ai-status').textContent = ''; }, 3000);
+    return;
+  }
+
+  const aiStatus = document.getElementById('ai-status');
+  let done = 0;
+  const BATCH = 3;
+
+  for (let i = 0; i < pending.length; i += BATCH) {
+    const batch = pending.slice(i, i + BATCH);
+    await Promise.all(batch.map(item => new Promise(resolve => {
+      chrome.runtime.sendMessage({
+        type: 'AI_ANALYZE',
+        item: {
+          fileId: item.fileId,
+          sourceUrl: item.sourceUrl,
+          content: item.content,
+          tagName: item.tag
+        },
+        notionPageId: item.id
+      }, response => {
+        if (chrome.runtime.lastError) { resolve(); return; }
+        if (response?.ok && response.result) {
+          item.ai_type = response.result.type || item.ai_type;
+          item.ai_description = response.result.description || item.ai_description;
+          item.ai_data = { ...response.result.data, tags: response.result.tags };
+          item.ai_analyzed = true;
+          // Re-render this card in place
+          const oldCard = document.querySelector(`.card[data-id="${item.id}"]`);
+          if (oldCard) oldCard.outerHTML = renderCard(item);
+        }
+        done++;
+        aiStatus.textContent = `Analyzing ${done}/${pending.length}…`;
+        resolve();
+      });
+    })));
+    if (i + BATCH < pending.length) await new Promise(r => setTimeout(r, 600));
+  }
+
+  aiStatus.textContent = `✓ ${done} analyzed`;
+  setTimeout(() => { aiStatus.textContent = ''; }, 4000);
+}
+
+// ─── Bootstrap ───────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
