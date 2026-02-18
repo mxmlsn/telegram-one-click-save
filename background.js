@@ -391,13 +391,13 @@ async function callAnthropic(messages, settings) {
       'content-type': 'application/json'
     },
     body: JSON.stringify({
-      model: settings.aiModel || 'claude-haiku-4-5-20251001',
+      model: (settings.aiModel && !settings.aiModel.startsWith('gemini')) ? settings.aiModel : 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       messages
     })
   });
   if (!res.ok) {
-    console.warn('[TG Saver] Anthropic error:', res.status);
+    console.warn('[TG Saver] Anthropic error:', res.status, await res.text());
     return null;
   }
   const data = await res.json();
