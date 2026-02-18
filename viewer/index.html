@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saves</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
+
+    /* Auth modal */
+    #auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    #auth-modal.hidden { display: none; }
+    .auth-box { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 32px; width: 420px; }
+    .auth-box h2 { font-size: 18px; margin-bottom: 24px; color: #fff; }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .auth-field input { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px 12px; color: #e0e0e0; font-size: 14px; outline: none; }
+    .auth-field input:focus { border-color: #555; }
+    .auth-btn { width: 100%; background: #fff; color: #000; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .auth-btn:hover { background: #e0e0e0; }
+  </style>
+</head>
+<body>
+
+<div id="auth-modal">
+  <div class="auth-box">
+    <h2>Connect</h2>
+    <div class="auth-field">
+      <label>Notion Token</label>
+      <input type="password" id="input-notion-token" placeholder="ntn_...">
+    </div>
+    <div class="auth-field">
+      <label>Telegram Bot Token</label>
+      <input type="password" id="input-tg-token" placeholder="123456:ABC...">
+    </div>
+    <div class="auth-field">
+      <label>Notion Database ID</label>
+      <input type="text" id="input-db-id" placeholder="30b6081f-..." value="30b6081f-3dc6-8148-871f-dfb6944ac36e">
+    </div>
+    <button class="auth-btn" onclick="saveAuth()">Connect</button>
+  </div>
+</div>
+
+<div id="app" class="hidden"></div>
+
+<script>
+const STORAGE_KEYS = { notion: 'sv_notion_token', tg: 'sv_tg_token', db: 'sv_db_id' };
+
+function saveAuth() {
+  const notion = document.getElementById('input-notion-token').value.trim();
+  const tg = document.getElementById('input-tg-token').value.trim();
+  const db = document.getElementById('input-db-id').value.trim();
+  if (!notion || !tg || !db) return alert('Fill all fields');
+  localStorage.setItem(STORAGE_KEYS.notion, notion);
+  localStorage.setItem(STORAGE_KEYS.tg, tg);
+  localStorage.setItem(STORAGE_KEYS.db, db);
+  document.getElementById('auth-modal').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  init();
+}
+
+function getAuth() {
+  return {
+    notion: localStorage.getItem(STORAGE_KEYS.notion),
+    tg: localStorage.getItem(STORAGE_KEYS.tg),
+    db: localStorage.getItem(STORAGE_KEYS.db)
+  };
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const { notion, tg, db } = getAuth();
+  if (notion && tg && db) {
+    document.getElementById('auth-modal').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    init();
+  }
+});
+
+function init() {
+  document.getElementById('app').innerHTML = '<p style="padding:40px;color:#666">Loading...</p>';
+}
+</script>
+</body>
+</html>
