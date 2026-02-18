@@ -128,6 +128,27 @@ const DEFAULT_SETTINGS = {
   aiAutoInViewer: true
 };
 
+const AI_MODELS = {
+  google: [
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (free)' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (free)' }
+  ],
+  anthropic: [
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku (fast)' },
+    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet (smart)' }
+  ]
+};
+const AI_DEFAULT_MODEL = { google: 'gemini-2.0-flash', anthropic: 'claude-haiku-4-5-20251001' };
+
+function populateAiModels(provider, selectedModel) {
+  const sel = document.getElementById('aiModel');
+  if (!sel) return;
+  const models = AI_MODELS[provider] || AI_MODELS.google;
+  sel.innerHTML = models.map(m =>
+    `<option value="${m.value}"${m.value === selectedModel ? ' selected' : ''}>${m.label}</option>`
+  ).join('');
+}
+
 // DOM elements
 const botTokenInput = document.getElementById('botToken');
 const chatIdInput = document.getElementById('chatId');
@@ -163,6 +184,7 @@ document.addEventListener('DOMContentLoaded', loadSettings);
 document.addEventListener('DOMContentLoaded', () => {
   const aiEnabledInput = document.getElementById('aiEnabled');
   const aiConfigDiv = document.getElementById('ai-config');
+  const aiProviderInput = document.getElementById('aiProvider');
   const aiApiKeyInput = document.getElementById('aiApiKey');
   const aiModelInput = document.getElementById('aiModel');
   const aiAutoOnSaveInput = document.getElementById('aiAutoOnSave');
@@ -174,6 +196,15 @@ document.addEventListener('DOMContentLoaded', () => {
     saveSetting('aiEnabled', e.target.checked);
     aiConfigDiv?.classList.toggle('hidden', !e.target.checked);
   });
+
+  aiProviderInput?.addEventListener('change', e => {
+    const provider = e.target.value;
+    saveSetting('aiProvider', provider);
+    const defaultModel = AI_DEFAULT_MODEL[provider];
+    saveSetting('aiModel', defaultModel);
+    populateAiModels(provider, defaultModel);
+  });
+
   aiApiKeyInput?.addEventListener('change', e => saveSetting('aiApiKey', e.target.value));
   aiModelInput?.addEventListener('change', e => saveSetting('aiModel', e.target.value));
   aiAutoOnSaveInput?.addEventListener('change', e => saveSetting('aiAutoOnSave', e.target.checked));
@@ -182,13 +213,27 @@ document.addEventListener('DOMContentLoaded', () => {
   testAiBtn?.addEventListener('click', async () => {
     if (aiTestStatus) aiTestStatus.textContent = 'Testing…';
     const key = aiApiKeyInput?.value;
+    const provider = aiProviderInput?.value || 'google';
     if (!key) { if (aiTestStatus) aiTestStatus.textContent = 'Enter API key first'; return; }
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
-      });
+      let res;
+      if (provider === 'google') {
+        const model = aiModelInput?.value || 'gemini-2.0-flash';
+        res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
+          }
+        );
+      } else {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+          body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
+        });
+      }
       if (aiTestStatus) aiTestStatus.textContent = res.ok ? '✓ Connected' : `✗ Error ${res.status}`;
     } catch (e) {
       if (aiTestStatus) aiTestStatus.textContent = '✗ Network error';
@@ -470,8 +515,8 @@ async function loadSettings() {
   // AI Analysis — apply saved values
   const aiEnabledInput = document.getElementById('aiEnabled');
   const aiConfigDiv = document.getElementById('ai-config');
+  const aiProviderInput = document.getElementById('aiProvider');
   const aiApiKeyInput = document.getElementById('aiApiKey');
-  const aiModelInput = document.getElementById('aiModel');
   const aiAutoOnSaveInput = document.getElementById('aiAutoOnSave');
   const aiAutoInViewerInput = document.getElementById('aiAutoInViewer');
 
@@ -479,8 +524,10 @@ async function loadSettings() {
     aiEnabledInput.checked = settings.aiEnabled || false;
     aiConfigDiv?.classList.toggle('hidden', !settings.aiEnabled);
   }
+  const savedProvider = settings.aiProvider || 'google';
+  if (aiProviderInput) aiProviderInput.value = savedProvider;
+  populateAiModels(savedProvider, settings.aiModel || AI_DEFAULT_MODEL[savedProvider]);
   if (aiApiKeyInput) aiApiKeyInput.value = settings.aiApiKey || '';
-  if (aiModelInput) aiModelInput.value = settings.aiModel || 'claude-haiku-4-5-20251001';
   if (aiAutoOnSaveInput) aiAutoOnSaveInput.checked = settings.aiAutoOnSave !== false;
   if (aiAutoInViewerInput) aiAutoInViewerInput.checked = settings.aiAutoInViewer !== false;
 

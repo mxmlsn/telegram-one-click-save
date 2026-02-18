@@ -455,15 +455,22 @@
 
           <div id="ai-config" class="hidden">
             <div class="field">
+              <label for="aiProvider">Provider</label>
+              <select id="aiProvider">
+                <option value="google">Google Gemini</option>
+                <option value="anthropic">Anthropic Claude</option>
+              </select>
+            </div>
+
+            <div class="field">
               <label for="aiApiKey">API Key</label>
-              <input type="password" id="aiApiKey" placeholder="sk-ant-…" autocomplete="off">
+              <input type="password" id="aiApiKey" placeholder="Key for selected provider" autocomplete="off">
             </div>
 
             <div class="field">
               <label for="aiModel">Model</label>
               <select id="aiModel">
-                <option value="claude-haiku-4-5-20251001">Haiku (fast, cheap)</option>
-                <option value="claude-sonnet-4-6">Sonnet (smarter)</option>
+                <!-- populated by JS based on provider -->
               </select>
             </div>
 
