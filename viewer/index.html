@@ -796,9 +796,10 @@ async function runAiBackgroundProcessing() {
           item.ai_description = response.result.description || item.ai_description;
           item.ai_data = { ...response.result.data, tags: response.result.tags };
           item.ai_analyzed = true;
-          // Re-render this card in place
-          const oldCard = document.querySelector(`.card[data-id="${item.id}"]`);
-          if (oldCard) oldCard.outerHTML = renderCard(item);
+          // Re-query fresh (applyFilters may have replaced innerHTML while batch was in-flight)
+          const freshCard = document.querySelector(`.card[data-id="${item.id}"]`);
+          if (freshCard) freshCard.outerHTML = renderCard(item);
+          // If card not in current view (filtered out), it will render correctly next time filters change
         }
         done++;
         aiStatus.textContent = `Analyzing ${done}/${pending.length}…`;
