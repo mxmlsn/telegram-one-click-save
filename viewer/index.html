@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saves</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
+
+    /* Auth modal */
+    #auth-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    .hidden { display: none; }
+    .auth-box { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 32px; width: 420px; }
+    .auth-box h2 { font-size: 18px; margin-bottom: 24px; color: #fff; }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .auth-field input { width: 100%; background: #111; border: 1px solid #333; border-radius: 8px; padding: 10px 12px; color: #e0e0e0; font-size: 14px; outline: none; }
+    .auth-field input:focus { border-color: #555; }
+    .auth-btn { width: 100%; background: #fff; color: #000; border: none; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+    .auth-btn:hover { background: #e0e0e0; }
+
+    /* App layout */
+    #app { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+    .toolbar { position: sticky; top: 0; background: #0f0f0f; padding: 16px 0; z-index: 100; border-bottom: 1px solid #1e1e1e; margin-bottom: 24px; }
+    .search-bar { width: 100%; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 12px 16px; color: #e0e0e0; font-size: 15px; outline: none; }
+    .search-bar:focus { border-color: #444; }
+
+    .tag-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .tag-pill { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 20px; padding: 5px 14px; font-size: 12px; cursor: pointer; color: #888; transition: all 0.15s; }
+    .tag-pill.active { background: #fff; color: #000; border-color: #fff; }
+
+    .color-filters { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+    .color-label { font-size: 12px; color: #555; margin-right: 4px; }
+    .color-circle { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #333; cursor: pointer; background: #1a1a1a; position: relative; transition: border-color 0.15s; }
+    .color-circle.filled { border-color: transparent; }
+    .color-circle:hover { border-color: #666; }
+    .color-dropdown { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; z-index: 200; width: 160px; }
+    .color-dropdown.hidden { display: none; }
+    .color-option { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.1s; }
+    .color-option:hover { border-color: #fff; }
+
+    /* Cards grid */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+
+    /* Cards */
+    .card { background: #1a1a1a; border: 1px solid #222; border-radius: 12px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+    .card:hover { border-color: #444; }
+    .card-wrap { position: relative; }
+    .card-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #111; }
+    .card-body { padding: 12px; }
+    .card-domain { font-size: 13px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-text { font-size: 13px; color: #aaa; line-height: 1.5; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .card-text.expanded { display: block; -webkit-line-clamp: none; }
+    .card-source { font-size: 11px; color: #555; margin-top: 8px; }
+    .card-source a { color: #555; text-decoration: none; }
+    .card-source a:hover { color: #888; }
+    .card-tag { display: inline-block; font-size: 11px; color: #666; background: #111; border-radius: 4px; padding: 2px 7px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+
+<div id="auth-modal">
+  <div class="auth-box">
+    <h2>Connect</h2>
+    <div class="auth-field">
+      <label for="input-notion-token">Notion Token</label>
+      <input type="password" id="input-notion-token" placeholder="ntn_..." autocomplete="off">
+    </div>
+    <div class="auth-field">
+      <label for="input-tg-token">Telegram Bot Token</label>
+      <input type="password" id="input-tg-token" placeholder="123456:ABC..." autocomplete="off">
+    </div>
+    <div class="auth-field">
+      <label for="input-db-id">Notion Database ID</label>
+      <input type="text" id="input-db-id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off">
+    </div>
+    <button class="auth-btn" onclick="saveAuth()">Connect</button>
+  </div>
+</div>
+
+<div id="app" class="hidden"></div>
+
+<script>
+const STORAGE_KEYS = { notion: 'sv_notion_token', tg: 'sv_tg_token', db: 'sv_db_id' };
+const NOTION_VERSION = '2022-06-28';
+
+window.__colorCache = JSON.parse(localStorage.getItem('sv_colors') || '{}');
+window.__ocrCache = JSON.parse(localStorage.getItem('sv_ocr') || '{}');
+let __ocrRunning = false;
+
+function saveAuth() {
+  const notion = document.getElementById('input-notion-token').value.trim();
+  const tg = document.getElementById('input-tg-token').value.trim();
+  const db = document.getElementById('input-db-id').value.trim();
+  if (!notion || !tg || !db) return alert('Fill all fields');
+  localStorage.setItem(STORAGE_KEYS.notion, notion);
+  localStorage.setItem(STORAGE_KEYS.tg, tg);
+  localStorage.setItem(STORAGE_KEYS.db, db);
+  document.getElementById('auth-modal').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  init();
+}
+
+function getAuth() {
+  return {
+    notion: localStorage.getItem(STORAGE_KEYS.notion),
+    tg: localStorage.getItem(STORAGE_KEYS.tg),
+    db: localStorage.getItem(STORAGE_KEYS.db)
+  };
+}
+
+function logout() {
+  Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+  location.reload();
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const { notion, tg, db } = getAuth();
+  if (notion && tg && db) {
+    document.getElementById('auth-modal').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    init();
+  }
+});
+
+async function fetchNotion(notionToken, dbId) {
+  let results = [];
+  let cursor = undefined;
+  let page = 0;
+  do {
+    const body = { page_size: 100, sorts: [{ property: 'Date', direction: 'descending' }] };
+    if (cursor) body.start_cursor = cursor;
+    const res = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      let msg = 'Notion fetch failed';
+      try { msg = (await res.json()).message || msg; } catch {}
+      throw new Error(`${res.status}: ${msg}`);
+    }
+    const data = await res.json();
+    results = results.concat(data.results);
+    cursor = data.has_more ? data.next_cursor : undefined;
+    page++;
+  } while (cursor && page < 20);
+  return results;
+}
+
+function parseItem(page) {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: p['URL']?.title?.[0]?.text?.content || '',
+    type: p['Type']?.select?.name || 'link',
+    tag: p['Tag']?.select?.name || '',
+    content: p['Content']?.rich_text?.[0]?.text?.content || '',
+    fileId: p['File ID']?.rich_text?.[0]?.text?.content || '',
+    sourceUrl: p['Source URL']?.url || '',
+    date: p['Date']?.date?.start || ''
+  };
+}
+
+async function init() {
+  const { notion, tg, db } = getAuth();
+  document.getElementById('app').innerHTML = '<p style="padding:40px;color:#666">Fetching...</p>';
+  try {
+    const pages = await fetchNotion(notion, db);
+    const items = pages.map(parseItem);
+    console.log('[Saves] loaded', items.length, 'items');
+    const imageMap = await resolveAllImages(items, tg);
+    renderApp(items, imageMap);
+    processColors(items, imageMap);  // no await — runs in background
+    processOCR(items, imageMap).catch(e => console.warn('[OCR] worker failed:', e)); // no await — runs in background
+  } catch (e) {
+    const errEl = document.createElement('p');
+    errEl.style.cssText = 'padding:40px;color:#f66';
+    errEl.textContent = 'Error: ' + e.message;
+    document.getElementById('app').replaceChildren(errEl);
+  }
+}
+
+async function resolveFileId(tgToken, fileId) {
+  if (!fileId) return null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${tgToken}/getFile?file_id=${fileId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.ok || !data.result?.file_path) return null;
+    return `https://api.telegram.org/file/bot${tgToken}/${data.result.file_path}`;
+  } catch { return null; }
+}
+
+async function resolveAllImages(items, tgToken) {
+  const withImages = items.filter(i => i.fileId);
+  const map = {};
+  const BATCH = 10;
+  for (let i = 0; i < withImages.length; i += BATCH) {
+    const batch = withImages.slice(i, i + BATCH);
+    const urls = await Promise.all(batch.map(item => resolveFileId(tgToken, item.fileId)));
+    batch.forEach((item, idx) => { if (urls[idx]) map[item.fileId] = urls[idx]; });
+    if (i + BATCH < withImages.length) await new Promise(r => setTimeout(r, 350));
+  }
+  return map;
+}
+
+function rgbToHue(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (d === 0) return 0;
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return ((h * 60) + 360) % 360;
+}
+
+function rgbToSat(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+function rgbToBaseName([r, g, b]) {
+  const h = rgbToHue(r, g, b);
+  const s = rgbToSat(r, g, b);
+  const v = Math.max(r, g, b) / 255;
+  if (v < 0.15) return 'black';
+  if (s < 0.12) return 'gray';
+  if (h < 15 || h >= 345) return 'red';
+  if (h < 40 && s < 0.55 && v < 0.55) return 'brown';
+  if (h < 40) return 'orange';
+  if (h < 70) return 'yellow';
+  if (h < 165) return 'green';
+  if (h < 250) return 'blue';
+  if (h < 290) return 'purple';
+  return 'pink';
+}
+
+async function processColors(items, imageMap) {
+  const thief = new ColorThief();
+  const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && !window.__colorCache[i.fileId]);
+  for (const item of toProcess) {
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = imageMap[item.fileId];
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+      const color = thief.getColor(img);
+      window.__colorCache[item.fileId] = rgbToBaseName(color);
+    } catch { window.__colorCache[item.fileId] = null; }
+    localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
+  }
+  renderCards();
+}
+
+async function processOCR(items, imageMap) {
+  const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && window.__ocrCache[i.fileId] === undefined);
+  if (!toProcess.length) return;
+  if (__ocrRunning) return;
+  __ocrRunning = true;
+  const worker = await Tesseract.createWorker('eng');
+  try {
+    for (const item of toProcess) {
+      try {
+        const { data: { text } } = await worker.recognize(imageMap[item.fileId]);
+        window.__ocrCache[item.fileId] = text.trim();
+      } catch {
+        window.__ocrCache[item.fileId] = '';
+      }
+      localStorage.setItem('sv_ocr', JSON.stringify(window.__ocrCache));
+    }
+  } finally {
+    await worker.terminate();
+    __ocrRunning = false;
+  }
+  renderCards();
+}
+
+const BASE_COLORS = [
+  { name: 'red', hex: '#e74c3c' }, { name: 'orange', hex: '#e67e22' },
+  { name: 'yellow', hex: '#f1c40f' }, { name: 'green', hex: '#2ecc71' },
+  { name: 'blue', hex: '#3498db' }, { name: 'purple', hex: '#9b59b6' },
+  { name: 'pink', hex: '#e91e8c' }, { name: 'brown', hex: '#795548' },
+  { name: 'gray', hex: '#95a5a6' }, { name: 'black', hex: '#1a1a1a' }
+];
+
+const state = { search: '', activeTags: new Set(), activeColors: [null, null, null, null, null, null] };
+
+function renderApp(items, imageMap) {
+  state.search = '';
+  state.activeTags = new Set();
+  state.activeColors = [null, null, null, null, null, null];
+  window.__allItems = items;
+  window.__imageMap = imageMap;
+
+  const tags = [...new Set(items.map(i => i.tag).filter(Boolean))];
+
+  document.getElementById('app').innerHTML = `
+    <div class="toolbar">
+      <input class="search-bar" id="search-input" placeholder="Search..." oninput="onSearch(this.value)">
+      <div class="tag-filters" id="tag-filters">
+        ${tags.map(t => `<button class="tag-pill" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}
+      </div>
+      <div class="color-filters">
+        <span class="color-label">Color</span>
+        ${[0,1,2,3,4,5].map(i => `
+          <div class="color-circle" id="cc-${i}" onclick="toggleColorDropdown(event,${i})">
+            <div class="color-dropdown hidden" id="cd-${i}">
+              ${BASE_COLORS.map(c => `<div class="color-option" style="background:${c.hex}" title="${c.name}" onclick="selectColor(event,${i},'${c.name}','${c.hex}')"></div>`).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <button onclick="logout()" style="background:none;border:1px solid #333;border-radius:6px;padding:5px 12px;color:#555;font-size:12px;cursor:pointer;margin-top:12px;float:right">Disconnect</button>
+    </div>
+    <div class="cards-grid" id="cards-grid"></div>
+  `;
+
+  document.getElementById('tag-filters').addEventListener('click', e => {
+    const btn = e.target.closest('.tag-pill');
+    if (btn) toggleTag(btn.dataset.tag);
+  });
+  renderCards();
+
+  // Delegated click handler for cards — attached once here, not inside renderCards()
+  document.getElementById('cards-grid').addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    const card = e.target.closest('[data-action]');
+    if (!card) return;
+    const action = card.dataset.action;
+    if (action === 'open') {
+      const url = card.dataset.url;
+      if (url) window.open(url, '_blank');
+    } else if (action === 'lightbox') {
+      openLightbox(card.dataset.fileId, card.dataset.sourceUrl);
+    } else if (action === 'expand') {
+      const textEl = card.querySelector('.card-text');
+      if (!textEl) return;
+      textEl.classList.toggle('expanded');
+    }
+  });
+}
+
+function closeAllDropdowns(e) {
+  if (!e.target.closest('.color-circle')) {
+    document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+  }
+}
+document.addEventListener('click', closeAllDropdowns);
+
+function onSearch(val) { state.search = val.toLowerCase(); renderCards(); }
+
+function toggleTag(tag) {
+  state.activeTags.has(tag) ? state.activeTags.delete(tag) : state.activeTags.add(tag);
+  document.querySelectorAll('.tag-pill').forEach(p => {
+    p.classList.toggle('active', state.activeTags.has(p.dataset.tag));
+  });
+  renderCards();
+}
+
+function toggleColorDropdown(e, i) {
+  e.stopPropagation();
+  const dropdown = document.getElementById(`cd-${i}`);
+  const wasHidden = dropdown.classList.contains('hidden');
+  document.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+  if (wasHidden) dropdown.classList.remove('hidden');
+}
+
+function selectColor(e, i, name, hex) {
+  e.stopPropagation();
+  state.activeColors[i] = state.activeColors[i] === name ? null : name;
+  const circle = document.getElementById(`cc-${i}`);
+  circle.style.background = state.activeColors[i] ? hex : '';
+  circle.classList.toggle('filled', !!state.activeColors[i]);
+  document.getElementById(`cd-${i}`).classList.add('hidden');
+  renderCards();
+}
+
+function getDomain(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildCard(item) {
+  const imgUrl = item.fileId ? (window.__imageMap?.[item.fileId] || null) : null;
+  const domain = getDomain(item.sourceUrl || item.url);
+  const safeSourceUrl = escapeHtml(item.sourceUrl);
+  const safeDomain = escapeHtml(domain);
+
+  if (item.type === 'image') {
+    return `
+      <div class="card card-wrap" data-action="lightbox" data-file-id="${escapeHtml(item.fileId)}" data-source-url="${safeSourceUrl}">
+        ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy">` : '<div class="card-img"></div>'}
+        <div class="card-body">
+          ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+          ${domain ? `<div class="card-source"><a href="${safeSourceUrl}" target="_blank">${safeDomain}</a></div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  if (item.type === 'link') {
+    return `
+      <div class="card card-wrap" data-action="open" data-url="${safeSourceUrl}">
+        ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy">` : ''}
+        <div class="card-body">
+          <div class="card-domain">${safeDomain}</div>
+          ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+        </div>
+      </div>`;
+  }
+
+  // text — source link always present (visible regardless of expansion state)
+  const sourceHtml = domain ? `<div class="card-source"><a href="${safeSourceUrl}" target="_blank">${safeDomain}</a></div>` : '';
+  return `
+    <div class="card" data-action="expand">
+      <div class="card-body">
+        <div class="card-text">${escapeHtml(item.content)}</div>
+        ${sourceHtml}
+        ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function openLightbox(fileId, sourceUrl) {
+  document.getElementById('lightbox')?.remove();
+  const imgUrl = window.__imageMap?.[fileId];
+  if (!imgUrl) return;
+  const domain = getDomain(sourceUrl);
+  const lb = document.createElement('div');
+  lb.id = 'lightbox';
+  lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:500;cursor:zoom-out';
+  const img = document.createElement('img');
+  img.src = imgUrl;
+  img.style.cssText = 'max-width:90vw;max-height:80vh;border-radius:8px;object-fit:contain';
+  lb.appendChild(img);
+  if (sourceUrl) {
+    const link = document.createElement('a');
+    link.href = /^https?:\/\//i.test(sourceUrl) ? sourceUrl : '#';
+    link.target = '_blank';
+    link.textContent = domain;
+    link.style.cssText = 'color:#888;font-size:13px;margin-top:16px;text-decoration:none';
+    link.addEventListener('click', e => e.stopPropagation());
+    lb.appendChild(link);
+  }
+  const onKey = e => {
+    if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', onKey); }
+  };
+  document.addEventListener('keydown', onKey);
+  lb.addEventListener('click', () => { lb.remove(); document.removeEventListener('keydown', onKey); });
+  document.body.appendChild(lb);
+}
+
+function renderCards() {
+  const activeColors = state.activeColors.filter(Boolean);
+  const filtered = (window.__allItems || []).filter(item => {
+    if (state.activeTags.size && !state.activeTags.has(item.tag)) return false;
+    if (state.search) {
+      const hay = (item.content + ' ' + item.url + ' ' + item.sourceUrl + ' ' + (window.__ocrCache?.[item.fileId] || '')).toLowerCase();
+      if (!hay.includes(state.search)) return false;
+    }
+    if (activeColors.length) {
+      const itemColor = window.__colorCache?.[item.fileId];
+      if (!itemColor || !activeColors.includes(itemColor)) return false;
+    }
+    return true;
+  });
+  const grid = document.getElementById('cards-grid');
+  if (!grid) return;
+  if (!filtered.length) {
+    grid.innerHTML = '<p style="color:#444;padding:40px 0;grid-column:1/-1">Nothing here</p>';
+    return;
+  }
+  grid.innerHTML = filtered.map(buildCard).join('');
+}
+</script>
+</body>
+</html>
