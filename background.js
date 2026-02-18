@@ -48,7 +48,11 @@ const DEFAULT_SETTINGS = {
     { name: '', color: '#BB4FFF', id: 'purple' },
     { name: '', color: '#3D3D3B', id: 'black' },
     { name: '', color: '#DEDEDE', id: 'white' }
-  ]
+  ],
+  // Notion integration
+  notionEnabled: false,
+  notionToken: '',
+  notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e'
 };
 
 // Get emoji for a tag based on selected pack
@@ -248,6 +252,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function getSettings() {
   const result = await chrome.storage.local.get(DEFAULT_SETTINGS);
   return { ...DEFAULT_SETTINGS, ...result };
+}
+
+// Save entry to Notion database (fire-and-forget, never blocks main flow)
+async function saveToNotion(data, settings) {
+  if (!settings.notionEnabled || !settings.notionToken || !settings.notionDbId) return;
+
+  const { type, sourceUrl, content, fileId, tagName } = data;
+  const domain = sourceUrl
+    ? sourceUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
+    : '';
+
+  const properties = {
+    'URL': { title: [{ text: { content: domain || sourceUrl || '—' } }] },
+    'Type': { select: { name: type } },
+    'Date': { date: { start: new Date().toISOString() } }
+  };
+
+  if (sourceUrl) properties['Source URL'] = { url: sourceUrl };
+  if (tagName) properties['Tag'] = { select: { name: tagName } };
+  if (content) properties['Content'] = { rich_text: [{ text: { content: content.slice(0, 2000) } }] };
+  if (fileId) properties['File ID'] = { rich_text: [{ text: { content: fileId } }] };
+
+  try {
+    const res = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${settings.notionToken}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ parent: { database_id: settings.notionDbId }, properties })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      console.warn('[TG Saver] Notion save failed:', err.message);
+    }
+  } catch (e) {
+    console.warn('[TG Saver] Notion save error:', e);
+  }
 }
 
 // Helper to escape HTML for Telegram
@@ -890,7 +933,11 @@ async function sendPhoto(blob, caption, settings) {
     }
 
     console.log('[TG Saver] Photo sent successfully');
-    return response.json();
+    const result = await response.json();
+    // Extract file_id of the largest photo variant for Notion storage
+    const photos = result.result?.photo;
+    const fileId = photos && photos.length > 0 ? photos[photos.length - 1].file_id : null;
+    return { ...result, fileId };
   } catch (err) {
     console.error('[TG Saver] Network error sending photo:', err);
     throw err;
@@ -956,11 +1003,15 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
 
   const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
 
+  let fileId = null;
   if (settings.imageCompression || useScreenshot) {
-    await sendPhoto(blob, caption, settings);
+    const result = await sendPhoto(blob, caption, settings);
+    fileId = result?.fileId || null;
   } else {
     await sendDocument(blob, caption, settings, imageUrl);
   }
+
+  saveToNotion({ type: 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name }, settings);
 
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
@@ -969,6 +1020,7 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
 async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
   const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
   await sendTextMessage(caption, settings);
+  saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
@@ -976,6 +1028,7 @@ async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
 async function sendLinkDirect(linkUrl, pageUrl, settings, tabId, selectedTag) {
   const caption = buildCaption(linkUrl, settings.tagLink, '', settings, selectedTag);
   await sendTextMessage(caption, settings);
+  saveToNotion({ type: 'link', sourceUrl: linkUrl, tagName: selectedTag?.name }, settings);
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
@@ -1064,6 +1117,7 @@ async function sendScreenshotDirect(tab, settings, selectedTag) {
 
   if (!settings.addScreenshot) {
     await sendMessage(tab.url, settings, selectedTag);
+    saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
     await showToast(tab.id, 'success', 'Success');
     return;
   }
@@ -1072,7 +1126,8 @@ async function sendScreenshotDirect(tab, settings, selectedTag) {
   const blob = await fetch(dataUrl).then(r => r.blob());
   const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
-  await sendPhoto(blob, caption, settings);
+  const result = await sendPhoto(blob, caption, settings);
+  saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
   await showToast(tab.id, 'success', 'Success');
 }
 
@@ -1082,6 +1137,7 @@ async function sendVideoDirect(tab, settings, selectedTag) {
   const blob = await fetch(dataUrl).then(r => r.blob());
   const caption = buildCaption(tab.url, settings.tagImage, '', settings, selectedTag);
 
-  await sendPhoto(blob, caption, settings);
+  const result = await sendPhoto(blob, caption, settings);
+  saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
   await showToast(tab.id, 'success', 'Success');
 }
