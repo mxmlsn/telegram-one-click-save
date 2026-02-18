@@ -223,7 +223,7 @@ function renderApp(items, imageMap) {
     <div class="toolbar">
       <input class="search-bar" id="search-input" placeholder="Search..." oninput="onSearch(this.value)">
       <div class="tag-filters" id="tag-filters">
-        ${tags.map(t => `<button class="tag-pill" data-tag="${t.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">${t.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</button>`).join('')}
+        ${tags.map(t => `<button class="tag-pill" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}
       </div>
       <div class="color-filters">
         <span class="color-label">Color</span>
@@ -244,6 +244,23 @@ function renderApp(items, imageMap) {
     if (btn) toggleTag(btn.dataset.tag);
   });
   renderCards();
+
+  // Delegated click handler for cards — attached once here, not inside renderCards()
+  document.getElementById('cards-grid').addEventListener('click', e => {
+    const card = e.target.closest('[data-action]');
+    if (!card) return;
+    const action = card.dataset.action;
+    if (action === 'open') {
+      const url = card.dataset.url;
+      if (url) window.open(url, '_blank');
+    } else if (action === 'lightbox') {
+      openLightbox(card.dataset.fileId, card.dataset.sourceUrl);
+    } else if (action === 'expand') {
+      const textEl = card.querySelector('.card-text');
+      if (!textEl) return;
+      textEl.classList.toggle('expanded');
+    }
+  });
 }
 
 function closeAllDropdowns(e) {
@@ -375,23 +392,6 @@ function renderCards() {
     return;
   }
   grid.innerHTML = filtered.map(buildCard).join('');
-
-  // Delegated click handler for cards
-  grid.addEventListener('click', e => {
-    const card = e.target.closest('[data-action]');
-    if (!card) return;
-    const action = card.dataset.action;
-    if (action === 'open') {
-      const url = card.dataset.url;
-      if (url) window.open(url, '_blank');
-    } else if (action === 'lightbox') {
-      openLightbox(card.dataset.fileId, card.dataset.sourceUrl);
-    } else if (action === 'expand') {
-      const textEl = card.querySelector('.card-text');
-      if (!textEl) return;
-      textEl.classList.toggle('expanded');
-    }
-  });
 }
 </script>
 </body>
