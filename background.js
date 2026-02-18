@@ -52,7 +52,13 @@ const DEFAULT_SETTINGS = {
   // Notion integration
   notionEnabled: false,
   notionToken: '',
-  notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e'
+  notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e',
+  aiEnabled: false,
+  aiProvider: 'anthropic',
+  aiApiKey: '',
+  aiModel: 'claude-haiku-4-5-20251001',
+  aiAutoOnSave: true,
+  aiAutoInViewer: true
 };
 
 // Get emoji for a tag based on selected pack
@@ -320,6 +326,128 @@ async function saveToNotion(data, settings) {
     }
   } catch (e) {
     console.warn('[TG Saver] Notion save error:', e);
+  }
+}
+
+// ─── AI Analysis ─────────────────────────────────────────────────────────────
+
+const AI_PROMPT = `Analyze this saved content and return ONLY valid JSON, no other text:
+{
+  "type": "article|video|product|x_post",
+  "description": "1-2 sentence summary of what this is",
+  "data": {},
+  "tags": []
+}
+
+Rules:
+- type must be exactly one of: article, video, product, x_post
+- For product: data = {"price": "$X", "product_name": "..."}
+- For x_post: data = {"tweet_text": "full text", "author": "@handle"}
+- For article: data = {"headline": "..."}
+- For video: data = {"title": "...", "channel": "..."}
+- tags: up to 3 short descriptive English words
+- description: plain text, no markdown`;
+
+async function analyzeWithAI(item, settings) {
+  if (!settings.aiEnabled || !settings.aiApiKey) return null;
+
+  try {
+    const messages = [];
+
+    if (item.fileId && settings.botToken) {
+      // Get Telegram image URL first
+      const fileRes = await fetch(
+        `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${item.fileId}`
+      );
+      const fileData = await fileRes.json();
+      if (fileData.ok) {
+        const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${fileData.result.file_path}`;
+        messages.push({
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'url', url: imgUrl } },
+            { type: 'text', text: AI_PROMPT }
+          ]
+        });
+      }
+    }
+
+    if (messages.length === 0) {
+      // Text/link only
+      const context = [
+        item.sourceUrl ? `URL: ${item.sourceUrl}` : '',
+        item.content ? `Content: ${item.content.slice(0, 500)}` : '',
+        item.tagName ? `User tag: ${item.tagName}` : ''
+      ].filter(Boolean).join('\n');
+
+      messages.push({
+        role: 'user',
+        content: `${AI_PROMPT}\n\nContent to analyze:\n${context}`
+      });
+    }
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': settings.aiApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: settings.aiModel || 'claude-haiku-4-5-20251001',
+        max_tokens: 300,
+        messages
+      })
+    });
+
+    if (!res.ok) {
+      console.warn('[TG Saver] AI error:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    return JSON.parse(text);
+  } catch (e) {
+    console.warn('[TG Saver] AI parse error:', e);
+    return null;
+  }
+}
+
+async function patchNotionWithAI(pageId, aiResult, settings) {
+  if (!pageId || !aiResult) return;
+
+  const properties = {
+    'ai_analyzed': { checkbox: true }
+  };
+
+  if (aiResult.type) {
+    properties['ai_type'] = { select: { name: aiResult.type } };
+  }
+  if (aiResult.description) {
+    properties['ai_description'] = {
+      rich_text: [{ text: { content: aiResult.description.slice(0, 2000) } }]
+    };
+  }
+  if (aiResult.data || aiResult.tags) {
+    const dataStr = JSON.stringify({ ...aiResult.data, tags: aiResult.tags });
+    properties['ai_data'] = {
+      rich_text: [{ text: { content: dataStr.slice(0, 2000) } }]
+    };
+  }
+
+  try {
+    await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${settings.notionToken}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ properties })
+    });
+  } catch (e) {
+    console.warn('[TG Saver] Notion AI patch error:', e);
   }
 }
 
@@ -1176,19 +1304,28 @@ async function sendVideoDirect(tab, settings, selectedTag) {
 }
 
 // ─── Viewer fetch relay ───────────────────────────────────────────────────────
-// Allows viewer/index.html (chrome-extension:// page) to make CORS-free requests
-// through background.js. Viewer sends: { type: 'FETCH', url, options }
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type !== 'FETCH') return false;
+  if (msg.type === 'FETCH') {
+    fetch(msg.url, msg.options || {})
+      .then(async res => {
+        const text = await res.text();
+        sendResponse({ ok: res.ok, status: res.status, body: text });
+      })
+      .catch(err => sendResponse({ ok: false, status: 0, body: err.message }));
+    return true;
+  }
 
-  fetch(msg.url, msg.options || {})
-    .then(async res => {
-      const text = await res.text();
-      sendResponse({ ok: res.ok, status: res.status, body: text });
-    })
-    .catch(err => {
-      sendResponse({ ok: false, status: 0, body: err.message });
+  if (msg.type === 'AI_ANALYZE') {
+    chrome.storage.local.get(null, async (settings) => {
+      const merged = { ...DEFAULT_SETTINGS, ...settings };
+      const result = await analyzeWithAI(msg.item, merged);
+      if (result && msg.notionPageId) {
+        await patchNotionWithAI(msg.notionPageId, result, merged);
+      }
+      sendResponse({ ok: !!result, result });
     });
+    return true;
+  }
 
-  return true; // keep message channel open for async response
+  return false;
 });
