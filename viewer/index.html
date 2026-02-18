@@ -228,6 +228,7 @@ function rgbToBaseName([r, g, b]) {
   if (v < 0.15) return 'black';
   if (s < 0.12) return 'gray';
   if (h < 15 || h >= 345) return 'red';
+  if (h < 40 && s < 0.55 && v < 0.55) return 'brown';
   if (h < 40) return 'orange';
   if (h < 70) return 'yellow';
   if (h < 165) return 'green';
@@ -248,8 +249,8 @@ async function processColors(items, imageMap) {
       const color = thief.getColor(img);
       window.__colorCache[item.fileId] = rgbToBaseName(color);
     } catch { window.__colorCache[item.fileId] = null; }
+    localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
   }
-  localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
   renderCards();
 }
 
