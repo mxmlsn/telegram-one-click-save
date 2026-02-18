@@ -477,6 +477,7 @@ async function sendScreenshot(tab, settings) {
     if (!settings.addScreenshot) {
       // Send just the link without screenshot
       await sendMessage(tab.url, settings, selectedTag);
+      saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
       await showToast(tab.id, 'success', 'Success');
       return;
     }
@@ -484,7 +485,8 @@ async function sendScreenshot(tab, settings) {
     const blob = await fetch(dataUrl).then(r => r.blob());
     const caption = buildCaption(tab.url, settings.tagLink, '', settings, selectedTag);
 
-    await sendPhoto(blob, caption, settings);
+    const result = await sendPhoto(blob, caption, settings);
+    saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
     await showToast(tab.id, 'success', 'Success');
   } catch (err) {
     console.error('[TG Saver] Error in sendScreenshot:', err);
@@ -797,6 +799,7 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
 
     const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
     await sendTextMessage(caption, settings);
+    saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
 
     if (tabId) await showToast(tabId, 'success', 'Success');
   } catch (err) {
