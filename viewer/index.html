@@ -52,7 +52,7 @@
     .card-body { padding: 12px; }
     .card-domain { font-size: 13px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .card-text { font-size: 13px; color: #aaa; line-height: 1.5; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-    .card-text.expanded { display: block; -webkit-line-clamp: unset; }
+    .card-text.expanded { display: block; -webkit-line-clamp: none; }
     .card-source { font-size: 11px; color: #555; margin-top: 8px; }
     .card-source a { color: #555; text-decoration: none; }
     .card-source a:hover { color: #888; }
@@ -247,6 +247,7 @@ function renderApp(items, imageMap) {
 
   // Delegated click handler for cards — attached once here, not inside renderCards()
   document.getElementById('cards-grid').addEventListener('click', e => {
+    if (e.target.closest('a')) return;
     const card = e.target.closest('[data-action]');
     if (!card) return;
     const action = card.dataset.action;
@@ -299,7 +300,7 @@ function selectColor(e, i, name, hex) {
 }
 
 function getDomain(url) {
-  try { return new URL(url).hostname.replace('www.', ''); } catch { return url || ''; }
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; }
 }
 
 function escapeHtml(str) {
@@ -348,6 +349,7 @@ function buildCard(item) {
 }
 
 function openLightbox(fileId, sourceUrl) {
+  document.getElementById('lightbox')?.remove();
   const imgUrl = window.__imageMap?.[fileId];
   if (!imgUrl) return;
   const domain = getDomain(sourceUrl);
@@ -360,14 +362,18 @@ function openLightbox(fileId, sourceUrl) {
   lb.appendChild(img);
   if (sourceUrl) {
     const link = document.createElement('a');
-    link.href = sourceUrl;
+    link.href = /^https?:\/\//i.test(sourceUrl) ? sourceUrl : '#';
     link.target = '_blank';
     link.textContent = domain;
     link.style.cssText = 'color:#888;font-size:13px;margin-top:16px;text-decoration:none';
     link.addEventListener('click', e => e.stopPropagation());
     lb.appendChild(link);
   }
-  lb.addEventListener('click', () => lb.remove());
+  const onKey = e => {
+    if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', onKey); }
+  };
+  document.addEventListener('keydown', onKey);
+  lb.addEventListener('click', () => { lb.remove(); document.removeEventListener('keydown', onKey); });
   document.body.appendChild(lb);
 }
 
