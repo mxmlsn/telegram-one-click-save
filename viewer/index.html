@@ -296,8 +296,8 @@
       position: absolute; top: 28px; right: 0;
       background: var(--surface); border: 1px solid rgba(255,255,255,0.12);
       border-radius: 10px; padding: 8px;
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
-      z-index: 200; width: 136px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+      z-index: 200; width: 102px;
     }
     .color-dropdown-single.hidden { display: none; }
     .color-option-single {
@@ -316,7 +316,7 @@
     <button class="type-pill active" data-type="all">All</button>
     <button class="type-pill" data-type="image">Image</button>
     <button class="type-pill" data-type="link">Link</button>
-    <button class="type-pill" data-type="text">Text</button>
+    <button class="type-pill" data-type="quote">Quote</button>
     <div class="filter-divider"></div>
     <button class="type-pill" data-type="video">Video</button>
     <button class="type-pill" data-type="product">Product</button>
@@ -327,17 +327,14 @@
     <div class="color-filter-wrap">
       <div class="color-circle-single" id="color-filter-btn" title="Filter by color">+</div>
       <div class="color-dropdown-single hidden" id="color-dropdown">
-        <div class="color-option-single" data-color="red" style="background:#e74c3c"></div>
-        <div class="color-option-single" data-color="orange" style="background:#e67e22"></div>
-        <div class="color-option-single" data-color="yellow" style="background:#f1c40f"></div>
-        <div class="color-option-single" data-color="green" style="background:#2ecc71"></div>
-        <div class="color-option-single" data-color="blue" style="background:#3498db"></div>
-        <div class="color-option-single" data-color="purple" style="background:#9b59b6"></div>
-        <div class="color-option-single" data-color="pink" style="background:#e91e8c"></div>
-        <div class="color-option-single" data-color="brown" style="background:#795548"></div>
-        <div class="color-option-single" data-color="gray" style="background:#95a5a6"></div>
-        <div class="color-option-single" data-color="black" style="background:#1a1a1a"></div>
-        <div class="color-option-single" data-color="white" style="background:#e8e8e8; border: 1px solid rgba(255,255,255,0.2)"></div>
+        <div class="color-option-single" data-color="red" style="background:linear-gradient(135deg,#e74c3c,#e91e8c)" title="Red / Pink"></div>
+        <div class="color-option-single" data-color="orange" style="background:linear-gradient(135deg,#e67e22,#f1c40f)" title="Orange / Yellow"></div>
+        <div class="color-option-single" data-color="green" style="background:linear-gradient(135deg,#27ae60,#1abc9c)" title="Green"></div>
+        <div class="color-option-single" data-color="blue" style="background:linear-gradient(135deg,#2980b9,#8e44ad)" title="Blue / Purple"></div>
+        <div class="color-option-single" data-color="brown" style="background:linear-gradient(135deg,#795548,#a0522d)" title="Brown / Beige"></div>
+        <div class="color-option-single" data-color="white" style="background:linear-gradient(135deg,#e8e8e8,#f5f5f5);border:1px solid rgba(255,255,255,0.2)" title="White / Light"></div>
+        <div class="color-option-single" data-color="black" style="background:linear-gradient(135deg,#111,#333)" title="Black / Dark"></div>
+        <div class="color-option-single" data-color="bw" style="background:linear-gradient(135deg,#000 50%,#fff 50%)" title="Black & White"></div>
       </div>
     </div>
     <span id="ai-status"></span>

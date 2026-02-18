@@ -340,7 +340,7 @@ const AI_PROMPT = `Analyze this saved content and return ONLY valid JSON, no oth
   "content_type": null,
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
-  "colors": [],
+  "color_palette": null,
   "text_on_image": "",
   "price": "",
   "author": "",
@@ -351,11 +351,11 @@ Rules:
 - content_type: set ONLY if confident, otherwise null. Must be one of:
   - "article" — URL is clearly an article/essay/instruction/journalism piece
   - "video" — youtube.com/youtu.be/vimeo.com URL, instagram reel URL, OR image shows video player UI (play button, audio icon, progress bar), OR text/hashtags indicate video
-  - "product" — known shop domain (amazon, etsy, aliexpress, ebay, etc.) OR image shows a price (any currency) near a product OR page looks like product listing
+  - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. Marketing photos, product images, shop websites WITHOUT a visible price = NOT product. No price visible = null.
   - "xpost" — URL contains x.com or twitter.com
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
-- colors: 3-6 dominant colors as simple English words. Empty array if no image.
+- color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD of the image (ignore UI chrome, white backgrounds of websites). Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only if the image is genuinely black-and-white or monochrome photography. Use "white" for images dominated by white/light tones as the main subject. Use "black" for dark/night images where darkness is the mood. Null if no image.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text or no image.
 - price: the main product price from the image with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
 - author: for xpost — @handle from screenshot. Empty string otherwise.
@@ -493,7 +493,7 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
   }
   const aiDataPayload = {};
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
-  if (aiResult.colors?.length) aiDataPayload.colors = aiResult.colors;
+  if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;
   if (aiResult.text_on_image) aiDataPayload.text_on_image = aiResult.text_on_image;
   if (aiResult.price) aiDataPayload.price = aiResult.price;
   if (aiResult.author) aiDataPayload.author = aiResult.author;
@@ -1035,7 +1035,7 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
 
     const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
     await sendTextMessage(caption, settings);
-    const notionPageId = await saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
+    const notionPageId = await saveToNotion({ type: 'quote', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
     if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
       analyzeWithAI({ sourceUrl: pageUrl, content: text }, settings)
         .then(r => patchNotionWithAI(notionPageId, r, settings))
@@ -1269,7 +1269,7 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
 async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
   const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
   await sendTextMessage(caption, settings);
-  const notionPageId = await saveToNotion({ type: 'text', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
+  const notionPageId = await saveToNotion({ type: 'quote', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
     analyzeWithAI({ sourceUrl: pageUrl, content: text }, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))

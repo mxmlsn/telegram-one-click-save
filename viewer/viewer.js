@@ -344,13 +344,12 @@ function setupToolbarEvents() {
 }
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
-// Base types (from TG): image, link, text
+// Base types (from TG): image, link, quote
 // AI types (content category): article, video, product, xpost
 // Filtering: if base type selected → match item.type
 //            if AI type selected → match item.ai_type
-//            selecting both "link" and "article" shows all links (incl. those with ai_type)
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
-const BASE_TYPES = new Set(['image', 'link', 'text']);
+const BASE_TYPES = new Set(['image', 'link', 'quote']);
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost']);
 
 function applyFilters() {
@@ -361,18 +360,16 @@ function applyFilters() {
     const activeAI = [...STATE.activeTypes].filter(t => AI_TYPES.has(t));
 
     items = items.filter(item => {
-      const baseMatch = activeBase.length === 0 || activeBase.includes(item.type);
+      // Notion still stores old 'text' records — treat as 'quote'
+      const itemBaseType = item.type === 'text' ? 'quote' : item.type;
+      const baseMatch = activeBase.length === 0 || activeBase.includes(itemBaseType);
       const aiMatch = activeAI.length === 0 || activeAI.includes(item.ai_type);
       return baseMatch && aiMatch;
     });
   }
 
   if (STATE.activeColor) {
-    items = items.filter(item => {
-      const colors = item.ai_data?.colors;
-      if (!Array.isArray(colors)) return false;
-      return colors.some(c => c.toLowerCase().includes(STATE.activeColor));
-    });
+    items = items.filter(item => item.ai_data?.color_palette === STATE.activeColor);
   }
 
   if (STATE.search) {
@@ -405,7 +402,9 @@ function renderCard(item) {
   const aiType = item.ai_type; // article | video | product | xpost | null
   const aiData = item.ai_data || {};
   const domain = getDomain(item.sourceUrl || item.url);
-  const effectiveType = aiType || item.type;
+  const url = item.sourceUrl || item.url || '';
+  const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
+  const effectiveType = isInstagramReel ? 'video' : (aiType || item.type);
 
   const pendingDot = !item.ai_analyzed ? '<div class="badge-pending"></div>' : '';
 
@@ -423,31 +422,32 @@ function renderCard(item) {
       <img class="product-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       <div class="product-info">
         ${aiData.price ? `<div class="product-price">${escapeHtml(aiData.price)}</div>` : ''}
-        <div class="product-desc">${escapeHtml(item.ai_description || item.url || domain)}</div>
+        ${domain ? `<div class="product-desc">${escapeHtml(domain)}</div>` : ''}
       </div>
     </div>`;
   }
 
   // ── X Post ──
   if (effectiveType === 'xpost') {
-    const text = escapeHtml(aiData.tweet_text || item.content || item.ai_description || '');
+    const tweetText = escapeHtml(aiData.tweet_text || '');
     const author = escapeHtml(aiData.author || '');
     return `<div class="card card-xpost" data-id="${item.id}" ${item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : ''}>
       ${pendingDot}
       ${author ? `<div class="xpost-author">${author}</div>` : ''}
-      <div class="xpost-text">${text}</div>
-      ${item.sourceUrl ? `<div class="card-source">${escapeHtml(domain)}</div>` : ''}
+      ${tweetText ? `<div class="xpost-text">${tweetText}</div>` : ''}
+      ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" style="width:100%;border-radius:0 0 8px 8px;display:block;margin-top:10px">` : ''}
+      ${item.sourceUrl ? `<div class="card-source" style="margin-top:8px">${escapeHtml(domain)}</div>` : ''}
     </div>`;
   }
 
   // ── Has image ──
+  const VALID_AI_TYPES = new Set(['article', 'video', 'product', 'xpost']);
   if (imgUrl) {
-    const badge = aiType ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : '';
+    const badge = (aiType && VALID_AI_TYPES.has(aiType)) ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : '';
     return `<div class="card card-image" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
       ${pendingDot}
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       <div class="card-overlay">
-        ${item.ai_description ? `<div class="overlay-desc">${escapeHtml(item.ai_description)}</div>` : ''}
         ${colorsHtml}
         ${materialsHtml}
       </div>
@@ -462,7 +462,6 @@ function renderCard(item) {
       <img class="card-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" alt="" onerror="this.style.display='none'">
       <span class="card-domain">${escapeHtml(domain)}</span>
       <div class="card-title">${escapeHtml(item.url || domain)}</div>
-      ${item.ai_description ? `<div class="card-desc">${escapeHtml(item.ai_description)}</div>` : ''}
     </div>`;
   }
 
@@ -552,7 +551,7 @@ async function runAiBackgroundProcessing() {
           const r = response.result;
           const aiDataPayload = {};
           if (r.materials?.length) aiDataPayload.materials = r.materials;
-          if (r.colors?.length) aiDataPayload.colors = r.colors;
+          if (r.color_palette) aiDataPayload.color_palette = r.color_palette;
           if (r.text_on_image) aiDataPayload.text_on_image = r.text_on_image;
           if (r.price) aiDataPayload.price = r.price;
           if (r.author) aiDataPayload.author = r.author;
