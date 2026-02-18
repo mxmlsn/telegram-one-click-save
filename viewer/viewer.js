@@ -246,7 +246,8 @@ async function processOCR(items, imageMap) {
   if (!toProcess.length) return;
   if (__ocrRunning) return;
   __ocrRunning = true;
-  const worker = await Tesseract.createWorker('eng');
+  const workerPath = chrome.runtime.getURL('viewer/libs/tesseract-worker.min.js');
+  const worker = await Tesseract.createWorker('eng', 1, { workerPath });
   try {
     for (const item of toProcess) {
       try {

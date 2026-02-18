@@ -50,7 +50,8 @@
     {
       "resources": [
         "MartianMono-Regular.ttf",
-        "icons/*.png"
+        "icons/*.png",
+        "viewer/libs/tesseract-worker.min.js"
       ],
       "matches": [
         "<all_urls>"
