@@ -426,7 +426,7 @@ function setupToolbarEvents() {
     });
   });
 
-  document.getElementById('disconnect-btn').addEventListener('click', disconnect);
+  document.getElementById('disconnect-btn')?.addEventListener('click', disconnect);
 }
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
