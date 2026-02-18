@@ -1174,3 +1174,21 @@ async function sendVideoDirect(tab, settings, selectedTag) {
   saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
   await showToast(tab.id, 'success', 'Success');
 }
+
+// ─── Viewer fetch relay ───────────────────────────────────────────────────────
+// Allows viewer/index.html (chrome-extension:// page) to make CORS-free requests
+// through background.js. Viewer sends: { type: 'FETCH', url, options }
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type !== 'FETCH') return false;
+
+  fetch(msg.url, msg.options || {})
+    .then(async res => {
+      const text = await res.text();
+      sendResponse({ ok: res.ok, status: res.status, body: text });
+    })
+    .catch(err => {
+      sendResponse({ ok: false, status: 0, body: err.message });
+    });
+
+  return true; // keep message channel open for async response
+});
