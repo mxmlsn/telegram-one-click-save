@@ -43,6 +43,20 @@
 
     /* Cards grid */
     .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+
+    /* Cards */
+    .card { background: #1a1a1a; border: 1px solid #222; border-radius: 12px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+    .card:hover { border-color: #444; }
+    .card-wrap { position: relative; }
+    .card-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #111; }
+    .card-body { padding: 12px; }
+    .card-domain { font-size: 13px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-text { font-size: 13px; color: #aaa; line-height: 1.5; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+    .card-text.expanded { display: block; -webkit-line-clamp: unset; }
+    .card-source { font-size: 11px; color: #555; margin-top: 8px; }
+    .card-source a { color: #555; text-decoration: none; }
+    .card-source a:hover { color: #888; }
+    .card-tag { display: inline-block; font-size: 11px; color: #666; background: #111; border-radius: 4px; padding: 2px 7px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -267,6 +281,79 @@ function selectColor(e, i, name, hex) {
   renderCards();
 }
 
+function getDomain(url) {
+  try { return new URL(url).hostname.replace('www.', ''); } catch { return url || ''; }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function buildCard(item) {
+  const imgUrl = item.fileId ? (window.__imageMap?.[item.fileId] || null) : null;
+  const domain = getDomain(item.sourceUrl || item.url);
+  const safeSourceUrl = escapeHtml(item.sourceUrl);
+  const safeDomain = escapeHtml(domain);
+
+  if (item.type === 'image') {
+    return `
+      <div class="card card-wrap" data-action="lightbox" data-file-id="${escapeHtml(item.fileId)}" data-source-url="${safeSourceUrl}">
+        ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy">` : '<div class="card-img"></div>'}
+        <div class="card-body">
+          ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+          ${domain ? `<div class="card-source"><a href="${safeSourceUrl}" target="_blank">${safeDomain}</a></div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  if (item.type === 'link') {
+    return `
+      <div class="card card-wrap" data-action="open" data-url="${safeSourceUrl}">
+        ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy">` : ''}
+        <div class="card-body">
+          <div class="card-domain">${safeDomain}</div>
+          ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+        </div>
+      </div>`;
+  }
+
+  // text — source link always present (visible regardless of expansion state)
+  const sourceHtml = domain ? `<div class="card-source"><a href="${safeSourceUrl}" target="_blank">${safeDomain}</a></div>` : '';
+  return `
+    <div class="card" data-action="expand">
+      <div class="card-body">
+        <div class="card-text">${escapeHtml(item.content)}</div>
+        ${sourceHtml}
+        ${item.tag ? `<span class="card-tag">${escapeHtml(item.tag)}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+function openLightbox(fileId, sourceUrl) {
+  const imgUrl = window.__imageMap?.[fileId];
+  if (!imgUrl) return;
+  const domain = getDomain(sourceUrl);
+  const lb = document.createElement('div');
+  lb.id = 'lightbox';
+  lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:500;cursor:zoom-out';
+  const img = document.createElement('img');
+  img.src = imgUrl;
+  img.style.cssText = 'max-width:90vw;max-height:80vh;border-radius:8px;object-fit:contain';
+  lb.appendChild(img);
+  if (sourceUrl) {
+    const link = document.createElement('a');
+    link.href = sourceUrl;
+    link.target = '_blank';
+    link.textContent = domain;
+    link.style.cssText = 'color:#888;font-size:13px;margin-top:16px;text-decoration:none';
+    link.addEventListener('click', e => e.stopPropagation());
+    lb.appendChild(link);
+  }
+  lb.addEventListener('click', () => lb.remove());
+  document.body.appendChild(lb);
+}
+
 function renderCards() {
   const activeColors = state.activeColors.filter(Boolean);
   const filtered = (window.__allItems || []).filter(item => {
@@ -287,7 +374,24 @@ function renderCards() {
     grid.innerHTML = '<p style="color:#444;padding:40px 0;grid-column:1/-1">Nothing here</p>';
     return;
   }
-  grid.innerHTML = filtered.map(() => '<div class="card">...</div>').join('');
+  grid.innerHTML = filtered.map(buildCard).join('');
+
+  // Delegated click handler for cards
+  grid.addEventListener('click', e => {
+    const card = e.target.closest('[data-action]');
+    if (!card) return;
+    const action = card.dataset.action;
+    if (action === 'open') {
+      const url = card.dataset.url;
+      if (url) window.open(url, '_blank');
+    } else if (action === 'lightbox') {
+      openLightbox(card.dataset.fileId, card.dataset.sourceUrl);
+    } else if (action === 'expand') {
+      const textEl = card.querySelector('.card-text');
+      if (!textEl) return;
+      textEl.classList.toggle('expanded');
+    }
+  });
 }
 </script>
 </body>
