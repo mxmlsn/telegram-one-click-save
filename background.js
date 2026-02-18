@@ -136,13 +136,19 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   console.log('[TG Saver] Context menu clicked at', clickTime);
 
   if (info.menuItemId === 'open-viewer') {
-    const viewerUrl = chrome.runtime.getURL('viewer/index.html');
-    const existing = await chrome.tabs.query({ url: viewerUrl });
-    if (existing.length > 0) {
-      await chrome.tabs.update(existing[0].id, { active: true });
-      await chrome.windows.update(existing[0].windowId, { focused: true });
-    } else {
-      await chrome.tabs.create({ url: viewerUrl });
+    try {
+      const viewerUrl = chrome.runtime.getURL('viewer/index.html');
+      const existing = await chrome.tabs.query({ url: viewerUrl + '*' });
+      if (existing.length > 0) {
+        await chrome.tabs.update(existing[0].id, { active: true });
+        if (existing[0].windowId > 0) {
+          await chrome.windows.update(existing[0].windowId, { focused: true });
+        }
+      } else {
+        await chrome.tabs.create({ url: viewerUrl });
+      }
+    } catch (e) {
+      console.error('[TG Saver] Failed to open viewer', e);
     }
     return;
   }

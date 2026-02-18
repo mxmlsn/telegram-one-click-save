@@ -43,15 +43,13 @@
   "host_permissions": [
     "https://api.telegram.org/*",
     "https://api.notion.com/*",
-    "https://api.anthropic.com/*",
     "<all_urls>"
   ],
   "web_accessible_resources": [
     {
       "resources": [
         "MartianMono-Regular.ttf",
-        "icons/*.png",
-        "viewer/index.html"
+        "icons/*.png"
       ],
       "matches": [
         "<all_urls>"
