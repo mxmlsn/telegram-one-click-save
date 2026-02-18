@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saves</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; }
@@ -88,6 +89,7 @@ const STORAGE_KEYS = { notion: 'sv_notion_token', tg: 'sv_tg_token', db: 'sv_db_
 const NOTION_VERSION = '2022-06-28';
 
 window.__colorCache = JSON.parse(localStorage.getItem('sv_colors') || '{}');
+window.__ocrCache = JSON.parse(localStorage.getItem('sv_ocr') || '{}');
 
 function saveAuth() {
   const notion = document.getElementById('input-notion-token').value.trim();
@@ -172,6 +174,7 @@ async function init() {
     const imageMap = await resolveAllImages(items, tg);
     renderApp(items, imageMap);
     processColors(items, imageMap);  // no await — runs in background
+    processOCR(items, imageMap); // no await — runs in background
   } catch (e) {
     const errEl = document.createElement('p');
     errEl.style.cssText = 'padding:40px;color:#f66';
@@ -247,6 +250,21 @@ async function processColors(items, imageMap) {
     } catch { window.__colorCache[item.fileId] = null; }
   }
   localStorage.setItem('sv_colors', JSON.stringify(window.__colorCache));
+  renderCards();
+}
+
+async function processOCR(items, imageMap) {
+  const toProcess = items.filter(i => i.fileId && imageMap[i.fileId] && window.__ocrCache[i.fileId] === undefined);
+  if (!toProcess.length) return;
+  const worker = await Tesseract.createWorker('eng');
+  for (const item of toProcess) {
+    try {
+      const { data: { text } } = await worker.recognize(imageMap[item.fileId]);
+      window.__ocrCache[item.fileId] = text.trim();
+    } catch { window.__ocrCache[item.fileId] = ''; }
+    localStorage.setItem('sv_ocr', JSON.stringify(window.__ocrCache));
+  }
+  await worker.terminate();
   renderCards();
 }
 
