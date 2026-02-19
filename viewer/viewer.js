@@ -673,8 +673,8 @@ function renderCard(item) {
 
   // ── Text / Quote ──
   const quoteTextRaw = item.content || item.ai_description || '';
-  const isTruncated = quoteTextRaw.length > 700;
-  const quoteTextDisplay = isTruncated ? quoteTextRaw.slice(0, 700) : quoteTextRaw;
+  const isTruncated = quoteTextRaw.length > 460;
+  const quoteTextDisplay = isTruncated ? quoteTextRaw.slice(0, 460) : quoteTextRaw;
   const quoteText = escapeHtml(quoteTextDisplay);
   const truncatedClass = isTruncated ? ' truncated' : '';
   const quoteSourceUrl = item.sourceUrl || item.url || '';
@@ -759,11 +759,13 @@ function openLightbox(imgUrl, sourceUrl) {
 }
 
 // ─── Content overlay (shared) ────────────────────────────────────────────────
-function openContentOverlay(innerHtml) {
+function openContentOverlay(innerHtml, opts) {
   const overlay = document.getElementById('content-overlay');
   const content = document.getElementById('overlay-content');
   content.innerHTML = innerHtml;
+  overlay.classList.toggle('align-top', !!(opts && opts.alignTop));
   overlay.classList.remove('hidden');
+  overlay.scrollTop = 0;
 }
 
 function closeContentOverlay() {
@@ -815,16 +817,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const domain = sourceUrl ? getDomain(sourceUrl) : '';
         const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
 
+        const linkOpen = sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" style="text-decoration:none;color:inherit;">` : '';
+        const linkClose = sourceUrl ? '</a>' : '';
+
         let html = '<div class="overlay-tweet">';
         html += '<div class="overlay-tweet-header">';
-        if (faviconUrl) html += `<img class="overlay-tweet-avatar" src="${escapeHtml(faviconUrl)}" alt="">`;
-        if (author) html += `<div class="overlay-tweet-author">${escapeHtml(author)}</div>`;
+        if (faviconUrl) html += `${linkOpen}<img class="overlay-tweet-avatar" src="${escapeHtml(faviconUrl)}" alt="">${linkClose}`;
+        if (author) html += `${linkOpen}<div class="overlay-tweet-author">${escapeHtml(author)}</div>${linkClose}`;
         html += '</div>';
         if (tweetText) html += `<div class="overlay-tweet-text">${escapeHtml(tweetText)}</div>`;
-        if (imgSrc) html += `<img class="overlay-tweet-img" src="${escapeHtml(imgSrc)}" alt="">`;
-        if (sourceUrl) {
-          html += `<div class="overlay-tweet-footer"><a class="overlay-tweet-link" href="${escapeHtml(sourceUrl)}" target="_blank">${escapeHtml(domain)}</a></div>`;
-        }
+        if (imgSrc) html += `${linkOpen}<img class="overlay-tweet-img" src="${escapeHtml(imgSrc)}" alt="">${linkClose}`;
         html += '</div>';
         openContentOverlay(html);
       }
@@ -843,13 +845,12 @@ document.addEventListener('DOMContentLoaded', () => {
       html += `<div class="overlay-quote-text">${escapeHtml(quoteText)}</div>`;
       html += '</div>';
       html += '<div class="overlay-quote-footer">';
-      html += domain ? `<span class="overlay-quote-source">${escapeHtml(domain)}</span>` : '<span></span>';
+      html += (domain && sourceUrl)
+        ? `<a class="overlay-quote-source" href="${escapeHtml(sourceUrl)}" target="_blank">${escapeHtml(domain)}</a>`
+        : (domain ? `<span class="overlay-quote-source">${escapeHtml(domain)}</span>` : '<span></span>');
       html += '</div>';
-      if (sourceUrl) {
-        html += `<div style="padding: 0 28px 20px;"><a class="overlay-quote-link" href="${escapeHtml(sourceUrl)}" target="_blank">Open source →</a></div>`;
-      }
       html += '</div>';
-      openContentOverlay(html);
+      openContentOverlay(html, { alignTop: quoteText.length > 460 });
       return;
     }
   });
