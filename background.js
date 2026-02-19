@@ -376,6 +376,7 @@ Rules:
   - "video" — URL is youtube.com/youtu.be/vimeo.com/instagram. OR screenshot shows video indicators: mute/unmute speaker icon, progress bar + playhead, play button overlay. Instagram posts with a mute/unmute icon are ALWAYS video.
   - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. No visible price = null.
   - "xpost" — URL contains x.com or twitter.com
+  - "tool" — URL is a digital tool, app, SaaS service, template marketplace, font foundry/specimen, browser extension, CLI utility, framework/library page, AI tool, online generator/converter, or a showcase/launch post ("I made X", "I built X", Product Hunt, etc.)
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
 - color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD of the image (ignore UI chrome, white backgrounds of websites). Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if no image.

@@ -350,7 +350,7 @@ function setupToolbarEvents() {
 //            if AI type selected → match item.ai_type
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
 const BASE_TYPES = new Set(['image', 'link', 'quote']);
-const AI_TYPES = new Set(['article', 'video', 'product', 'xpost']);
+const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool']);
 
 function applyFilters() {
   let items = STATE.items;
@@ -512,8 +512,24 @@ function renderCard(item) {
     </div>`;
   }
 
-  // ── Link (base type = link, and not article/product/xpost) ──
-  const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost']);
+  // ── Tool card ──
+  if (effectiveType === 'tool') {
+    const toolUrl = item.sourceUrl || item.url || '';
+    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
+    const hammerIcon = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 3.5L20.5 9.5L18 12L14 8L10 12L8 10L12 6L14.5 3.5Z" fill="white" stroke="white" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 12L3.5 18.5C2.95 19.05 2.95 19.95 3.5 20.5C4.05 21.05 4.95 21.05 5.5 20.5L12 14" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    return `<div class="card card-tool" data-id="${item.id}" data-action="open" data-url="${escapeHtml(toolUrl)}">
+      ${pendingDot}
+      <div class="tool-header">
+        ${faviconUrl ? `<img class="tool-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="tool-domain">${escapeHtml(domain)}</span>
+        <button class="tool-hammer-btn" data-action="open" data-url="${escapeHtml(toolUrl)}" title="Open">${hammerIcon}</button>
+      </div>
+      ${imgUrl ? `<div class="tool-preview"><div class="screenshot-crop"><img class="tool-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div></div>` : ''}
+    </div>`;
+  }
+
+  // ── Link (base type = link, and not article/product/xpost/tool) ──
+  const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool']);
   if (item.type === 'link' && !LINK_AI_OVERRIDES.has(aiType)) {
     const linkUrl = item.sourceUrl || item.url || '';
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
