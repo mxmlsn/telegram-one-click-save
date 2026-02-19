@@ -397,7 +397,7 @@
       border: none;
       cursor: pointer;
       opacity: 0.2;
-      transition: opacity 0.3s ease, filter 0.3s ease;
+      transition: opacity 0.15s ease, filter 0.15s ease;
       flex-shrink: 0;
       padding: 0;
     }
@@ -573,7 +573,7 @@
       position: absolute;
       inset: 0;
       background: url('../savecloud.png') center/cover no-repeat;
-      transition: transform 0.4s ease;
+      transition: transform 0.2s ease;
       z-index: 0;
     }
     .card-article:hover .article-bg {
@@ -604,6 +604,11 @@
       padding: 0 14px 14px;
       position: relative;
       margin-bottom: -60px;
+      transition: transform 0.2s ease;
+      transform-origin: center bottom;
+    }
+    .card-article:hover .article-book {
+      transform: perspective(600px) rotateX(-4deg);
     }
     /* Shared layout for main + shadow layers */
     .card-article .article-book-main,
@@ -646,13 +651,6 @@
       transform: skewY(4deg);
       transform-origin: right bottom;
       border-radius: 50% 50% 0 4px / 12px 12px 0 4px;
-      transition: transform 0.4s ease;
-    }
-    .card-article:hover .article-book-main .article-page-left {
-      transform: skewY(4deg) scaleX(0.97);
-    }
-    .card-article:hover .article-book-shadow .article-page-left {
-      transform: skewY(4deg) scaleX(0.96);
     }
     .card-article .article-page-left::after {
       right: 0;
@@ -662,13 +660,6 @@
       transform: skewY(-4deg);
       transform-origin: left bottom;
       border-radius: 50% 50% 4px 0 / 12px 12px 4px 0;
-      transition: transform 0.4s ease;
-    }
-    .card-article:hover .article-book-main .article-page-right {
-      transform: skewY(-4deg) scaleX(0.97);
-    }
-    .card-article:hover .article-book-shadow .article-page-right {
-      transform: skewY(-4deg) scaleX(0.96);
     }
     .card-article .article-page-right::after {
       left: 0;
