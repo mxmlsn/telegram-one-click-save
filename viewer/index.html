@@ -147,10 +147,106 @@
     .card-text-item .card-quote { font-size: 14px; line-height: 1.6; color: var(--text); }
     .card-text-item .card-source { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
 
+    /* Quote card (new design) */
+    .card.card-quote-new {
+      border-radius: 0;
+      overflow: hidden;
+    }
+    .card-quote-new {
+      background: linear-gradient(170deg, #FFFAF3 61%, #FFF1DE 98%);
+      border-radius: 0;
+      overflow: hidden;
+      position: relative;
+    }
+    .card-quote-new .quote-body {
+      padding: 13px 16px 10px;
+    }
+    .card-quote-new .quote-text {
+      font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #000;
+      white-space: pre-wrap;
+    }
+    .card-quote-new .quote-footer {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 6px 16px 12px;
+    }
+    .card-quote-new .quote-source {
+      font-family: 'Anybody', sans-serif;
+      font-size: 12px;
+      color: rgba(92, 70, 39, 0.49);
+    }
+    .card-quote-new .quote-sign {
+      width: 26px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .card-quote-new .quote-diamonds-svg {
+      display: block;
+      width: 100%;
+      height: 8px;
+      flex-shrink: 0;
+    }
+
     /* X post card */
-    .card-xpost { background: #0c0c0c; border: 1px solid rgba(29,155,240,0.12); padding: 15px; }
-    .card-xpost .xpost-author { font-size: 12px; color: #1d9bf0; margin-bottom: 7px; font-weight: 500; }
-    .card-xpost .xpost-text { font-size: 14px; line-height: 1.6; color: var(--text); }
+    .card.card-xpost {
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .card-xpost {
+      background: #000;
+      border: 0.3px solid rgba(81,81,81,0.4);
+      border-radius: 20px;
+      box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
+      overflow: hidden;
+      position: relative;
+    }
+    .card-xpost .xpost-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 13px 6px;
+    }
+    .card-xpost .xpost-avatar {
+      width: 34px; height: 34px; flex-shrink: 0;
+      object-fit: cover;
+    }
+    .card-xpost .xpost-author {
+      font-size: 14px; font-weight: 700;
+      color: #fff; line-height: 1.19;
+    }
+    .card-xpost .xpost-body {
+      padding: 0 13px 10px;
+      position: relative;
+    }
+    .card-xpost .xpost-text {
+      font-size: 14px; line-height: 1.45;
+      color: #fff;
+      display: -webkit-box;
+      -webkit-line-clamp: 5;
+      line-clamp: 5;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    }
+    .card-xpost .xpost-preview {
+      padding: 0 10px 10px;
+    }
+    .card-xpost .xpost-screenshot-wrap {
+      border-radius: 10px;
+      overflow: hidden;
+      width: 100%;
+      position: relative;
+    }
+    .card-xpost .xpost-screenshot {
+      width: 160%;
+      margin-left: -30%;
+      display: block;
+      object-fit: cover;
+      object-position: top;
+    }
 
     /* Product card */
     .card-product { background: var(--surface); border: 1px solid var(--border); }
@@ -237,6 +333,60 @@
     }
     .card-video .video-share-btn svg {
       width: 42px; height: 42px;
+    }
+
+    /* ── Link card (new design) ── */
+    .card.card-link-new {
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .card-link-new {
+      background: linear-gradient(180deg, #393939 0%, #2E2E2E 100%);
+      border: 0.3px solid #515151;
+      border-radius: 20px;
+      box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .card-link-new .link-header {
+      height: 56px;
+      display: flex; align-items: center;
+      padding: 0 15px;
+      gap: 10px;
+      position: relative;
+    }
+    .card-link-new .link-favicon {
+      width: 27px; height: 27px;
+      border-radius: 4px; flex-shrink: 0;
+      object-fit: contain;
+      background: #fff;
+    }
+    .card-link-new .link-domain {
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 400;
+      flex: 1;
+    }
+    .card-link-new .link-arrow-btn {
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      background: none;
+      border: none;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+      padding: 0;
+    }
+    .card-link-new .link-arrow-btn:hover { opacity: 0.8; }
+    .card-link-new .link-arrow-btn svg { width: 34px; height: 34px; }
+    .card-link-new .link-preview {
+      padding: 0 10px 10px;
+    }
+    .card-link-new .link-screenshot {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+      object-fit: cover;
     }
 
     /* ── Product card (new design) ── */

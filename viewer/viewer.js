@@ -417,11 +417,41 @@ function renderCard(item) {
 
   // ── Video card ──
   if (effectiveType === 'video') {
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+    const vimeoMatch = !ytMatch && url.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+
+    // YouTube: maxresdefault (no black bars), fallback to sddefault via onerror
+    const ytId = ytMatch ? ytMatch[1] : null;
+    const ytSrc = ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null;
+    const ytFallback = ytId ? `https://img.youtube.com/vi/${ytId}/sddefault.jpg` : null;
+    const videoImgUrl = ytSrc || imgUrl;
+
     const faviconUrl = domain
       ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`
       : '';
     const shareIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
     const clickHandler = url ? `onclick="window.open('${escapeHtml(url)}','_blank')"` : '';
+
+    // For Vimeo: fetch thumbnail async and patch img src after render
+    const vimeoId = vimeoMatch ? vimeoMatch[1] : null;
+    const vimeoImgId = vimeoId ? `vimeo-thumb-${item.id}` : null;
+    if (vimeoId) {
+      fetch(`https://vimeo.com/api/v2/video/${vimeoId}.json`)
+        .then(r => r.json())
+        .then(data => {
+          const src = data[0]?.thumbnail_large || data[0]?.thumbnail_medium || '';
+          if (!src) return;
+          const el = document.getElementById(vimeoImgId);
+          const glowEl = document.getElementById(vimeoImgId + '-glow');
+          if (el) el.src = src;
+          if (glowEl) glowEl.src = src;
+        }).catch(() => {});
+    }
+
+    const thumbSrc = vimeoId ? (imgUrl || '') : (videoImgUrl || '');
+    const thumbGlowAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
+    const thumbImgAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
+
     return `<div class="card card-video" data-id="${item.id}" ${clickHandler}>
       ${pendingDot}
       <div class="video-header">
@@ -429,10 +459,10 @@ function renderCard(item) {
         <span class="video-domain">${escapeHtml(domain)}</span>
         <button class="video-share-btn" onclick="event.stopPropagation();window.open('${escapeHtml(url)}','_blank')" title="Open">${shareIcon}</button>
       </div>
-      ${imgUrl ? `<div class="video-preview">
+      ${(thumbSrc || vimeoId) ? `<div class="video-preview">
         <div class="video-glow-wrap">
-          <img class="video-glow" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" aria-hidden="true">
-          <img class="video-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+          <img class="video-glow" ${vimeoImgId ? `id="${vimeoImgId}-glow"` : ''} src="${escapeHtml(thumbSrc)}" loading="lazy" alt="" aria-hidden="true" ${thumbGlowAttr}>
+          <img class="video-screenshot" ${vimeoImgId ? `id="${vimeoImgId}"` : ''} src="${escapeHtml(thumbSrc)}" loading="lazy" alt="" ${thumbImgAttr}>
         </div>
       </div>` : ''}
     </div>`;
@@ -473,18 +503,39 @@ function renderCard(item) {
 
   // ── X Post ──
   if (effectiveType === 'xpost') {
-    const tweetText = escapeHtml(aiData.tweet_text || '');
+    const tweetText = escapeHtml(aiData.tweet_text || item.content || item.ai_description || '');
     const author = escapeHtml(aiData.author || '');
-    return `<div class="card card-xpost" data-id="${item.id}" ${item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : ''}>
+    const clickHandler = item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : '';
+    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
+    return `<div class="card card-xpost" data-id="${item.id}" ${clickHandler}>
       ${pendingDot}
-      ${author ? `<div class="xpost-author">${author}</div>` : ''}
-      ${tweetText ? `<div class="xpost-text">${tweetText}</div>` : ''}
-      ${imgUrl ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" style="width:100%;border-radius:0 0 8px 8px;display:block;margin-top:10px">` : ''}
-      ${item.sourceUrl ? `<div class="card-source" style="margin-top:8px">${escapeHtml(domain)}</div>` : ''}
+      <div class="xpost-header">
+        ${faviconUrl ? `<img class="xpost-avatar" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        ${author ? `<div class="xpost-author">${author}</div>` : ''}
+      </div>
+      ${tweetText ? `<div class="xpost-body"><div class="xpost-text">${tweetText}</div></div>` : ''}
+      ${imgUrl ? `<div class="xpost-preview"><div class="xpost-screenshot-wrap"><img class="xpost-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div></div>` : ''}
     </div>`;
   }
 
-  // ── Has image ──
+  // ── Link (base type = link, and not article/product/xpost) ──
+  const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost']);
+  if (item.type === 'link' && !LINK_AI_OVERRIDES.has(aiType)) {
+    const linkUrl = item.sourceUrl || item.url || '';
+    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
+    const arrowIcon = `<svg viewBox="0 0 36.738 36.7375" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.9528 14.1284C18.5149 12.5663 21.047 12.5663 22.6091 14.1284C24.1712 15.6905 24.1712 18.2226 22.6091 19.7847L6.82782 35.5659C5.26573 37.128 2.73367 37.128 1.17157 35.5659C-0.390524 34.0038 -0.390524 31.4718 1.17157 29.9097L16.9528 14.1284Z" fill="white"/><path d="M28.738 29.9131V9C28.738 8.44788 28.29 8.00026 27.738 8H6.82489C4.61575 8 2.82489 6.20914 2.82489 4C2.82489 1.79086 4.61575 0 6.82489 0H27.738C32.7083 0.00026285 36.738 4.0296 36.738 9V29.9131C36.7377 32.1218 34.9467 33.9128 32.738 33.9131C30.529 33.9131 28.7382 32.122 28.738 29.9131Z" fill="white"/></svg>`;
+    return `<div class="card card-link-new" data-id="${item.id}" onclick="window.open('${escapeHtml(linkUrl)}','_blank')">
+      ${pendingDot}
+      <div class="link-header">
+        ${faviconUrl ? `<img class="link-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="link-domain">${escapeHtml(domain)}</span>
+        <button class="link-arrow-btn" onclick="event.stopPropagation();window.open('${escapeHtml(linkUrl)}','_blank')" title="Open">${arrowIcon}</button>
+      </div>
+      ${imgUrl ? `<div class="link-preview"><img class="link-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>` : ''}
+    </div>`;
+  }
+
+  // ── Has image (article or untyped item with screenshot) ──
   const VALID_AI_TYPES = new Set(['article', 'video', 'product', 'xpost']);
   if (imgUrl) {
     const badge = (aiType && VALID_AI_TYPES.has(aiType)) ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : '';
@@ -499,21 +550,31 @@ function renderCard(item) {
     </div>`;
   }
 
-  // ── Link ──
-  if (item.type === 'link' || aiType === 'link') {
-    return `<div class="card card-link" data-id="${item.id}" onclick="window.open('${escapeHtml(item.sourceUrl || item.url)}','_blank')">
-      ${pendingDot}
-      <img class="card-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" alt="" onerror="this.style.display='none'">
-      <span class="card-domain">${escapeHtml(domain)}</span>
-      <div class="card-title">${escapeHtml(item.url || domain)}</div>
-    </div>`;
-  }
-
   // ── Text / Quote ──
-  return `<div class="card card-text-item" data-id="${item.id}">
+  const quoteText = escapeHtml(item.content || item.ai_description || '');
+  const quoteDomainHtml = domain ? `<span class="quote-source">${escapeHtml(domain)}</span>` : '<span></span>';
+  const quoteSignSvg = `<svg class="quote-sign" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 22V13.2C0 9.86667 0.733333 7.06667 2.2 4.8C3.73333 2.53333 6.13333 0.866667 9.4 -4.57764e-07L11 3C9 3.53333 7.46667 4.53333 6.4 6C5.4 7.4 4.86667 9.13333 4.8 11.2H9.4V22H0ZM14.6 22V13.2C14.6 9.86667 15.3333 7.06667 16.8 4.8C18.3333 2.53333 20.7333 0.866667 24 -4.57764e-07L25.6 3C23.6 3.53333 22.0667 4.53333 21 6C20 7.4 19.4667 9.13333 19.4 11.2H24V22H14.6Z" fill="rgba(230,184,120,0.31)"/>
+  </svg>`;
+
+  // Spikes border — triangular teeth pointing down, card bg color, glued to bottom
+  // Sawtooth: cream card-color triangles pointing down against dark site bg
+  // viewBox height 10 vs spike height 8 = 80% vertical scale (≈20% squeeze)
+  const diamondBorder = `<svg class="quote-diamonds-svg" viewBox="0 0 280 10" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:8px;display:block;">
+    <rect width="280" height="10" fill="#080808"/>
+    <path d="M0,0 ${Array.from({length: 35}, (_,i) => `L${i*8+4},8 L${i*8+8},0`).join(' ')} L280,0 Z" fill="#FFFAF3"/>
+  </svg>`;
+
+  return `<div class="card card-quote-new" data-id="${item.id}">
     ${pendingDot}
-    <div class="card-quote">${escapeHtml(item.content || item.ai_description || '')}</div>
-    ${domain ? `<div class="card-source">${escapeHtml(domain)}</div>` : ''}
+    <div class="quote-body">
+      <div class="quote-text">${quoteText}</div>
+    </div>
+    <div class="quote-footer">
+      ${quoteDomainHtml}
+      ${quoteSignSvg}
+    </div>
+    ${diamondBorder}
   </div>`;
 }
 
