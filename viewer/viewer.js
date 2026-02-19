@@ -415,14 +415,58 @@ function renderCard(item) {
     ? `<div class="card-materials">${escapeHtml(aiData.materials.join(', '))}</div>`
     : '';
 
+  // ── Video card ──
+  if (effectiveType === 'video') {
+    const faviconUrl = domain
+      ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`
+      : '';
+    const shareIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+    const clickHandler = url ? `onclick="window.open('${escapeHtml(url)}','_blank')"` : '';
+    return `<div class="card card-video" data-id="${item.id}" ${clickHandler}>
+      ${pendingDot}
+      <div class="video-header">
+        ${faviconUrl ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="video-domain">${escapeHtml(domain)}</span>
+        <button class="video-share-btn" onclick="event.stopPropagation();window.open('${escapeHtml(url)}','_blank')" title="Open">${shareIcon}</button>
+      </div>
+      ${imgUrl ? `<div class="video-preview">
+        <div class="video-glow-wrap">
+          <img class="video-glow" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" aria-hidden="true">
+          <img class="video-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+        </div>
+      </div>` : ''}
+    </div>`;
+  }
+
   // ── Product with image ──
   if (effectiveType === 'product' && imgUrl) {
-    return `<div class="card card-product" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
+    const clickHandler = url ? `onclick="window.open('${escapeHtml(url)}','_blank')"` : '';
+    const rawPrice = aiData.price || '';
+    const CURRENCY_MAP = { 'USD':'$','EUR':'€','GBP':'£','JPY':'¥','RUB':'₽','CNY':'¥','KRW':'₩','INR':'₹','BRL':'R$','AUD':'A$','CAD':'C$' };
+    let formattedPrice = rawPrice;
+    if (rawPrice) {
+      // Extract number and currency word/symbol
+      const numMatch = rawPrice.match(/[\d\s.,]+/);
+      const num = numMatch ? numMatch[0].trim() : rawPrice;
+      let sym = '';
+      for (const [word, s] of Object.entries(CURRENCY_MAP)) {
+        if (rawPrice.toUpperCase().includes(word)) { sym = s; break; }
+      }
+      // If no word match, check if starts with known symbol
+      if (!sym) { const m = rawPrice.match(/^([^\d\s]+)/); sym = m ? m[1] : '$'; }
+      formattedPrice = sym + num;
+    }
+    const notchSvg = `<svg viewBox="0 0 95.0078 37.6777" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M47.5039 0C55.1408 0 61.3925 5.93081 61.9063 13.4374C61.944 13.9883 62.3881 14.4375 62.9404 14.4375H83.3887C89.8059 14.4377 95.0078 19.6404 95.0078 26.0576C95.0078 32.4749 89.8059 37.6775 83.3887 37.6777H11.6201C5.20275 37.6777 2.11322e-05 32.475 0 26.0576C0 19.6402 5.20274 14.4375 11.6201 14.4375H32.0674C32.6197 14.4375 33.0638 13.9883 33.1015 13.4373C33.6153 5.93083 39.8671 4.64136e-05 47.5039 0Z" fill="#080808" stroke="rgba(88,119,65,0.5)" stroke-width="0.5"/>
+    </svg>`;
+    return `<div class="card card-product-new" data-id="${item.id}" ${clickHandler}>
       ${pendingDot}
-      <img class="product-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
-      <div class="product-info">
-        ${aiData.price ? `<div class="product-price">${escapeHtml(aiData.price)}</div>` : ''}
-        ${domain ? `<div class="product-desc">${escapeHtml(domain)}</div>` : ''}
+      <div class="product-new-notch">${notchSvg}</div>
+      <div class="product-new-header">
+        ${rawPrice ? `<div class="product-new-price">${escapeHtml(formattedPrice)}</div>` : ''}
+      </div>
+      <div class="product-new-preview">
+        <img class="product-new-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       </div>
     </div>`;
   }
