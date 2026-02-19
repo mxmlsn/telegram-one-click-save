@@ -415,35 +415,71 @@
     }
 
     /* ── PDF card ── */
-    .card-pdf .pdf-preview {
-      padding: 0 10px;
-    }
-    .card-pdf .pdf-screenshot {
-      display: block;
-      object-fit: cover;
-    }
-    .card-pdf .pdf-label {
-      padding: 12px 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .card-pdf .pdf-icon {
-      background: #e74c3c;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 7px;
-      border-radius: 4px;
-      letter-spacing: 0.5px;
-      flex-shrink: 0;
-    }
-    .card-pdf .pdf-filename {
-      color: var(--text-secondary, rgba(255,255,255,0.5));
-      font-size: 12px;
+    .card.card-pdf {
+      border-radius: 20px;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    }
+    .card-pdf {
+      background: #121212;
+      border: 0.3px solid rgba(110, 110, 110, 0.2);
+      border-radius: 20px;
+      box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
+      overflow: hidden;
+      position: relative;
+    }
+    .card-pdf .pdf-blur-wrap {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: -20px;
+      padding-bottom: 20px;
+    }
+    .card-pdf .pdf-blur-img {
+      display: block;
+      width: calc(100% + 40px);
+      margin: -20px -20px 0;
+      filter: blur(6px);
+      transition: filter 0.25s ease;
+      will-change: filter;
+      mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
+      -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
+    }
+    .card-pdf:hover .pdf-blur-img {
+      filter: blur(0px);
+    }
+    .card-pdf .pdf-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border-radius: 5px;
+      padding: 3px 8px;
+      z-index: 2;
+    }
+    .card-pdf .pdf-badge-text {
+      font-family: 'Anybody', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      line-height: 1;
+      letter-spacing: 0.4px;
+    }
+    .card-pdf .pdf-title {
+      padding: 0 18px 16px;
+      margin-top: -10px;
+      position: relative;
+      z-index: 1;
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-size: 28px;
+      line-height: 1.15;
+      color: rgba(255,255,255,0.8);
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
 
     /* ── Tool card ── */

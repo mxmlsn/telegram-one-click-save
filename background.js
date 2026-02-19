@@ -345,6 +345,7 @@ const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no
 {
   "content_type": null,
   "content_type_secondary": null,
+  "title": "",
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "color_palette": null,
@@ -359,6 +360,7 @@ const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no
 Rules:
 - content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the image next to a product. Otherwise content_type MUST be null. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
 - content_type_secondary: null for direct photos (not applicable).
+- title: the single most important headline or title visible on the screen. Extract the primary heading/title text — the biggest, most prominent text that describes what this content is about. Keep it short (under 80 chars). If no clear title/headline exists, empty string.
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none.
 - COLOR TAGS — allowed values for all color fields: "red", "violet", "pink", "yellow", "green", "blue", "brown", "white", "black", "bw".
@@ -386,6 +388,7 @@ const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no o
 {
   "content_type": null,
   "content_type_secondary": null,
+  "title": "",
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "color_palette": null,
@@ -411,6 +414,7 @@ Rules:
   - article reviewing a tool → content_type="article", content_type_secondary="tool"
   - video about a product → content_type="video", content_type_secondary="product"
   Set null if only one category applies.
+- title: the single most important headline or title visible on the screen. Extract the primary heading/title text — the biggest, most prominent text that describes what this content is about. For articles — the article headline. For products — the product name. For tools — the tool/app name. For PDFs — the document title. Keep it short (under 80 chars). If no clear title/headline exists, empty string.
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
 - COLOR TAGS — allowed values for all color fields: "red", "violet", "pink", "yellow", "green", "blue", "brown", "white", "black", "bw".
@@ -488,7 +492,7 @@ async function callAnthropic(messages, settings) {
 
 async function analyzeWithAI(item, settings) {
   if (!settings.aiEnabled || !settings.aiApiKey) return null;
-  if (item.type === 'quote' || item.type === 'pdf') return null;
+  if (item.type === 'quote') return null;
 
   try {
     const provider = settings.aiProvider || 'google';
@@ -607,6 +611,7 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
     };
   }
   const aiDataPayload = {};
+  if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;
   if (aiResult.color_subject) aiDataPayload.color_subject = aiResult.color_subject;

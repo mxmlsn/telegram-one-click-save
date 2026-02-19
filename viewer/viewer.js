@@ -811,21 +811,14 @@ function renderCard(item) {
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
     const pdfUrl = item.sourceUrl || item.url || '';
-    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
-    const pdfFilename = pdfUrl.split('?')[0].split('/').pop() || 'document.pdf';
-    const arrowIcon = `<svg viewBox="0 0 36.738 36.7375" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.9528 14.1284C18.5149 12.5663 21.047 12.5663 22.6091 14.1284C24.1712 15.6905 24.1712 18.2226 22.6091 19.7847L6.82782 35.5659C5.26573 37.128 2.73367 37.128 1.17157 35.5659C-0.390524 34.0038 -0.390524 31.4718 1.17157 29.9097L16.9528 14.1284Z" fill="white"/><path d="M28.738 29.9131V9C28.738 8.44788 28.29 8.00026 27.738 8H6.82489C4.61575 8 2.82489 6.20914 2.82489 4C2.82489 1.79086 4.61575 0 6.82489 0H27.738C32.7083 0.00026285 36.738 4.0296 36.738 9V29.9131C36.7377 32.1218 34.9467 33.9128 32.738 33.9131C30.529 33.9131 28.7382 32.122 28.738 29.9131Z" fill="white"/></svg>`;
+    const pdfTitle = aiData.title || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf';
     const previewHtml = imgUrl
-      ? `<div class="pdf-preview"><div class="screenshot-crop"><img class="pdf-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div></div>`
-      : '';
-    return `<div class="card card-link-new card-pdf" data-id="${item.id}" data-action="open" data-url="${escapeHtml(pdfUrl)}">
+      ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
+      : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
+    return `<div class="card card-pdf" data-id="${item.id}" data-action="open" data-url="${escapeHtml(pdfUrl)}">
       ${pendingDot}
-      <div class="link-header">
-        ${faviconUrl ? `<img class="link-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
-        <span class="link-domain">${escapeHtml(domain)}</span>
-        <button class="link-arrow-btn" data-action="open" data-url="${escapeHtml(pdfUrl)}" title="Open">${arrowIcon}</button>
-      </div>
       ${previewHtml}
-      <div class="pdf-label"><span class="pdf-icon">PDF</span><span class="pdf-filename">${escapeHtml(pdfFilename)}</span></div>
+      <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
     </div>`;
   }
 
