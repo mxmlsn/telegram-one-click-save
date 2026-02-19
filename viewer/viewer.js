@@ -455,7 +455,7 @@ function renderCard(item) {
       ${(thumbSrc || vimeoId) ? `<div class="video-preview">
         <div class="video-glow-wrap">
           <img class="video-glow" ${vimeoImgId ? `id="${vimeoImgId}-glow"` : ''} src="${escapeHtml(thumbSrc)}" loading="lazy" alt="" aria-hidden="true" ${thumbGlowAttr}>
-          <img class="video-screenshot" ${vimeoImgId ? `id="${vimeoImgId}"` : ''} src="${escapeHtml(thumbSrc)}" loading="lazy" alt="" ${thumbImgAttr}>
+          <div class="screenshot-crop" style="border-radius:11px"><img class="video-screenshot" ${vimeoImgId ? `id="${vimeoImgId}"` : ''} src="${escapeHtml(thumbSrc)}" loading="lazy" alt="" ${thumbImgAttr}></div>
         </div>
       </div>` : ''}
     </div>`;
