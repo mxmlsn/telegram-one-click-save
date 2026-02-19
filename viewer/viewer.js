@@ -24,7 +24,11 @@ const STATE = {
   aiAutoInViewer: false,
   search: '',
   activeTypes: new Set(),
-  activeColor: null
+  activeColor: null,
+  layout: 'adaptive',   // adaptive | 4col | 3col
+  align: 'masonry',     // masonry | center
+  gap: 10,
+  padding: 14
 };
 
 
@@ -76,10 +80,12 @@ function disconnect() {
 // ─── App start ────────────────────────────────────────────────────────────────
 async function startApp() {
   document.getElementById('toolbar').classList.remove('hidden');
+  document.getElementById('display-bar').classList.remove('hidden');
   document.getElementById('grid-wrap').classList.remove('hidden');
   document.getElementById('ai-status').textContent = 'Loading…';
 
   setupToolbarEvents();
+  setupDisplayBar();
 
   try {
     const pages = await fetchNotion();
@@ -342,6 +348,89 @@ function setupToolbarEvents() {
   });
 
   document.getElementById('disconnect-btn')?.addEventListener('click', disconnect);
+}
+
+// ─── Display bar ──────────────────────────────────────────────────────────────
+function setupDisplayBar() {
+  // Layout buttons
+  document.querySelectorAll('#display-bar [data-layout]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#display-bar [data-layout]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE.layout = btn.dataset.layout;
+      applyGridMode();
+    });
+  });
+
+  // Gap range
+  const gapRange = document.getElementById('gap-range');
+  const gapVal = document.getElementById('gap-val');
+  gapRange.addEventListener('input', () => {
+    STATE.gap = parseInt(gapRange.value, 10);
+    gapVal.textContent = STATE.gap;
+    applyGridMode();
+  });
+
+  // Padding range
+  const padRange = document.getElementById('padding-range');
+  const padVal = document.getElementById('padding-val');
+  padRange.addEventListener('input', () => {
+    STATE.padding = parseInt(padRange.value, 10);
+    padVal.textContent = STATE.padding;
+    applyGridMode();
+  });
+
+  // Row alignment buttons
+  document.querySelectorAll('#display-bar [data-align]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#display-bar [data-align]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE.align = btn.dataset.align;
+      applyGridMode();
+    });
+  });
+
+  applyGridMode();
+}
+
+function applyGridMode() {
+  const m = document.getElementById('masonry');
+  const wrap = document.getElementById('grid-wrap');
+  if (!m) return;
+
+  const gap = STATE.gap + 'px';
+  m.style.setProperty('--grid-gap', gap);
+
+  // Apply side padding
+  const pad = STATE.padding + 'px';
+  wrap.style.paddingLeft = pad;
+  wrap.style.paddingRight = pad;
+
+  // Reset all mode classes and inline overrides
+  m.classList.remove('mode-adaptive', 'mode-4col', 'mode-3col', 'mode-rows', 'rows-adaptive', 'rows-4col', 'rows-3col');
+  m.style.columnGap = '';
+  m.style.gap = '';
+  m.style.display = '';
+  m.style.flexWrap = '';
+
+  if (STATE.align === 'center') {
+    // Flex-based row layout — gap handled via CSS var in .mode-rows
+    m.classList.add('mode-rows');
+
+    if (STATE.layout === '3col') m.classList.add('rows-3col');
+    else if (STATE.layout === '4col') m.classList.add('rows-4col');
+    else m.classList.add('rows-adaptive');
+
+    m.querySelectorAll('.card').forEach(c => { c.style.marginBottom = ''; });
+  } else {
+    // CSS columns masonry mode
+    m.style.columnGap = gap;
+
+    if (STATE.layout === '4col') m.classList.add('mode-4col');
+    else if (STATE.layout === '3col') m.classList.add('mode-3col');
+
+    m.querySelectorAll('.card').forEach(c => { c.style.marginBottom = gap; });
+  }
 }
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
@@ -630,6 +719,7 @@ function renderAll(items) {
   }
   empty.classList.add('hidden');
   masonry.innerHTML = items.map(renderCard).join('');
+  applyGridMode();
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────

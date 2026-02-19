@@ -117,7 +117,7 @@
     }
 
     /* ── Masonry grid ── */
-    #grid-wrap { padding: 68px 14px 40px; }
+    #grid-wrap { padding: 106px 14px 40px; }
 
     #masonry { columns: 5; column-gap: 10px; }
     @media (max-width: 1400px) { #masonry { columns: 4; } }
@@ -865,6 +865,109 @@
       border: 2px solid transparent; transition: border-color 0.1s; box-sizing: border-box;
     }
     .color-option-single:hover { border-color: #fff; }
+
+    /* ── Display settings bar ── */
+    #display-bar {
+      position: fixed; top: 52px; left: 0; right: 0;
+      height: 40px;
+      background: rgba(8,8,8,0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 18px;
+      z-index: 99;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    #display-bar.hidden { display: none; }
+
+    .db-group {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .db-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-dim); white-space: nowrap; user-select: none;
+    }
+    .db-btn {
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 5px; padding: 3px 9px;
+      font-size: 11px; color: var(--text-muted); cursor: pointer;
+      transition: all 0.15s; white-space: nowrap; line-height: 1.2;
+    }
+    .db-btn:hover { border-color: rgba(255,255,255,0.18); color: var(--text); }
+    .db-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    .db-divider { width: 1px; height: 16px; background: var(--border); }
+
+    .db-range-wrap {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .db-range {
+      -webkit-appearance: none; appearance: none;
+      width: 80px; height: 3px; border-radius: 2px;
+      background: var(--surface2); outline: none;
+      cursor: pointer;
+    }
+    .db-range::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--text-muted); cursor: pointer;
+      transition: background 0.15s;
+    }
+    .db-range::-webkit-slider-thumb:hover { background: var(--text); }
+    .db-range::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--text-muted); border: none; cursor: pointer;
+    }
+    .db-range-val {
+      font-size: 10px; color: var(--text-dim); min-width: 22px; text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Grid modes ── */
+    /* Adaptive masonry (default) — columns set by CSS */
+    #masonry.mode-adaptive { column-count: auto; }
+
+    /* Fixed column modes — override media queries */
+    #masonry.mode-4col { columns: 4 !important; }
+    #masonry.mode-3col { columns: 3 !important; }
+
+    /* Center-aligned row mode — uses flexbox instead of CSS columns */
+    #masonry.mode-rows {
+      columns: unset !important;
+      display: flex !important;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--grid-gap) !important;
+    }
+    #masonry.mode-rows > .card {
+      break-inside: auto;
+      flex-shrink: 0;
+      margin-bottom: 0 !important;
+    }
+    #masonry.mode-rows.rows-3col > .card {
+      width: calc((100% - var(--grid-gap) * 2) / 3);
+    }
+    #masonry.mode-rows.rows-4col > .card {
+      width: calc((100% - var(--grid-gap) * 3) / 4);
+    }
+    #masonry.mode-rows.rows-adaptive > .card {
+      width: calc((100% - var(--grid-gap) * 4) / 5);
+    }
+    @media (max-width: 1400px) {
+      #masonry.mode-rows.rows-adaptive > .card { width: calc((100% - var(--grid-gap) * 3) / 4); }
+    }
+    @media (max-width: 1100px) {
+      #masonry.mode-rows.rows-adaptive > .card { width: calc((100% - var(--grid-gap) * 2) / 3); }
+    }
+    @media (max-width: 750px) {
+      #masonry.mode-rows.rows-adaptive > .card { width: calc((100% - var(--grid-gap)) / 2); }
+    }
+    @media (max-width: 480px) {
+      #masonry.mode-rows.rows-adaptive > .card { width: 100%; }
+    }
+    #masonry.mode-rows > .card { align-self: center; }
   </style>
 </head>
 <body>
@@ -903,9 +1006,41 @@
   </div>
 </div>
 
+<!-- Display settings bar -->
+<div id="display-bar" class="hidden">
+  <div class="db-group">
+    <span class="db-label">Layout</span>
+    <button class="db-btn active" data-layout="adaptive">Auto</button>
+    <button class="db-btn" data-layout="4col">4 col</button>
+    <button class="db-btn" data-layout="3col">3 col</button>
+  </div>
+  <div class="db-divider"></div>
+  <div class="db-group">
+    <span class="db-label">Gap</span>
+    <div class="db-range-wrap">
+      <input type="range" class="db-range" id="gap-range" min="0" max="32" value="10">
+      <span class="db-range-val" id="gap-val">10</span>
+    </div>
+  </div>
+  <div class="db-divider"></div>
+  <div class="db-group">
+    <span class="db-label">Padding</span>
+    <div class="db-range-wrap">
+      <input type="range" class="db-range" id="padding-range" min="0" max="120" value="14">
+      <span class="db-range-val" id="padding-val">14</span>
+    </div>
+  </div>
+  <div class="db-divider"></div>
+  <div class="db-group">
+    <span class="db-label">Rows</span>
+    <button class="db-btn active" data-align="masonry">Masonry</button>
+    <button class="db-btn" data-align="center">Center</button>
+  </div>
+</div>
+
 <!-- Grid -->
 <div id="grid-wrap" class="hidden">
-  <div id="masonry"></div>
+  <div id="masonry" style="--grid-gap: 10px;"></div>
 </div>
 
 <!-- Empty state -->
