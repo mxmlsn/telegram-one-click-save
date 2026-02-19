@@ -386,7 +386,6 @@
       background: #D6EEFF;
       border: 0.3px solid rgba(100,170,220,0.4);
       border-radius: 20px;
-      box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
       overflow: hidden;
       position: relative;
     }
@@ -408,6 +407,7 @@
     .card-article .article-book {
       padding: 0 14px 14px;
       position: relative;
+      margin-bottom: -24px;
     }
     /* Shared layout for main + shadow layers */
     .card-article .article-book-main,
@@ -430,18 +430,17 @@
     }
     .card-article .article-book-shadow-2 {
       z-index: 1;
-      transform: scaleX(1.07) translateY(5px);
+      transform: scaleX(1.06) translateY(8px);
       opacity: 0.4;
     }
     .card-article .article-book-shadow-1 {
       z-index: 2;
-      transform: scaleX(1.035) translateY(2px);
+      transform: scaleX(1.035) translateY(4px);
       opacity: 0.65;
     }
     .card-article .article-page {
       flex: 1;
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
       position: relative;
     }
     .card-article .article-page::after {
