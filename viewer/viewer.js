@@ -529,19 +529,21 @@ function renderCard(item) {
     </div>`;
   }
 
-  // ── Article (AI-typed link with screenshot) — opens source directly ──
+  // ── Article (AI-typed link with screenshot) — open book design ──
   if (effectiveType === 'article' || aiType === 'article') {
     const articleUrl = item.sourceUrl || item.url || '';
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
-    const articleIcon = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4C4 2.89543 4.89543 2 6 2H14L20 8V20C20 21.1046 19.1046 22 18 22H6C4.89543 22 4 21.1046 4 20V4Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2V8H20" stroke="white" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 13H16M8 17H13" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-    return `<div class="card card-link-new" data-id="${item.id}" data-action="open" data-url="${escapeHtml(articleUrl)}">
+    const bookPages = imgUrl ? `<div class="article-book">
+        <div class="article-page article-page-left"><img src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
+        <div class="article-page article-page-right"><img src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
+      </div>` : '';
+    return `<div class="card card-article" data-id="${item.id}" data-action="open" data-url="${escapeHtml(articleUrl)}">
       ${pendingDot}
-      <div class="link-header">
-        ${faviconUrl ? `<img class="link-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
-        <span class="link-domain">${escapeHtml(domain)}</span>
-        <button class="link-arrow-btn" data-action="open" data-url="${escapeHtml(articleUrl)}" title="Open article">${articleIcon}</button>
+      <div class="article-header">
+        ${faviconUrl ? `<img class="article-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
+        <span class="article-domain">${escapeHtml(domain)}</span>
       </div>
-      ${imgUrl ? `<div class="link-preview"><img class="link-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>` : ''}
+      ${bookPages}
     </div>`;
   }
 
