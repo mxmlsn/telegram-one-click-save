@@ -342,6 +342,8 @@ const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "color_palette": null,
+  "color_subject": null,
+  "color_top3": [],
   "text_on_image": "",
   "price": "",
   "author": "",
@@ -353,7 +355,20 @@ Rules:
 - content_type_secondary: null for direct photos (not applicable).
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none.
-- color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD. Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if unclear.
+- COLOR TAGS — allowed values for all color fields: "red", "violet", "pink", "yellow", "green", "blue", "brown", "white", "black", "bw".
+  - "red" = true reds, scarlet, crimson, burgundy, maroon, dark red
+  - "violet" = purple, violet, lavender, indigo, magenta-leaning purple
+  - "pink" = pink, magenta, rose, fuchsia, coral-pink
+  - "yellow" = yellow, gold, amber, warm orange, mustard
+  - "green" = green, emerald, olive, lime, teal-leaning green, mint
+  - "blue" = blue, navy, cyan, teal, sky blue, cobalt
+  - "brown" = brown, beige, tan, khaki, sand, chocolate, caramel
+  - "white" = white, cream, off-white, very light gray
+  - "black" = black, very dark gray, charcoal, near-black
+  - "bw" = ONLY for genuine black-and-white or monochrome photography/imagery with no color
+- color_palette: the single OVERALL dominant color of the entire image by area. Null if unclear.
+- color_subject: the color of the MAIN SUBJECT/OBJECT (the thing the photo is about, not the background). For product photos — the product color. For portraits — clothing or key object color. Null if no clear subject or same as color_palette.
+- color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Only include colors that cover a meaningful portion of the image. Do NOT pad to 3 — if the image is mostly one color, return just ["black"]. Empty array if no image.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text.
 - price: the main product price with currency symbol (e.g. "$129"). Empty string if not visible.
 - author: empty string.
@@ -367,6 +382,8 @@ const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no o
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "color_palette": null,
+  "color_subject": null,
+  "color_top3": [],
   "text_on_image": "",
   "price": "",
   "author": "",
@@ -388,7 +405,20 @@ Rules:
   Set null if only one category applies.
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
-- color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD of the image (ignore UI chrome, white backgrounds of websites). Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if no image.
+- COLOR TAGS — allowed values for all color fields: "red", "violet", "pink", "yellow", "green", "blue", "brown", "white", "black", "bw".
+  - "red" = true reds, scarlet, crimson, burgundy, maroon, dark red
+  - "violet" = purple, violet, lavender, indigo, magenta-leaning purple
+  - "pink" = pink, magenta, rose, fuchsia, coral-pink
+  - "yellow" = yellow, gold, amber, warm orange, mustard
+  - "green" = green, emerald, olive, lime, teal-leaning green, mint
+  - "blue" = blue, navy, cyan, teal, sky blue, cobalt
+  - "brown" = brown, beige, tan, khaki, sand, chocolate, caramel
+  - "white" = white, cream, off-white, very light gray
+  - "black" = black, very dark gray, charcoal, near-black
+  - "bw" = ONLY for genuine black-and-white or monochrome photography/imagery with no color
+- color_palette: the single OVERALL dominant color of the entire screenshot/image including backgrounds, UI, everything. For websites/apps — include the site background color. A dark-themed site = "black". A white site with a small red button = "white". Null if no image.
+- color_subject: the color of the MAIN SUBJECT/OBJECT only, ignoring backgrounds and UI chrome. For product pages — the product itself. For tools/apps — the key accent/brand color. For articles — the hero image dominant color. Null if no clear subject or same as color_palette.
+- color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Include ALL visually significant colors — backgrounds, UI, objects. Do NOT pad to 3 — if the image is mostly one color, return just ["black"]. Empty array if no image.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text or no image.
 - price: the main product price with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
 - author: for xpost — @handle from screenshot. Empty string otherwise.
@@ -543,6 +573,8 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
   const aiDataPayload = {};
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;
+  if (aiResult.color_subject) aiDataPayload.color_subject = aiResult.color_subject;
+  if (aiResult.color_top3?.length) aiDataPayload.color_top3 = aiResult.color_top3;
   if (aiResult.text_on_image) aiDataPayload.text_on_image = aiResult.text_on_image;
   if (aiResult.price) aiDataPayload.price = aiResult.price;
   if (aiResult.author) aiDataPayload.author = aiResult.author;

@@ -499,7 +499,27 @@ function applyFilters() {
   }
 
   if (STATE.activeColor) {
-    items = items.filter(item => item.ai_data?.color_palette === STATE.activeColor);
+    // Map legacy AI tags → new filter tags so old records still match
+    const COLOR_ALIASES = {
+      purple: 'violet', orange: 'yellow',
+    };
+    const REVERSE_ALIASES = {};
+    for (const [old, nw] of Object.entries(COLOR_ALIASES)) REVERSE_ALIASES[nw] = (REVERSE_ALIASES[nw] || []).concat(old);
+
+    const target = STATE.activeColor;
+    const alsoMatch = REVERSE_ALIASES[target] || []; // e.g. violet → ["purple"]
+
+    items = items.filter(item => {
+      const d = item.ai_data;
+      if (!d) return false;
+      // New system: match color_top3
+      if (d.color_top3?.length) {
+        return d.color_top3.includes(target) || d.color_top3.some(c => COLOR_ALIASES[c] === target);
+      }
+      // Legacy fallback: match color_palette
+      const cp = d.color_palette;
+      return cp === target || alsoMatch.includes(cp);
+    });
   }
 
   if (STATE.search) {
@@ -611,14 +631,31 @@ function renderCard(item) {
       if (!sym) { const m = rawPrice.match(/^([^\d\s]+)/); sym = m ? m[1] : '$'; }
       formattedPrice = sym + num;
     }
+    const PRODUCT_PALETTE = {
+      red:    { bg: '#3D1A1A', border: 'rgba(140,50,50,0.5)',   price: '#C97A7A' },
+      violet: { bg: '#313367', border: 'rgba(69,57,131,0.5)',   price: '#9392CA' },
+      pink:   { bg: '#3D1A2E', border: 'rgba(140,50,100,0.5)',  price: '#CA7AAF' },
+      yellow: { bg: '#3A3210', border: 'rgba(140,125,30,0.5)',  price: '#C9B860' },
+      green:  { bg: '#1A2E15', border: 'rgba(50,110,45,0.5)',   price: '#7ABF72' },
+      blue:   { bg: '#13213D', border: 'rgba(45,85,160,0.5)',   price: '#7A9FCA' },
+      brown:  { bg: '#2E1F10', border: 'rgba(110,72,30,0.5)',   price: '#C4986A' },
+      white:  { bg: '#2A2A2A', border: 'rgba(120,120,120,0.5)', price: '#C0C0C0' },
+      black:  { bg: '#111111', border: 'rgba(70,70,70,0.5)',    price: '#909090' },
+      bw:     { bg: '#1A1A1A', border: 'rgba(90,90,90,0.5)',    price: '#ABABAB' },
+      // Legacy aliases
+      orange: { bg: '#3A2410', border: 'rgba(140,85,30,0.5)',   price: '#C99060' },
+      purple: { bg: '#313367', border: 'rgba(69,57,131,0.5)',   price: '#9392CA' },
+    };
+    const colorKey = aiData.color_subject || aiData.color_top3?.[0] || aiData.color_palette || 'violet';
+    const theme = PRODUCT_PALETTE[colorKey] || PRODUCT_PALETTE.purple;
     const notchSvg = `<svg viewBox="-3 -3 101.0078 43.6777" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M47.5039 0C55.1408 0 61.3925 5.93081 61.9063 13.4374C61.944 13.9883 62.3881 14.4375 62.9404 14.4375H83.3887C89.8059 14.4377 95.0078 19.6404 95.0078 26.0576C95.0078 32.4749 89.8059 37.6775 83.3887 37.6777H11.6201C5.20275 37.6777 2.11322e-05 32.475 0 26.0576C0 19.6402 5.20274 14.4375 11.6201 14.4375H32.0674C32.6197 14.4375 33.0638 13.9883 33.1015 13.4373C33.6153 5.93083 39.8671 4.64136e-05 47.5039 0Z" fill="#080808" stroke="rgba(69,57,131,0.7)" stroke-width="4"/>
+      <path d="M47.5039 0C55.1408 0 61.3925 5.93081 61.9063 13.4374C61.944 13.9883 62.3881 14.4375 62.9404 14.4375H83.3887C89.8059 14.4377 95.0078 19.6404 95.0078 26.0576C95.0078 32.4749 89.8059 37.6775 83.3887 37.6777H11.6201C5.20275 37.6777 2.11322e-05 32.475 0 26.0576C0 19.6402 5.20274 14.4375 11.6201 14.4375H32.0674C32.6197 14.4375 33.0638 13.9883 33.1015 13.4373C33.6153 5.93083 39.8671 4.64136e-05 47.5039 0Z" fill="#080808" stroke="${theme.border}" stroke-width="4"/>
     </svg>`;
-    return `<div class="card card-product-new" data-id="${item.id}" data-action="open" data-url="${escapeHtml(url)}">
+    return `<div class="card card-product-new" data-id="${item.id}" data-action="open" data-url="${escapeHtml(url)}" style="background:${theme.bg};border-color:${theme.border}">
       ${pendingDot}
       <div class="product-new-notch">${notchSvg}</div>
       <div class="product-new-header">
-        ${rawPrice ? `<div class="product-new-price">${escapeHtml(formattedPrice)}</div>` : ''}
+        ${rawPrice ? `<div class="product-new-price" style="color:${theme.price}">${escapeHtml(formattedPrice)}</div>` : ''}
       </div>
       <div class="product-new-preview">
         <div class="screenshot-crop"><img class="product-new-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
@@ -999,6 +1036,8 @@ async function runAiBackgroundProcessing() {
           const aiDataPayload = {};
           if (r.materials?.length) aiDataPayload.materials = r.materials;
           if (r.color_palette) aiDataPayload.color_palette = r.color_palette;
+          if (r.color_subject) aiDataPayload.color_subject = r.color_subject;
+          if (r.color_top3?.length) aiDataPayload.color_top3 = r.color_top3;
           if (r.text_on_image) aiDataPayload.text_on_image = r.text_on_image;
           if (r.price) aiDataPayload.price = r.price;
           if (r.author) aiDataPayload.author = r.author;

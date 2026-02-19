@@ -559,7 +559,8 @@
     }
     .card-product-new {
       background: #313367;
-      border: 3px solid rgba(69,57,131,0.7);
+      border: 3px solid rgba(69,57,131,0.5);
+      /* Default violet theme — overridden per-card via inline style */
       border-radius: 20px;
       box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
       overflow: hidden;
@@ -876,8 +877,8 @@
       position: absolute; top: 28px; right: 0;
       background: var(--surface); border: 1px solid rgba(255,255,255,0.12);
       border-radius: 10px; padding: 8px;
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
-      z-index: 200; width: 102px;
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;
+      z-index: 200; width: 160px;
     }
     .color-dropdown-single.hidden { display: none; }
     .color-option-single {
@@ -1000,14 +1001,16 @@
     <div class="color-filter-wrap">
       <div class="color-circle-single" id="color-filter-btn" title="Filter by color">+</div>
       <div class="color-dropdown-single hidden" id="color-dropdown">
-        <div class="color-option-single" data-color="red" style="background:linear-gradient(135deg,#e74c3c,#e91e8c)" title="Red / Pink"></div>
-        <div class="color-option-single" data-color="orange" style="background:linear-gradient(135deg,#e67e22,#f1c40f)" title="Orange / Yellow"></div>
-        <div class="color-option-single" data-color="green" style="background:linear-gradient(135deg,#27ae60,#1abc9c)" title="Green"></div>
-        <div class="color-option-single" data-color="blue" style="background:linear-gradient(135deg,#2980b9,#8e44ad)" title="Blue / Purple"></div>
-        <div class="color-option-single" data-color="brown" style="background:linear-gradient(135deg,#795548,#a0522d)" title="Brown / Beige"></div>
-        <div class="color-option-single" data-color="white" style="background:linear-gradient(135deg,#e8e8e8,#f5f5f5);border:1px solid rgba(255,255,255,0.2)" title="White / Light"></div>
-        <div class="color-option-single" data-color="black" style="background:linear-gradient(135deg,#111,#333)" title="Black / Dark"></div>
-        <div class="color-option-single" data-color="bw" style="background:linear-gradient(135deg,#000 50%,#fff 50%)" title="Black & White"></div>
+        <div class="color-option-single" data-color="red" style="background:#e74c3c" title="Red"></div>
+        <div class="color-option-single" data-color="violet" style="background:#8e44ad" title="Violet"></div>
+        <div class="color-option-single" data-color="pink" style="background:#e84393" title="Pink"></div>
+        <div class="color-option-single" data-color="yellow" style="background:#f1c40f" title="Yellow"></div>
+        <div class="color-option-single" data-color="green" style="background:#27ae60" title="Green"></div>
+        <div class="color-option-single" data-color="blue" style="background:#2980b9" title="Blue"></div>
+        <div class="color-option-single" data-color="brown" style="background:#795548" title="Brown"></div>
+        <div class="color-option-single" data-color="white" style="background:#e8e8e8;border:1px solid rgba(255,255,255,0.2)" title="White"></div>
+        <div class="color-option-single" data-color="black" style="background:#222" title="Black"></div>
+        <div class="color-option-single" data-color="bw" style="background:linear-gradient(135deg,#000 50%,#fff 50%)" title="B&W"></div>
       </div>
     </div>
     <span id="ai-status"></span>
