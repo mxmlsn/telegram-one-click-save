@@ -358,7 +358,7 @@ function setupDisplayBar() {
       document.querySelectorAll('#display-bar [data-layout]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       STATE.layout = btn.dataset.layout;
-      applyGridMode();
+      applyFilters();
     });
   });
 
@@ -386,8 +386,17 @@ function setupDisplayBar() {
       document.querySelectorAll('#display-bar [data-align]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       STATE.align = btn.dataset.align;
-      applyGridMode();
+      applyFilters();
     });
+  });
+
+  // Re-render on resize (column count may change in adaptive mode)
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    if (STATE.align === 'masonry' && STATE.layout === 'adaptive') {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => applyFilters(), 150);
+    }
   });
 
   applyGridMode();
@@ -406,31 +415,17 @@ function applyGridMode() {
   wrap.style.paddingLeft = pad;
   wrap.style.paddingRight = pad;
 
-  // Reset all mode classes and inline overrides
-  m.classList.remove('mode-adaptive', 'mode-4col', 'mode-3col', 'mode-rows', 'rows-adaptive', 'rows-4col', 'rows-3col');
-  m.style.columnGap = '';
-  m.style.gap = '';
-  m.style.display = '';
-  m.style.flexWrap = '';
+  // Reset mode classes
+  m.classList.remove('mode-rows', 'rows-adaptive', 'rows-4col', 'rows-3col');
 
   if (STATE.align === 'center') {
-    // Flex-based row layout — gap handled via CSS var in .mode-rows
+    // Flex-wrap row layout
     m.classList.add('mode-rows');
-
     if (STATE.layout === '3col') m.classList.add('rows-3col');
     else if (STATE.layout === '4col') m.classList.add('rows-4col');
     else m.classList.add('rows-adaptive');
-
-    m.querySelectorAll('.card').forEach(c => { c.style.marginBottom = ''; });
-  } else {
-    // CSS columns masonry mode
-    m.style.columnGap = gap;
-
-    if (STATE.layout === '4col') m.classList.add('mode-4col');
-    else if (STATE.layout === '3col') m.classList.add('mode-3col');
-
-    m.querySelectorAll('.card').forEach(c => { c.style.marginBottom = gap; });
   }
+  // Masonry mode: gap is handled by CSS flex gap on #masonry and .masonry-col
 }
 
 // ─── Filtering ────────────────────────────────────────────────────────────────
@@ -708,6 +703,18 @@ function renderCard(item) {
   </div>`;
 }
 
+function getColumnCount() {
+  if (STATE.layout === '3col') return 3;
+  if (STATE.layout === '4col') return 4;
+  // adaptive — match CSS media queries
+  const w = window.innerWidth;
+  if (w <= 480) return 1;
+  if (w <= 750) return 2;
+  if (w <= 1100) return 3;
+  if (w <= 1400) return 4;
+  return 5;
+}
+
 function renderAll(items) {
   const masonry = document.getElementById('masonry');
   const empty = document.getElementById('empty-state');
@@ -718,7 +725,29 @@ function renderAll(items) {
     return;
   }
   empty.classList.add('hidden');
-  masonry.innerHTML = items.map(renderCard).join('');
+  const cards = items.map(renderCard);
+
+  if (STATE.align === 'masonry') {
+    // Build explicit column divs — distribute cards round-robin
+    // so row reading order (left-to-right, top-to-bottom) is chronological.
+    // Items come newest-first from Notion, so visual order:
+    //   row 0 (top): items 0,1,2,3  (newest)
+    //   row 1:       items 4,5,6,7
+    //   ...
+    //   last row (bottom): oldest items
+    // Round-robin: item i goes to column (i % cols)
+    const cols = getColumnCount();
+    const columns = Array.from({ length: cols }, () => []);
+    for (let i = 0; i < cards.length; i++) {
+      columns[i % cols].push(cards[i]);
+    }
+    masonry.innerHTML = columns.map(col =>
+      `<div class="masonry-col">${col.join('')}</div>`
+    ).join('');
+  } else {
+    // Center mode — flat cards directly in masonry container
+    masonry.innerHTML = cards.join('');
+  }
   applyGridMode();
 }
 
