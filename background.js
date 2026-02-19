@@ -31,6 +31,8 @@ const DEFAULT_SETTINGS = {
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#text',
+  tagGif: '#gif',
+  tagPdf: '#pdf',
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4,
@@ -206,7 +208,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   try {
     // Handle different content types
-    if (info.srcUrl) {
+    // If the tab is a PDF page, always send as PDF regardless of right-click target
+    if (isPdfUrl(tab.url)) {
+      console.log('[TG Saver] Tab is a PDF page, sending as PDF:', tab.url);
+      await sendPdfDirect(tab.url, tab.url, settings, tab.id, selectedTag);
+    } else if (info.srcUrl) {
       console.log('[TG Saver] Handling image source:', info.srcUrl);
       await sendImageDirect(info.srcUrl, tab.url, settings, tab.id, selectedTag);
     } else if (info.selectionText) {
@@ -398,6 +404,7 @@ Rules:
   - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. No visible price = null.
   - "xpost" — URL contains x.com or twitter.com
   - "tool" — URL is a digital tool, app, SaaS service, template marketplace, font foundry/specimen, browser extension, CLI utility, framework/library page, AI tool, online generator/converter, or a showcase/launch post ("I made X", "I built X", Product Hunt, etc.)
+  - "pdf" — screenshot shows a PDF document viewer (browser PDF viewer, Google Drive PDF preview, embedded PDF). Look for: PDF toolbar/controls, page navigation, ".pdf" in URL bar or title, document-style layout with page borders. Set this when the page is clearly displaying a PDF file.
 - content_type_secondary: If the content fits TWO categories, set the secondary one here. Same allowed values as content_type. Must be DIFFERENT from content_type (or null). Common cases:
   - xpost about a tool/app/SaaS → content_type="xpost", content_type_secondary="tool"
   - xpost about a product with price → content_type="xpost", content_type_secondary="product"
@@ -436,12 +443,12 @@ async function fetchBase64(url) {
   return btoa(binary);
 }
 
-async function callGemini(prompt, imageBase64OrNull, settings) {
+async function callGemini(prompt, imageBase64OrNull, settings, mimeType = 'image/jpeg') {
   const model = settings.aiModel || 'gemini-2.0-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
   const parts = [];
   if (imageBase64OrNull) {
-    parts.push({ inline_data: { mime_type: 'image/jpeg', data: imageBase64OrNull } });
+    parts.push({ inline_data: { mime_type: mimeType, data: imageBase64OrNull } });
   }
   parts.push({ text: prompt });
   const res = await fetch(url, {
@@ -481,27 +488,54 @@ async function callAnthropic(messages, settings) {
 
 async function analyzeWithAI(item, settings) {
   if (!settings.aiEnabled || !settings.aiApiKey) return null;
-  if (item.type === 'quote') return null;
+  if (item.type === 'quote' || item.type === 'pdf') return null;
 
   try {
     const provider = settings.aiProvider || 'google';
     let responseText = null;
 
-    const isDirectImage = item.type === 'image';
+    const isDirectImage = item.type === 'image' || item.type === 'gif';
 
-    if (item.fileId && settings.botToken) {
-      // Get Telegram image (direct photo)
+    // For GIFs: use original image URL directly (Telegram thumbnail is tiny/inaccurate)
+    if (item.originalImageUrl) {
+      const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+      const ext = item.originalImageUrl.split('?')[0].split('.').pop()?.toLowerCase();
+      const mimeType = ext === 'gif' ? 'image/gif' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+      if (provider === 'google') {
+        const base64 = await fetchBase64(item.originalImageUrl);
+        responseText = await callGemini(prompt, base64, settings, mimeType);
+      } else {
+        const messages = [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'url', url: item.originalImageUrl } },
+            { type: 'text', text: prompt }
+          ]
+        }];
+        responseText = await callAnthropic(messages, settings);
+      }
+    } else if (item.fileId && settings.botToken) {
+      // Get Telegram file (photo, etc.)
       const fileRes = await fetch(
         `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${item.fileId}`
       );
       const fileData = await fileRes.json();
       if (fileData.ok) {
-        const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${fileData.result.file_path}`;
+        const filePath = fileData.result.file_path;
+        const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
         const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+
+        // Detect mime type from file extension
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        const mimeType = ext === 'gif' ? 'image/gif'
+          : ext === 'png' ? 'image/png'
+          : ext === 'webp' ? 'image/webp'
+          : 'image/jpeg';
 
         if (provider === 'google') {
           const base64 = await fetchBase64(imgUrl);
-          responseText = await callGemini(prompt, base64, settings);
+          responseText = await callGemini(prompt, base64, settings, mimeType);
         } else {
           // Anthropic accepts image URLs directly
           const messages = [{
@@ -765,6 +799,20 @@ async function showTagSelection(tabId, customTags) {
 // Send screenshot of current tab
 async function sendScreenshot(tab, settings) {
   try {
+    // If the current page is a PDF, send it as a PDF document
+    if (isPdfUrl(tab.url)) {
+      // Show tag selection first
+      let selectedTag = null;
+      if (settings.enableQuickTags && settings.customTags && settings.customTags.length > 0) {
+        selectedTag = await showTagSelection(tab.id, settings.customTags);
+        if (selectedTag === '__CANCELLED__') return;
+      } else {
+        await showToast(tab.id, 'pending', 'Sending PDF');
+      }
+      await sendPdfDirect(tab.url, tab.url, settings, tab.id, selectedTag);
+      return;
+    }
+
     // Start capture immediately (non-blocking)
     const capturePromise = chrome.tabs.captureVisibleTab(null, { format: 'png' });
 
@@ -856,9 +904,12 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
       blob = await fetch(screenshotDataUrl).then(r => r.blob());
     }
 
-    const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+    const isGifDetected = !useScreenshot && (isGifUrl(imageUrl) || isGifBlob(blob));
+    const caption = buildCaption(pageUrl, isGifDetected ? settings.tagGif : settings.tagImage, '', settings, selectedTag);
 
-    if (settings.imageCompression || useScreenshot) {
+    if (isGifDetected) {
+      await sendAnimation(blob, caption, settings, imageUrl);
+    } else if (settings.imageCompression || useScreenshot) {
       await sendPhoto(blob, caption, settings);
     } else {
       await sendDocument(blob, caption, settings, imageUrl);
@@ -890,9 +941,12 @@ async function sendImage(imageUrl, pageUrl, settings, tabId = null, selectedTag 
       blob = await fetch(screenshotDataUrl).then(r => r.blob());
     }
 
-    const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+    const isGifDetected2 = !useScreenshot && (isGifUrl(imageUrl) || isGifBlob(blob));
+    const caption = buildCaption(pageUrl, isGifDetected2 ? settings.tagGif : settings.tagImage, '', settings, selectedTag);
 
-    if (settings.imageCompression || useScreenshot) {
+    if (isGifDetected2) {
+      await sendAnimation(blob, caption, settings, imageUrl);
+    } else if (settings.imageCompression || useScreenshot) {
       await sendPhoto(blob, caption, settings);
     } else {
       await sendDocument(blob, caption, settings, imageUrl);
@@ -1032,6 +1086,12 @@ async function sendVideoAsScreenshot(tab, settings, selectedTag = null) {
 
 // Send screenshot with pre-selected tag (for sendImageFromPage flow)
 async function sendScreenshotWithTag(tab, settings, selectedTag) {
+  // If the current page is a PDF, send it as a document
+  if (isPdfUrl(tab.url)) {
+    await sendPdfDirect(tab.url, tab.url, settings, tab.id, selectedTag);
+    return;
+  }
+
   // Start capture immediately (non-blocking) if needed
   const capturePromise = settings.addScreenshot ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
 
@@ -1086,7 +1146,9 @@ async function sendImageWithTag(imageUrl, pageUrl, settings, tabId, selectedTag)
 
   const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
 
-  if (settings.imageCompression || useScreenshot) {
+  if (!useScreenshot && (isGifUrl(imageUrl) || isGifBlob(blob))) {
+    await sendAnimation(blob, caption, settings, imageUrl);
+  } else if (settings.imageCompression || useScreenshot) {
     await sendPhoto(blob, caption, settings);
   } else {
     await sendDocument(blob, caption, settings, imageUrl);
@@ -1266,6 +1328,36 @@ async function sendPhoto(blob, caption, settings) {
   }
 }
 
+// Telegram API: send photo silently (no notification, no caption) — for preview fileId only
+async function sendPhotoSilent(blob, settings) {
+  try {
+    const compressedBlob = await compressImageIfNeeded(blob);
+    const formData = new FormData();
+    formData.append('chat_id', settings.chatId);
+    formData.append('photo', compressedBlob, 'preview.jpg');
+    formData.append('disable_notification', 'true');
+
+    const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[TG Saver] Silent photo error:', error);
+      return null;
+    }
+
+    const result = await response.json();
+    const photos = result.result?.photo;
+    const fileId = photos && photos.length > 0 ? photos[photos.length - 1].file_id : null;
+    return { fileId };
+  } catch (err) {
+    console.warn('[TG Saver] Silent photo failed:', err);
+    return null;
+  }
+}
+
 // Telegram API: send document (uncompressed)
 async function sendDocument(blob, caption, settings, originalUrl) {
   console.log('[TG Saver] Sending document to Telegram...');
@@ -1298,13 +1390,79 @@ async function sendDocument(blob, caption, settings, originalUrl) {
   }
 }
 
+// Telegram API: send animation (GIF with inline preview)
+async function sendAnimation(blob, caption, settings, originalUrl) {
+  console.log('[TG Saver] Sending animation (GIF) to Telegram...', { blobSize: blob?.size, blobType: blob?.type });
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', settings.chatId);
+    formData.append('animation', blob, 'animation.gif');
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
+
+    const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendAnimation`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[TG Saver] Telegram API error (animation):', error);
+      throw new Error(error.description || 'Telegram API error');
+    }
+
+    console.log('[TG Saver] Animation sent successfully');
+    const result = await response.json();
+    console.log('[TG Saver] sendAnimation response keys:', JSON.stringify(Object.keys(result.result || {})));
+    // For viewer/AI: use the thumbnail file_id (static JPEG that getFile can serve as <img>).
+    // The animation.file_id points to an MP4 which <img> can't render.
+    // Viewer will fallback to original source URL stored in Notion content field.
+    const thumb = result.result?.animation?.thumbnail || result.result?.animation?.thumb;
+    const fileId = thumb?.file_id || null;
+    console.log('[TG Saver] Animation thumbnail file_id:', fileId);
+    return { ...result, fileId };
+  } catch (err) {
+    console.error('[TG Saver] Network error sending animation:', err);
+    throw err;
+  }
+}
+
+// Check if URL points to a GIF image
+function isGifUrl(url) {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  return cleanUrl.endsWith('.gif');
+}
+
+// Check if URL points to a PDF file
+function isPdfUrl(url) {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  return cleanUrl.endsWith('.pdf');
+}
+
+// Check if a blob is a GIF by MIME type
+function isGifBlob(blob) {
+  return blob && blob.type === 'image/gif';
+}
+
 // ============ DIRECT FUNCTIONS (tag already selected) ============
 
 // Send image directly (tag already selected via context menu handler)
 async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) {
+  console.log('[TG Saver] sendImageDirect called:', { imageUrl: imageUrl?.slice(0, 100), pageUrl: pageUrl?.slice(0, 60) });
+
+  // If srcUrl is a PDF (e.g. embedded PDF), send as document
+  if (isPdfUrl(imageUrl)) {
+    await sendPdfDirect(imageUrl, pageUrl, settings, tabId, selectedTag);
+    return;
+  }
+
   // Start fetching image immediately
+  console.log('[TG Saver] Fetching image blob...');
   const blobPromise = fetch(imageUrl)
     .then(response => {
+      console.log('[TG Saver] Image fetch response:', response.status, response.headers.get('content-type'));
       if (!response.ok) throw new Error('Failed to fetch image');
       return response.blob();
     })
@@ -1316,6 +1474,7 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
   // Wait for image
   let blob = await blobPromise;
   let useScreenshot = false;
+  console.log('[TG Saver] Blob result:', blob ? `${blob.type}, ${blob.size} bytes` : 'null');
 
   if (!blob && tabId) {
     useScreenshot = true;
@@ -1323,19 +1482,33 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
     blob = await fetch(screenshotDataUrl).then(r => r.blob());
   }
 
-  const caption = buildCaption(pageUrl, settings.tagImage, '', settings, selectedTag);
+  const isGif = !useScreenshot && (isGifUrl(imageUrl) || isGifBlob(blob));
+  const caption = buildCaption(pageUrl, isGif ? settings.tagGif : settings.tagImage, '', settings, selectedTag);
+  console.log('[TG Saver] GIF detected:', isGif, 'isGifUrl:', isGifUrl(imageUrl), 'isGifBlob:', isGifBlob(blob));
 
   let fileId = null;
-  if (settings.imageCompression || useScreenshot) {
+  // GIF: always send via sendAnimation for inline animated preview
+  if (isGif) {
+    console.log('[TG Saver] Sending as animation...');
+    const result = await sendAnimation(blob, caption, settings, imageUrl);
+    fileId = result?.fileId || null;
+  } else if (settings.imageCompression || useScreenshot) {
     const result = await sendPhoto(blob, caption, settings);
     fileId = result?.fileId || null;
   } else {
     await sendDocument(blob, caption, settings, imageUrl);
   }
 
-  const notionPageId = await saveToNotion({ type: 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name }, settings);
+  const notionData = { type: isGif ? 'gif' : 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name };
+  // For GIFs: store original image URL in content so viewer can display the animated GIF
+  if (isGif) notionData.content = imageUrl;
+  const notionPageId = await saveToNotion(notionData, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ type: 'image', sourceUrl: pageUrl, fileId }, settings)
+    // For GIFs: pass the original image URL so AI can fetch it directly
+    // (Telegram thumbnail is tiny and inaccurate)
+    const aiItem = { type: isGif ? 'gif' : 'image', sourceUrl: pageUrl, fileId };
+    if (isGif) aiItem.originalImageUrl = imageUrl;
+    analyzeWithAI(aiItem, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
@@ -1353,6 +1526,12 @@ async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
 
 // Send link directly (tag already selected via context menu handler)
 async function sendLinkDirect(linkUrl, pageUrl, settings, tabId, selectedTag) {
+  // PDF link: download and send as document
+  if (isPdfUrl(linkUrl)) {
+    await sendPdfDirect(linkUrl, pageUrl, settings, tabId, selectedTag);
+    return;
+  }
+
   const caption = buildCaption(linkUrl, settings.tagLink, '', settings, selectedTag);
   await sendTextMessage(caption, settings);
   const notionPageId = await saveToNotion({ type: 'link', sourceUrl: linkUrl, tagName: selectedTag?.name }, settings);
@@ -1362,6 +1541,77 @@ async function sendLinkDirect(linkUrl, pageUrl, settings, tabId, selectedTag) {
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
   if (tabId) await showToast(tabId, 'success', 'Success');
+}
+
+// Send PDF file directly (download and send as document)
+async function sendPdfDirect(pdfUrl, pageUrl, settings, tabId, selectedTag) {
+  console.log('[TG Saver] Sending PDF:', pdfUrl);
+  try {
+    // Capture screenshot of the PDF page for preview (if tab is available)
+    // Start capture immediately in parallel with PDF fetch
+    let screenshotPromise = null;
+    if (tabId) {
+      screenshotPromise = chrome.tabs.captureVisibleTab(null, { format: 'png' })
+        .catch(e => { console.warn('[TG Saver] PDF screenshot capture failed:', e); return null; });
+    }
+
+    const response = await fetch(pdfUrl);
+    if (!response.ok) throw new Error('Failed to fetch PDF');
+    const blob = await response.blob();
+
+    // Extract filename from URL or use default
+    const urlPath = pdfUrl.split('?')[0].split('#')[0];
+    const filename = urlPath.split('/').pop() || 'document.pdf';
+
+    const caption = buildCaption(pageUrl || pdfUrl, settings.tagPdf, '', settings, selectedTag);
+
+    const formData = new FormData();
+    formData.append('chat_id', settings.chatId);
+    formData.append('document', blob, filename);
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'HTML');
+
+    const tgResponse = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendDocument`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!tgResponse.ok) {
+      const error = await tgResponse.json();
+      console.error('[TG Saver] Telegram API error (PDF):', error);
+      throw new Error(error.description || 'Telegram API error');
+    }
+
+    console.log('[TG Saver] PDF sent successfully');
+
+    // Send screenshot as silent photo to get a fileId for viewer preview
+    let previewFileId = null;
+    if (screenshotPromise) {
+      const screenshotDataUrl = await screenshotPromise;
+      if (screenshotDataUrl) {
+        try {
+          const screenshotBlob = await fetch(screenshotDataUrl).then(r => r.blob());
+          const photoResult = await sendPhotoSilent(screenshotBlob, settings);
+          previewFileId = photoResult?.fileId || null;
+          console.log('[TG Saver] PDF preview screenshot fileId:', previewFileId);
+        } catch (e) {
+          console.warn('[TG Saver] PDF preview screenshot send failed:', e);
+        }
+      }
+    }
+
+    const notionPageId = await saveToNotion({ type: 'pdf', sourceUrl: pdfUrl, fileId: previewFileId, tagName: selectedTag?.name }, settings);
+    if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
+      analyzeWithAI({ type: 'pdf', sourceUrl: pdfUrl, fileId: previewFileId }, settings)
+        .then(r => patchNotionWithAI(notionPageId, r, settings))
+        .catch(e => console.warn('[TG Saver] AI on-save error:', e));
+    }
+
+    if (tabId) await showToast(tabId, 'success', 'Success');
+  } catch (err) {
+    console.error('[TG Saver] Error sending PDF:', err);
+    if (tabId) showToast(tabId, 'error', 'Error: ' + err.message);
+  }
 }
 
 // Send image from page directly (tag already selected via context menu handler)
@@ -1445,6 +1695,12 @@ async function sendImageFromPageDirect(tab, settings, selectedTag) {
 
 // Send screenshot directly (tag already selected)
 async function sendScreenshotDirect(tab, settings, selectedTag) {
+  // If the current page is a PDF, send it as a document
+  if (isPdfUrl(tab.url)) {
+    await sendPdfDirect(tab.url, tab.url, settings, tab.id, selectedTag);
+    return;
+  }
+
   const capturePromise = settings.addScreenshot ? chrome.tabs.captureVisibleTab(null, { format: 'png' }) : null;
 
   if (!settings.addScreenshot) {

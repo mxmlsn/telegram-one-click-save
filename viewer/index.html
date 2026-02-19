@@ -395,6 +395,57 @@
       object-fit: cover;
     }
 
+    /* ── GIF card ── */
+    .card-gif {
+      position: relative;
+    }
+    .card-gif .gif-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    /* ── PDF card ── */
+    .card-pdf .pdf-preview {
+      padding: 0 10px;
+    }
+    .card-pdf .pdf-screenshot {
+      display: block;
+      object-fit: cover;
+    }
+    .card-pdf .pdf-label {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-pdf .pdf-icon {
+      background: #e74c3c;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+    .card-pdf .pdf-filename {
+      color: var(--text-secondary, rgba(255,255,255,0.5));
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     /* ── Tool card ── */
     .card.card-tool {
       border-radius: 20px;
@@ -1129,8 +1180,10 @@
   <div class="type-filters" id="type-filters">
     <button class="type-pill active" data-type="all">All</button>
     <button class="type-pill" data-type="image">Image</button>
+    <button class="type-pill" data-type="gif">GIF</button>
     <button class="type-pill" data-type="link">Link</button>
     <button class="type-pill" data-type="quote">Quote</button>
+    <button class="type-pill" data-type="pdf">PDF</button>
     <div class="filter-divider"></div>
     <button class="type-pill" data-type="video">Video</button>
     <button class="type-pill" data-type="product">Product</button>
