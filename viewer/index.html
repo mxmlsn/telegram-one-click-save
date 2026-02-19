@@ -428,15 +428,9 @@
       bottom: 14px;
       pointer-events: none;
     }
-    .card-article .article-book-shadow-2 {
-      z-index: 1;
-      transform: scaleX(1.06) translateY(8px);
-      opacity: 0.4;
-    }
     .card-article .article-book-shadow-1 {
-      z-index: 2;
-      transform: scaleX(1.035) translateY(4px);
-      opacity: 0.65;
+      z-index: 1;
+      transform: scaleX(1.04) translateY(4px);
     }
     .card-article .article-page {
       flex: 1;
@@ -454,7 +448,7 @@
     .card-article .article-page-left {
       transform: skewY(4deg);
       transform-origin: right bottom;
-      border-radius: 4px 0 0 4px;
+      border-radius: 50% 50% 0 4px / 12px 12px 0 4px;
     }
     .card-article .article-page-left::after {
       right: 0;
@@ -463,14 +457,14 @@
     .card-article .article-page-right {
       transform: skewY(-4deg);
       transform-origin: left bottom;
-      border-radius: 0 4px 4px 0;
+      border-radius: 50% 50% 4px 0 / 12px 12px 4px 0;
     }
     .card-article .article-page-right::after {
       left: 0;
       background: linear-gradient(to right, rgba(0,0,0,0.25), rgba(0,0,0,0));
     }
     .card-article .article-page img {
-      width: 200%;
+      width: 230%;
       display: block;
     }
     .card-article .article-page-left img {
@@ -480,7 +474,9 @@
     .card-article .article-page-right img {
       object-fit: cover;
       object-position: right top;
-      margin-left: -100%;
+      margin-left: -130%;
+      position: relative;
+      left: 3%;
     }
 
     /* ── Product card (new design) ── */
