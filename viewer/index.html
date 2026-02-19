@@ -498,8 +498,9 @@
       border: 0.3px solid rgba(88,119,65,0.5);
       border-radius: 20px;
       box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
-      overflow: hidden;оквн
+      overflow: hidden;
       position: relative;
+      container-type: inline-size;
     }
     .card-product-new .product-new-notch {
       display: flex; justify-content: center;
@@ -514,12 +515,13 @@
     }
     .card-product-new .product-new-price {
       font-family: 'Anybody', sans-serif;
-      font-size: 60px;
+      font-size: min(60px, 18cqi);
       font-weight: 900;
       color: #C5CBB2;
       line-height: 1;
       letter-spacing: 0.5px;
       text-align: center;
+      white-space: nowrap;
     }
     .card-product-new .product-new-preview {
       padding: 0 10px 10px;
