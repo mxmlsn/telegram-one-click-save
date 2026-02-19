@@ -488,7 +488,7 @@ function renderCard(item) {
         ${rawPrice ? `<div class="product-new-price">${escapeHtml(formattedPrice)}</div>` : ''}
       </div>
       <div class="product-new-preview">
-        <img class="product-new-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+        <div class="screenshot-crop"><img class="product-new-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
       </div>
     </div>`;
   }
@@ -525,7 +525,7 @@ function renderCard(item) {
         <span class="link-domain">${escapeHtml(domain)}</span>
         <button class="link-arrow-btn" data-action="open" data-url="${escapeHtml(linkUrl)}" title="Open">${arrowIcon}</button>
       </div>
-      ${imgUrl ? `<div class="link-preview"><img class="link-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>` : ''}
+      ${imgUrl ? `<div class="link-preview"><div class="screenshot-crop"><img class="link-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div></div>` : ''}
     </div>`;
   }
 
