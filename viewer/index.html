@@ -406,10 +406,37 @@
       font-weight: 500;
     }
     .card-article .article-book {
+      padding: 0 14px 14px;
+      position: relative;
+    }
+    /* Shared layout for main + shadow layers */
+    .card-article .article-book-main,
+    .card-article .article-book-shadow {
       display: flex;
       gap: -1px;
-      padding: 0 14px 14px;
       perspective: 800px;
+    }
+    .card-article .article-book-main {
+      position: relative;
+      z-index: 3;
+    }
+    /* Shadow layers — absolute, behind main */
+    .card-article .article-book-shadow {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      pointer-events: none;
+    }
+    .card-article .article-book-shadow-2 {
+      z-index: 1;
+      transform: scaleX(1.07) translateY(5px);
+      opacity: 0.4;
+    }
+    .card-article .article-book-shadow-1 {
+      z-index: 2;
+      transform: scaleX(1.035) translateY(2px);
+      opacity: 0.65;
     }
     .card-article .article-page {
       flex: 1;
