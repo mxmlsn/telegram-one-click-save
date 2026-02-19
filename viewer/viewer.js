@@ -31,6 +31,34 @@ const STATE = {
   padding: 14
 };
 
+// ─── Display settings persistence ────────────────────────────────────────────
+const DISPLAY_SETTINGS_KEY = 'viewerDisplaySettings';
+let _displaySaveTimer = null;
+
+function scheduleDisplaySave() {
+  clearTimeout(_displaySaveTimer);
+  _displaySaveTimer = setTimeout(() => {
+    chrome.storage.local.set({ [DISPLAY_SETTINGS_KEY]: {
+      layout: STATE.layout, align: STATE.align, gap: STATE.gap, padding: STATE.padding
+    }});
+  }, 3000);
+}
+
+function restoreDisplaySettings() {
+  return new Promise(resolve => {
+    chrome.storage.local.get(DISPLAY_SETTINGS_KEY, data => {
+      const s = data[DISPLAY_SETTINGS_KEY];
+      if (s) {
+        if (s.layout) STATE.layout = s.layout;
+        if (s.align) STATE.align = s.align;
+        if (typeof s.gap === 'number') STATE.gap = s.gap;
+        if (typeof s.padding === 'number') STATE.padding = s.padding;
+      }
+      resolve();
+    });
+  });
+}
+
 
 // ─── Chrome relay helpers ─────────────────────────────────────────────────────
 function bgFetch(url, options = {}) {
@@ -84,6 +112,7 @@ async function startApp() {
   document.getElementById('grid-wrap').classList.remove('hidden');
   document.getElementById('ai-status').textContent = 'Loading…';
 
+  await restoreDisplaySettings();
   setupToolbarEvents();
   setupDisplayBar();
 
@@ -352,6 +381,22 @@ function setupToolbarEvents() {
 
 // ─── Display bar ──────────────────────────────────────────────────────────────
 function setupDisplayBar() {
+  // Restore UI from STATE
+  document.querySelectorAll('#display-bar [data-layout]').forEach(b => {
+    b.classList.toggle('active', b.dataset.layout === STATE.layout);
+  });
+  document.querySelectorAll('#display-bar [data-align]').forEach(b => {
+    b.classList.toggle('active', b.dataset.align === STATE.align);
+  });
+  const gapRange = document.getElementById('gap-range');
+  const gapVal = document.getElementById('gap-val');
+  gapRange.value = STATE.gap;
+  gapVal.textContent = STATE.gap;
+  const padRange = document.getElementById('padding-range');
+  const padVal = document.getElementById('padding-val');
+  padRange.value = STATE.padding;
+  padVal.textContent = STATE.padding;
+
   // Layout buttons
   document.querySelectorAll('#display-bar [data-layout]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -359,25 +404,24 @@ function setupDisplayBar() {
       btn.classList.add('active');
       STATE.layout = btn.dataset.layout;
       applyFilters();
+      scheduleDisplaySave();
     });
   });
 
   // Gap range
-  const gapRange = document.getElementById('gap-range');
-  const gapVal = document.getElementById('gap-val');
   gapRange.addEventListener('input', () => {
     STATE.gap = parseInt(gapRange.value, 10);
     gapVal.textContent = STATE.gap;
     applyGridMode();
+    scheduleDisplaySave();
   });
 
   // Padding range
-  const padRange = document.getElementById('padding-range');
-  const padVal = document.getElementById('padding-val');
   padRange.addEventListener('input', () => {
     STATE.padding = parseInt(padRange.value, 10);
     padVal.textContent = STATE.padding;
     applyGridMode();
+    scheduleDisplaySave();
   });
 
   // Row alignment buttons
@@ -387,6 +431,7 @@ function setupDisplayBar() {
       btn.classList.add('active');
       STATE.align = btn.dataset.align;
       applyFilters();
+      scheduleDisplaySave();
     });
   });
 
@@ -661,13 +706,15 @@ function renderCard(item) {
   if (imgUrl) {
     const sourceUrl = item.sourceUrl || item.url || '';
     const imgDomain = getDomain(sourceUrl);
+    const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
     const domainBtn = (sourceUrl && imgDomain)
       ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
       : '';
+    const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
     return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
       ${pendingDot}
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
-      ${domainBtn}
+      <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
     </div>`;
   }
 
@@ -740,6 +787,30 @@ function renderAll(items) {
     masonry.innerHTML = cards.join('');
   }
   applyGridMode();
+
+  // Mark truncated xpost cards for zoom-in cursor
+  masonry.querySelectorAll('.card-xpost').forEach(card => {
+    const textEl = card.querySelector('.xpost-text');
+    if (textEl && textEl.scrollHeight > textEl.clientHeight + 2) {
+      card.classList.add('xpost-truncated');
+    }
+  });
+}
+
+// ─── Download helper ─────────────────────────────────────────────────────────
+function downloadImage(url) {
+  const ext = (url.match(/\.(jpe?g|png|gif|webp|svg)/i) || [])[1] || 'jpg';
+  const name = 'image_' + Date.now() + '.' + ext;
+  fetch(url)
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(() => window.open(url, '_blank'));
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
@@ -747,7 +818,9 @@ function openLightbox(imgUrl, sourceUrl) {
   const lb = document.getElementById('lightbox');
   const img = document.getElementById('lightbox-img');
   const link = document.getElementById('lightbox-link');
+  const dlBtn = document.getElementById('lightbox-download');
   img.src = imgUrl;
+  dlBtn.onclick = (e) => { e.stopPropagation(); downloadImage(imgUrl); };
   if (sourceUrl && /^https?:\/\//i.test(sourceUrl)) {
     link.href = sourceUrl;
     link.textContent = getDomain(sourceUrl);
@@ -790,6 +863,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'open' && url) {
       e.stopPropagation();
       window.open(url, '_blank');
+      return;
+    }
+
+    // "download" — download image
+    if (action === 'download' && url) {
+      e.stopPropagation();
+      downloadImage(url);
       return;
     }
 

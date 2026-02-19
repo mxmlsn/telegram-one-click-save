@@ -141,9 +141,11 @@
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.55); }
+    .card.card-quote-new { cursor: zoom-in; }
+    .card.card-xpost.xpost-truncated { cursor: zoom-in; }
 
     /* Image card */
-    .card-image .card-img { width: 100%; display: block; border-radius: var(--radius); }
+    .card-image .card-img { width: 100%; display: block; border-radius: var(--radius); cursor: zoom-in; }
 
     /* Link card */
     .card-link {
@@ -601,26 +603,39 @@
 
     /* ── Image hover domain button ── */
     .card-image { position: relative; }
-    .card-image .img-domain-btn {
+    .card-image .img-hover-bar {
       position: absolute; bottom: 10px; left: 10px; right: 10px;
+      display: flex; gap: 6px;
+      opacity: 0; transition: opacity 0.2s;
+      z-index: 10; pointer-events: none;
+    }
+    .card-image:hover .img-hover-bar {
+      opacity: 1; pointer-events: auto;
+    }
+    .card-image .img-domain-btn {
+      flex: 1;
       background: rgba(0,0,0,0.35); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border: none; border-radius: 10px;
       padding: 8px 12px;
       font-family: 'Anybody', sans-serif; font-weight: 400;
       font-size: 12px; color: rgba(255,255,255,0.75);
       cursor: pointer; text-align: center;
-      opacity: 0; transition: opacity 0.2s, background 0.15s, color 0.15s;
-      z-index: 10;
-      pointer-events: none;
-    }
-    .card-image:hover .img-domain-btn {
-      opacity: 1;
-      pointer-events: auto;
+      transition: background 0.15s, color 0.15s;
     }
     .card-image .img-domain-btn:hover {
       background: rgba(0,0,0,0.55);
       color: #fff;
     }
+    .card-image .img-download-btn {
+      background: rgba(0,0,0,0.35); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: none; border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .card-image .img-download-btn:hover { background: rgba(0,0,0,0.55); }
+    .card-image .img-download-btn svg { width: 16px; height: 16px; }
 
     /* ── X Post + Tool hybrid card ── */
     .card-xpost-tool .xpost-preview {
@@ -661,7 +676,16 @@
     }
     #lightbox.hidden { display: none; }
     #lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 10px; object-fit: contain; }
-    #lightbox-link { color: #888; font-size: 13px; margin-top: 14px; text-decoration: none; position: absolute; bottom: 28px; }
+    #lightbox-bottom { position: absolute; bottom: 28px; display: flex; align-items: center; gap: 12px; }
+    #lightbox-link { color: #888; font-size: 13px; text-decoration: none; }
+    #lightbox-link:hover { color: #bbb; }
+    #lightbox-download {
+      background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+      padding: 6px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+      color: #888; font-size: 12px; transition: border-color 0.15s, color 0.15s;
+    }
+    #lightbox-download:hover { border-color: rgba(255,255,255,0.3); color: #bbb; }
+    #lightbox-download svg { width: 14px; height: 14px; }
 
     /* ── Fullscreen content overlay (tweets, quotes) ── */
     #content-overlay {
@@ -1037,7 +1061,10 @@
 <!-- Lightbox -->
 <div id="lightbox" class="hidden">
   <img id="lightbox-img" src="" alt="">
-  <a id="lightbox-link" href="#" target="_blank"></a>
+  <div id="lightbox-bottom">
+    <a id="lightbox-link" href="#" target="_blank"></a>
+    <button id="lightbox-download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+  </div>
 </div>
 
 <!-- Content overlay (tweets, quotes) -->
