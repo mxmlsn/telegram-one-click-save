@@ -404,16 +404,10 @@ function renderCard(item) {
   const domain = getDomain(item.sourceUrl || item.url);
   const url = item.sourceUrl || item.url || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
-  const effectiveType = isInstagramReel ? 'video' : (aiType || item.type);
+  // image from TG is always image — AI type cannot override it
+  const effectiveType = item.type === 'image' ? 'image' : (isInstagramReel ? 'video' : (aiType || item.type));
 
   const pendingDot = !item.ai_analyzed ? '<div class="badge-pending"></div>' : '';
-
-  const colorsHtml = Array.isArray(aiData.colors) && aiData.colors.length
-    ? `<div class="card-colors">${aiData.colors.slice(0,5).map(c => `<span class="card-color-tag">${escapeHtml(c)}</span>`).join('')}</div>`
-    : '';
-  const materialsHtml = Array.isArray(aiData.materials) && aiData.materials.length
-    ? `<div class="card-materials">${escapeHtml(aiData.materials.join(', '))}</div>`
-    : '';
 
   // ── Video card ──
   if (effectiveType === 'video') {
@@ -430,7 +424,6 @@ function renderCard(item) {
       ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`
       : '';
     const shareIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
-    const clickHandler = url ? `onclick="window.open('${escapeHtml(url)}','_blank')"` : '';
 
     // For Vimeo: fetch thumbnail async and patch img src after render
     const vimeoId = vimeoMatch ? vimeoMatch[1] : null;
@@ -452,12 +445,12 @@ function renderCard(item) {
     const thumbGlowAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
     const thumbImgAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
 
-    return `<div class="card card-video" data-id="${item.id}" ${clickHandler}>
+    return `<div class="card card-video" data-id="${item.id}" data-action="open" data-url="${escapeHtml(url)}">
       ${pendingDot}
       <div class="video-header">
         ${faviconUrl ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
         <span class="video-domain">${escapeHtml(domain)}</span>
-        <button class="video-share-btn" onclick="event.stopPropagation();window.open('${escapeHtml(url)}','_blank')" title="Open">${shareIcon}</button>
+        <button class="video-share-btn" data-action="open" data-url="${escapeHtml(url)}" title="Open">${shareIcon}</button>
       </div>
       ${(thumbSrc || vimeoId) ? `<div class="video-preview">
         <div class="video-glow-wrap">
@@ -470,7 +463,6 @@ function renderCard(item) {
 
   // ── Product with image ──
   if (effectiveType === 'product' && imgUrl) {
-    const clickHandler = url ? `onclick="window.open('${escapeHtml(url)}','_blank')"` : '';
     const rawPrice = aiData.price || '';
     const CURRENCY_MAP = { 'USD':'$','EUR':'€','GBP':'£','JPY':'¥','RUB':'₽','CNY':'¥','KRW':'₩','INR':'₹','BRL':'R$','AUD':'A$','CAD':'C$' };
     let formattedPrice = rawPrice;
@@ -489,7 +481,7 @@ function renderCard(item) {
     const notchSvg = `<svg viewBox="0 0 95.0078 37.6777" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M47.5039 0C55.1408 0 61.3925 5.93081 61.9063 13.4374C61.944 13.9883 62.3881 14.4375 62.9404 14.4375H83.3887C89.8059 14.4377 95.0078 19.6404 95.0078 26.0576C95.0078 32.4749 89.8059 37.6775 83.3887 37.6777H11.6201C5.20275 37.6777 2.11322e-05 32.475 0 26.0576C0 19.6402 5.20274 14.4375 11.6201 14.4375H32.0674C32.6197 14.4375 33.0638 13.9883 33.1015 13.4373C33.6153 5.93083 39.8671 4.64136e-05 47.5039 0Z" fill="#080808" stroke="rgba(88,119,65,0.5)" stroke-width="0.5"/>
     </svg>`;
-    return `<div class="card card-product-new" data-id="${item.id}" ${clickHandler}>
+    return `<div class="card card-product-new" data-id="${item.id}" data-action="open" data-url="${escapeHtml(url)}">
       ${pendingDot}
       <div class="product-new-notch">${notchSvg}</div>
       <div class="product-new-header">
@@ -503,14 +495,16 @@ function renderCard(item) {
 
   // ── X Post ──
   if (effectiveType === 'xpost') {
-    const tweetText = escapeHtml(aiData.tweet_text || item.content || item.ai_description || '');
+    const tweetTextRaw = aiData.tweet_text || item.content || item.ai_description || '';
+    const tweetText = escapeHtml(tweetTextRaw);
     const author = escapeHtml(aiData.author || '');
-    const clickHandler = item.sourceUrl ? `onclick="window.open('${escapeHtml(item.sourceUrl)}','_blank')"` : '';
+    const xpostSourceUrl = item.sourceUrl || '';
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
-    return `<div class="card card-xpost" data-id="${item.id}" ${clickHandler}>
+    // Store data for fullscreen overlay via data attributes
+    return `<div class="card card-xpost" data-id="${item.id}" data-action="xpost" data-source-url="${escapeHtml(xpostSourceUrl)}" data-tweet-text="${escapeHtml(tweetTextRaw)}" data-author="${author}" data-img="${escapeHtml(imgUrl || '')}">
       ${pendingDot}
       <div class="xpost-header">
-        ${faviconUrl ? `<img class="xpost-avatar" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        ${faviconUrl ? `<img class="xpost-avatar" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'" data-action="open" data-url="${escapeHtml(xpostSourceUrl)}">` : ''}
         ${author ? `<div class="xpost-author">${author}</div>` : ''}
       </div>
       ${tweetText ? `<div class="xpost-body"><div class="xpost-text">${tweetText}</div></div>` : ''}
@@ -524,48 +518,67 @@ function renderCard(item) {
     const linkUrl = item.sourceUrl || item.url || '';
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
     const arrowIcon = `<svg viewBox="0 0 36.738 36.7375" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.9528 14.1284C18.5149 12.5663 21.047 12.5663 22.6091 14.1284C24.1712 15.6905 24.1712 18.2226 22.6091 19.7847L6.82782 35.5659C5.26573 37.128 2.73367 37.128 1.17157 35.5659C-0.390524 34.0038 -0.390524 31.4718 1.17157 29.9097L16.9528 14.1284Z" fill="white"/><path d="M28.738 29.9131V9C28.738 8.44788 28.29 8.00026 27.738 8H6.82489C4.61575 8 2.82489 6.20914 2.82489 4C2.82489 1.79086 4.61575 0 6.82489 0H27.738C32.7083 0.00026285 36.738 4.0296 36.738 9V29.9131C36.7377 32.1218 34.9467 33.9128 32.738 33.9131C30.529 33.9131 28.7382 32.122 28.738 29.9131Z" fill="white"/></svg>`;
-    return `<div class="card card-link-new" data-id="${item.id}" onclick="window.open('${escapeHtml(linkUrl)}','_blank')">
+    return `<div class="card card-link-new" data-id="${item.id}" data-action="open" data-url="${escapeHtml(linkUrl)}">
       ${pendingDot}
       <div class="link-header">
         ${faviconUrl ? `<img class="link-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
         <span class="link-domain">${escapeHtml(domain)}</span>
-        <button class="link-arrow-btn" onclick="event.stopPropagation();window.open('${escapeHtml(linkUrl)}','_blank')" title="Open">${arrowIcon}</button>
+        <button class="link-arrow-btn" data-action="open" data-url="${escapeHtml(linkUrl)}" title="Open">${arrowIcon}</button>
       </div>
       ${imgUrl ? `<div class="link-preview"><img class="link-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>` : ''}
     </div>`;
   }
 
-  // ── Has image (article or untyped item with screenshot) ──
-  const VALID_AI_TYPES = new Set(['article', 'video', 'product', 'xpost']);
+  // ── Article (AI-typed link with screenshot) — opens source directly ──
+  if (effectiveType === 'article' || aiType === 'article') {
+    const articleUrl = item.sourceUrl || item.url || '';
+    const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
+    const articleIcon = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4C4 2.89543 4.89543 2 6 2H14L20 8V20C20 21.1046 19.1046 22 18 22H6C4.89543 22 4 21.1046 4 20V4Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2V8H20" stroke="white" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 13H16M8 17H13" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    return `<div class="card card-link-new" data-id="${item.id}" data-action="open" data-url="${escapeHtml(articleUrl)}">
+      ${pendingDot}
+      <div class="link-header">
+        ${faviconUrl ? `<img class="link-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
+        <span class="link-domain">${escapeHtml(domain)}</span>
+        <button class="link-arrow-btn" data-action="open" data-url="${escapeHtml(articleUrl)}" title="Open article">${articleIcon}</button>
+      </div>
+      ${imgUrl ? `<div class="link-preview"><img class="link-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>` : ''}
+    </div>`;
+  }
+
+  // ── Has image (pure image — no AI type override) ──
   if (imgUrl) {
-    const badge = (aiType && VALID_AI_TYPES.has(aiType)) ? `<div class="type-badge">${escapeHtml(aiType)}</div>` : '';
-    return `<div class="card card-image" data-id="${item.id}" onclick="openLightbox('${escapeHtml(imgUrl)}','${escapeHtml(item.sourceUrl)}')">
+    const sourceUrl = item.sourceUrl || item.url || '';
+    const imgDomain = getDomain(sourceUrl);
+    const domainBtn = (sourceUrl && imgDomain)
+      ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
+      : '';
+    return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
       ${pendingDot}
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
-      <div class="card-overlay">
-        ${colorsHtml}
-        ${materialsHtml}
-      </div>
-      ${badge}
+      ${domainBtn}
     </div>`;
   }
 
   // ── Text / Quote ──
-  const quoteText = escapeHtml(item.content || item.ai_description || '');
-  const quoteDomainHtml = domain ? `<span class="quote-source">${escapeHtml(domain)}</span>` : '<span></span>';
+  const quoteTextRaw = item.content || item.ai_description || '';
+  const quoteText = escapeHtml(quoteTextRaw);
+  const quoteSourceUrl = item.sourceUrl || item.url || '';
+  const quoteDomainHtml = domain
+    ? (quoteSourceUrl
+        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(quoteSourceUrl)}">${escapeHtml(domain)}</a>`
+        : `<span class="quote-source">${escapeHtml(domain)}</span>`)
+    : '<span></span>';
   const quoteSignSvg = `<svg class="quote-sign" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M0 22V13.2C0 9.86667 0.733333 7.06667 2.2 4.8C3.73333 2.53333 6.13333 0.866667 9.4 -4.57764e-07L11 3C9 3.53333 7.46667 4.53333 6.4 6C5.4 7.4 4.86667 9.13333 4.8 11.2H9.4V22H0ZM14.6 22V13.2C14.6 9.86667 15.3333 7.06667 16.8 4.8C18.3333 2.53333 20.7333 0.866667 24 -4.57764e-07L25.6 3C23.6 3.53333 22.0667 4.53333 21 6C20 7.4 19.4667 9.13333 19.4 11.2H24V22H14.6Z" fill="rgba(230,184,120,0.31)"/>
   </svg>`;
 
   // Spikes border — triangular teeth pointing down, card bg color, glued to bottom
-  // Sawtooth: cream card-color triangles pointing down against dark site bg
-  // viewBox height 10 vs spike height 8 = 80% vertical scale (≈20% squeeze)
   const diamondBorder = `<svg class="quote-diamonds-svg" viewBox="0 0 280 10" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:8px;display:block;">
     <rect width="280" height="10" fill="#080808"/>
     <path d="M0,0 ${Array.from({length: 35}, (_,i) => `L${i*8+4},8 L${i*8+8},0`).join(' ')} L280,0 Z" fill="#FFFAF3"/>
   </svg>`;
 
-  return `<div class="card card-quote-new" data-id="${item.id}">
+  return `<div class="card card-quote-new" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteTextRaw)}" data-source-url="${escapeHtml(quoteSourceUrl)}" data-domain="${escapeHtml(domain)}">
     ${pendingDot}
     <div class="quote-body">
       <div class="quote-text">${quoteText}</div>
@@ -607,7 +620,108 @@ function openLightbox(imgUrl, sourceUrl) {
   lb.classList.remove('hidden');
 }
 
+// ─── Content overlay (shared) ────────────────────────────────────────────────
+function openContentOverlay(innerHtml) {
+  const overlay = document.getElementById('content-overlay');
+  const content = document.getElementById('overlay-content');
+  content.innerHTML = innerHtml;
+  overlay.classList.remove('hidden');
+}
+
+function closeContentOverlay() {
+  const overlay = document.getElementById('content-overlay');
+  overlay.classList.add('hidden');
+  document.getElementById('overlay-content').innerHTML = '';
+}
+
+// ─── Event delegation (MV3 CSP forbids inline onclick) ───────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // ── Masonry grid: single delegated click handler for all cards ──
+  const masonry = document.getElementById('masonry');
+  masonry.addEventListener('click', e => {
+    // Find the closest element with a data-action attribute
+    const actionEl = e.target.closest('[data-action]');
+    if (!actionEl) return;
+
+    const action = actionEl.dataset.action;
+    const url = actionEl.dataset.url || '';
+
+    // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
+    if (action === 'open' && url) {
+      e.stopPropagation();
+      window.open(url, '_blank');
+      return;
+    }
+
+    // "lightbox" — open image lightbox
+    if (action === 'lightbox') {
+      const imgSrc = actionEl.dataset.img || '';
+      if (imgSrc) openLightbox(imgSrc, url);
+      return;
+    }
+
+    // "xpost" — tweet card click: check truncation
+    if (action === 'xpost') {
+      const card = actionEl;
+      const sourceUrl = card.dataset.sourceUrl || '';
+      const textEl = card.querySelector('.xpost-text');
+      const isTruncated = textEl && (textEl.scrollHeight > textEl.clientHeight + 2);
+
+      if (!isTruncated && sourceUrl) {
+        window.open(sourceUrl, '_blank');
+      } else {
+        // Open fullscreen overlay with full tweet
+        const tweetText = card.dataset.tweetText || '';
+        const author = card.dataset.author || '';
+        const imgSrc = card.dataset.img || '';
+        const domain = sourceUrl ? getDomain(sourceUrl) : '';
+        const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
+
+        let html = '<div class="overlay-tweet">';
+        html += '<div class="overlay-tweet-header">';
+        if (faviconUrl) html += `<img class="overlay-tweet-avatar" src="${escapeHtml(faviconUrl)}" alt="">`;
+        if (author) html += `<div class="overlay-tweet-author">${escapeHtml(author)}</div>`;
+        html += '</div>';
+        if (tweetText) html += `<div class="overlay-tweet-text">${escapeHtml(tweetText)}</div>`;
+        if (imgSrc) html += `<img class="overlay-tweet-img" src="${escapeHtml(imgSrc)}" alt="">`;
+        if (sourceUrl) {
+          html += `<div class="overlay-tweet-footer"><a class="overlay-tweet-link" href="${escapeHtml(sourceUrl)}" target="_blank">${escapeHtml(domain)}</a></div>`;
+        }
+        html += '</div>';
+        openContentOverlay(html);
+      }
+      return;
+    }
+
+    // "quote" — open fullscreen quote overlay
+    if (action === 'quote') {
+      const card = actionEl;
+      const quoteText = card.dataset.quoteText || '';
+      const sourceUrl = card.dataset.sourceUrl || '';
+      const domain = card.dataset.domain || '';
+
+      const quoteSignSvg = `<svg style="width:26px;height:22px;" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 22V13.2C0 9.86667 0.733333 7.06667 2.2 4.8C3.73333 2.53333 6.13333 0.866667 9.4 -4.57764e-07L11 3C9 3.53333 7.46667 4.53333 6.4 6C5.4 7.4 4.86667 9.13333 4.8 11.2H9.4V22H0ZM14.6 22V13.2C14.6 9.86667 15.3333 7.06667 16.8 4.8C18.3333 2.53333 20.7333 0.866667 24 -4.57764e-07L25.6 3C23.6 3.53333 22.0667 4.53333 21 6C20 7.4 19.4667 9.13333 19.4 11.2H24V22H14.6Z" fill="rgba(230,184,120,0.31)"/>
+      </svg>`;
+
+      let html = '<div class="overlay-quote">';
+      html += '<div class="overlay-quote-body">';
+      html += `<div class="overlay-quote-text">${escapeHtml(quoteText)}</div>`;
+      html += '</div>';
+      html += '<div class="overlay-quote-footer">';
+      html += domain ? `<span class="overlay-quote-source">${escapeHtml(domain)}</span>` : '<span></span>';
+      html += quoteSignSvg;
+      html += '</div>';
+      if (sourceUrl) {
+        html += `<div style="padding: 0 28px 20px;"><a class="overlay-quote-link" href="${escapeHtml(sourceUrl)}" target="_blank">Open source →</a></div>`;
+      }
+      html += '</div>';
+      openContentOverlay(html);
+      return;
+    }
+  });
+
+  // ── Lightbox close ──
   const lb = document.getElementById('lightbox');
   lb.addEventListener('click', e => {
     if (e.target === lb || e.target === document.getElementById('lightbox-img')) {
@@ -615,10 +729,22 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('lightbox-img').src = '';
     }
   });
+
+  // ── Content overlay close ──
+  const co = document.getElementById('content-overlay');
+  co.addEventListener('click', e => {
+    if (e.target === co || e.target.classList.contains('overlay-close')) {
+      closeContentOverlay();
+    }
+  });
+  co.querySelector('.overlay-close').addEventListener('click', closeContentOverlay);
+
+  // ── Escape key closes any overlay ──
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       lb.classList.add('hidden');
       document.getElementById('lightbox-img').src = '';
+      closeContentOverlay();
     }
   });
 });
@@ -642,6 +768,7 @@ async function runAiBackgroundProcessing() {
       chrome.runtime.sendMessage({
         type: 'AI_ANALYZE',
         item: {
+          type: item.type,
           fileId: item.fileId,
           sourceUrl: item.sourceUrl,
           content: item.content,

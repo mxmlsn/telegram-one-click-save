@@ -120,18 +120,6 @@
 
     /* Image card */
     .card-image .card-img { width: 100%; display: block; border-radius: var(--radius); }
-    .card-image .card-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, transparent 50%);
-      border-radius: var(--radius);
-      opacity: 0; transition: opacity 0.2s;
-      display: flex; flex-direction: column; justify-content: flex-end; padding: 12px;
-    }
-    .card-image:hover .card-overlay { opacity: 1; }
-    .overlay-desc { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4; }
-    .card-colors { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-    .card-color-tag { font-size: 10px; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.08); border-radius: 4px; padding: 1px 6px; }
-    .card-materials { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 4px; font-style: italic; }
 
     /* Link card */
     .card-link {
@@ -399,7 +387,7 @@
       border: 0.3px solid rgba(88,119,65,0.5);
       border-radius: 20px;
       box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
-      overflow: hidden;
+      overflow: hidden;ок
       position: relative;
     }
     .card-product-new .product-new-notch {
@@ -437,6 +425,45 @@
       border-radius: 50%; position: absolute; top: 9px; left: 9px;
     }
 
+    /* ── Image hover domain button ── */
+    .card-image { position: relative; }
+    .card-image .img-domain-btn {
+      position: absolute; bottom: 10px; left: 10px; right: 10px;
+      background: rgba(0,0,0,0.35); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: none; border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px; color: rgba(255,255,255,0.75);
+      cursor: pointer; text-align: center;
+      opacity: 0; transition: opacity 0.2s, background 0.15s, color 0.15s;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .card-image:hover .img-domain-btn {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .card-image .img-domain-btn:hover {
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+    }
+
+    /* ── X Post clickable favicon ── */
+    .card-xpost .xpost-avatar { cursor: pointer; }
+    .card-xpost .xpost-avatar:hover { opacity: 0.8; }
+
+    /* ── Quote source clickable ── */
+    .card-quote-new .quote-source-link {
+      font-family: 'Anybody', sans-serif;
+      font-size: 12px;
+      color: rgba(92, 70, 39, 0.49);
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .card-quote-new .quote-source-link:hover {
+      color: rgba(92, 70, 39, 0.75);
+    }
+
     /* ── Lightbox ── */
     #lightbox {
       position: fixed; inset: 0; background: rgba(0,0,0,0.92);
@@ -446,6 +473,87 @@
     #lightbox.hidden { display: none; }
     #lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 10px; object-fit: contain; }
     #lightbox-link { color: #888; font-size: 13px; margin-top: 14px; text-decoration: none; position: absolute; bottom: 28px; }
+
+    /* ── Fullscreen content overlay (tweets, quotes) ── */
+    #content-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+      display: flex; align-items: center; justify-content: center; flex-direction: column;
+      z-index: 500; cursor: default;
+      overflow-y: auto;
+      padding: 40px 20px;
+    }
+    #content-overlay.hidden { display: none; }
+    #content-overlay .overlay-close {
+      position: fixed; top: 20px; right: 24px;
+      background: none; border: none; color: rgba(255,255,255,0.5);
+      font-size: 28px; cursor: pointer; z-index: 510;
+      width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; transition: background 0.15s, color 0.15s;
+    }
+    #content-overlay .overlay-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+    /* Tweet fullscreen */
+    .overlay-tweet {
+      max-width: 520px; width: 100%;
+      background: #000; border-radius: 20px;
+      border: 0.3px solid rgba(81,81,81,0.4);
+      overflow: hidden;
+    }
+    .overlay-tweet .overlay-tweet-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 18px 10px;
+    }
+    .overlay-tweet .overlay-tweet-avatar {
+      width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%;
+      object-fit: cover;
+    }
+    .overlay-tweet .overlay-tweet-author {
+      font-size: 16px; font-weight: 700; color: #fff;
+    }
+    .overlay-tweet .overlay-tweet-text {
+      padding: 0 18px 16px;
+      font-size: 15px; line-height: 1.55; color: #fff;
+      white-space: pre-wrap;
+    }
+    .overlay-tweet .overlay-tweet-img {
+      width: 100%; display: block;
+    }
+    .overlay-tweet .overlay-tweet-footer {
+      padding: 12px 18px;
+      display: flex; justify-content: flex-end;
+    }
+    .overlay-tweet .overlay-tweet-link {
+      font-size: 13px; color: rgba(255,255,255,0.4); text-decoration: none;
+    }
+    .overlay-tweet .overlay-tweet-link:hover { color: rgba(255,255,255,0.7); }
+
+    /* Quote fullscreen */
+    .overlay-quote {
+      max-width: 580px; width: 100%;
+      background: linear-gradient(170deg, #FFFAF3 61%, #FFF1DE 98%);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .overlay-quote .overlay-quote-body {
+      padding: 32px 28px 20px;
+    }
+    .overlay-quote .overlay-quote-text {
+      font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+      font-size: 16px; line-height: 1.5; color: #000;
+      white-space: pre-wrap;
+    }
+    .overlay-quote .overlay-quote-footer {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      padding: 10px 28px 24px;
+    }
+    .overlay-quote .overlay-quote-source {
+      font-family: 'Anybody', sans-serif;
+      font-size: 14px; color: rgba(92, 70, 39, 0.49);
+    }
+    .overlay-quote .overlay-quote-link {
+      font-size: 13px; color: rgba(92, 70, 39, 0.4); text-decoration: none;
+    }
+    .overlay-quote .overlay-quote-link:hover { color: rgba(92, 70, 39, 0.7); }
 
     /* ── Empty / loading states ── */
     #empty-state {
@@ -620,6 +728,12 @@
 <div id="lightbox" class="hidden">
   <img id="lightbox-img" src="" alt="">
   <a id="lightbox-link" href="#" target="_blank"></a>
+</div>
+
+<!-- Content overlay (tweets, quotes) -->
+<div id="content-overlay" class="hidden">
+  <button class="overlay-close">×</button>
+  <div id="overlay-content"></div>
 </div>
 
 <!-- Settings panel -->

@@ -335,7 +335,30 @@ async function saveToNotion(data, settings) {
 
 // ─── AI Analysis ─────────────────────────────────────────────────────────────
 
-const AI_PROMPT = `Analyze this saved content and return ONLY valid JSON, no other text:
+const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no other text:
+{
+  "content_type": null,
+  "description": "detailed description: what is shown, composition, who/what is where, context",
+  "materials": [],
+  "color_palette": null,
+  "text_on_image": "",
+  "price": "",
+  "author": "",
+  "tweet_text": ""
+}
+
+Rules:
+- content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the image next to a product. Otherwise content_type MUST be null. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
+- description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
+- materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none.
+- color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD. Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if unclear.
+- text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text.
+- price: the main product price with currency symbol (e.g. "$129"). Empty string if not visible.
+- author: empty string.
+- tweet_text: empty string.
+- All fields must be present. No markdown, no extra fields.`;
+
+const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no other text:
 {
   "content_type": null,
   "description": "detailed description: what is shown, composition, who/what is where, context",
@@ -350,14 +373,14 @@ const AI_PROMPT = `Analyze this saved content and return ONLY valid JSON, no oth
 Rules:
 - content_type: set ONLY if confident, otherwise null. Must be one of:
   - "article" — URL is clearly an article/essay/instruction/journalism piece
-  - "video" — youtube.com/youtu.be/vimeo.com URL, instagram reel URL, OR image shows video player UI (play button, audio icon, progress bar), OR text/hashtags indicate video
-  - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. Marketing photos, product images, shop websites WITHOUT a visible price = NOT product. No price visible = null.
+  - "video" — URL is youtube.com/youtu.be/vimeo.com/instagram. OR screenshot shows video indicators: mute/unmute speaker icon, progress bar + playhead, play button overlay. Instagram posts with a mute/unmute icon are ALWAYS video.
+  - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. No visible price = null.
   - "xpost" — URL contains x.com or twitter.com
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
-- color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD of the image (ignore UI chrome, white backgrounds of websites). Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only if the image is genuinely black-and-white or monochrome photography. Use "white" for images dominated by white/light tones as the main subject. Use "black" for dark/night images where darkness is the mood. Null if no image.
+- color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD of the image (ignore UI chrome, white backgrounds of websites). Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if no image.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text or no image.
-- price: the main product price from the image with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
+- price: the main product price with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
 - author: for xpost — @handle from screenshot. Empty string otherwise.
 - tweet_text: for xpost — full tweet text from screenshot. Empty string otherwise.
 - All fields must be present. No markdown, no extra fields.`;
@@ -421,25 +444,28 @@ async function analyzeWithAI(item, settings) {
     const provider = settings.aiProvider || 'google';
     let responseText = null;
 
+    const isDirectImage = item.type === 'image';
+
     if (item.fileId && settings.botToken) {
-      // Get Telegram image
+      // Get Telegram image (direct photo)
       const fileRes = await fetch(
         `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${item.fileId}`
       );
       const fileData = await fileRes.json();
       if (fileData.ok) {
         const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${fileData.result.file_path}`;
+        const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
 
         if (provider === 'google') {
           const base64 = await fetchBase64(imgUrl);
-          responseText = await callGemini(AI_PROMPT, base64, settings);
+          responseText = await callGemini(prompt, base64, settings);
         } else {
           // Anthropic accepts image URLs directly
           const messages = [{
             role: 'user',
             content: [
               { type: 'image', source: { type: 'url', url: imgUrl } },
-              { type: 'text', text: AI_PROMPT }
+              { type: 'text', text: prompt }
             ]
           }];
           responseText = await callAnthropic(messages, settings);
@@ -454,7 +480,7 @@ async function analyzeWithAI(item, settings) {
         item.content ? `Content: ${item.content.slice(0, 500)}` : '',
         item.tagName ? `User tag: ${item.tagName}` : ''
       ].filter(Boolean).join('\n');
-      const fullPrompt = `${AI_PROMPT}\n\nContent to analyze:\n${context}`;
+      const fullPrompt = `${AI_PROMPT_LINK}\n\nContent to analyze:\n${context}`;
 
       if (provider === 'google') {
         responseText = await callGemini(fullPrompt, null, settings);
@@ -469,7 +495,14 @@ async function analyzeWithAI(item, settings) {
     if (!responseText) return null;
     // Strip markdown code fences if model wrapped JSON in ```json ... ```
     const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-    return JSON.parse(cleaned);
+    const parsed = JSON.parse(cleaned);
+
+    // Hard guard: direct TG image can only be "product" or null
+    if (isDirectImage && parsed.content_type !== 'product') {
+      parsed.content_type = null;
+    }
+
+    return parsed;
   } catch (e) {
     console.warn('[TG Saver] AI parse error:', e);
     return null;
@@ -483,9 +516,10 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
     'ai_analyzed': { checkbox: true }
   };
 
-  if (aiResult.content_type) {
-    properties['ai_type'] = { select: { name: aiResult.content_type } };
-  }
+  // Always write ai_type — explicitly null if no content_type, to clear stale values
+  properties['ai_type'] = aiResult.content_type
+    ? { select: { name: aiResult.content_type } }
+    : { select: null };
   if (aiResult.description) {
     properties['ai_description'] = {
       rich_text: [{ text: { content: aiResult.description.slice(0, 2000) } }]
@@ -705,7 +739,7 @@ async function sendScreenshot(tab, settings) {
       await sendMessage(tab.url, settings, selectedTag);
       const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
       if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-        analyzeWithAI({ sourceUrl: tab.url, fileId: null }, settings)
+        analyzeWithAI({ type: 'link', sourceUrl: tab.url, fileId: null }, settings)
           .then(r => patchNotionWithAI(notionPageId, r, settings))
           .catch(e => console.warn('[TG Saver] AI on-save error:', e));
       }
@@ -719,7 +753,7 @@ async function sendScreenshot(tab, settings) {
     const result = await sendPhoto(blob, caption, settings);
     const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
     if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-      analyzeWithAI({ sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
+      analyzeWithAI({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
         .then(r => patchNotionWithAI(notionPageId, r, settings))
         .catch(e => console.warn('[TG Saver] AI on-save error:', e));
     }
@@ -1037,7 +1071,7 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
     await sendTextMessage(caption, settings);
     const notionPageId = await saveToNotion({ type: 'quote', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
     if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-      analyzeWithAI({ sourceUrl: pageUrl, content: text }, settings)
+      analyzeWithAI({ type: 'quote', sourceUrl: pageUrl, content: text }, settings)
         .then(r => patchNotionWithAI(notionPageId, r, settings))
         .catch(e => console.warn('[TG Saver] AI on-save error:', e));
     }
@@ -1257,7 +1291,7 @@ async function sendImageDirect(imageUrl, pageUrl, settings, tabId, selectedTag) 
 
   const notionPageId = await saveToNotion({ type: 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name }, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ sourceUrl: pageUrl, fileId }, settings)
+    analyzeWithAI({ type: 'image', sourceUrl: pageUrl, fileId }, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
@@ -1271,7 +1305,7 @@ async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
   await sendTextMessage(caption, settings);
   const notionPageId = await saveToNotion({ type: 'quote', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ sourceUrl: pageUrl, content: text }, settings)
+    analyzeWithAI({ type: 'quote', sourceUrl: pageUrl, content: text }, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
@@ -1284,7 +1318,7 @@ async function sendLinkDirect(linkUrl, pageUrl, settings, tabId, selectedTag) {
   await sendTextMessage(caption, settings);
   const notionPageId = await saveToNotion({ type: 'link', sourceUrl: linkUrl, tagName: selectedTag?.name }, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ sourceUrl: linkUrl, fileId: null }, settings)
+    analyzeWithAI({ type: 'link', sourceUrl: linkUrl, fileId: null }, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
@@ -1378,7 +1412,7 @@ async function sendScreenshotDirect(tab, settings, selectedTag) {
     await sendMessage(tab.url, settings, selectedTag);
     const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, tagName: selectedTag?.name }, settings);
     if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-      analyzeWithAI({ sourceUrl: tab.url, fileId: null }, settings)
+      analyzeWithAI({ type: 'link', sourceUrl: tab.url, fileId: null }, settings)
         .then(r => patchNotionWithAI(notionPageId, r, settings))
         .catch(e => console.warn('[TG Saver] AI on-save error:', e));
     }
@@ -1393,7 +1427,7 @@ async function sendScreenshotDirect(tab, settings, selectedTag) {
   const result = await sendPhoto(blob, caption, settings);
   const notionPageId = await saveToNotion({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
+    analyzeWithAI({ type: 'link', sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
@@ -1409,7 +1443,7 @@ async function sendVideoDirect(tab, settings, selectedTag) {
   const result = await sendPhoto(blob, caption, settings);
   const notionPageId = await saveToNotion({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null, tagName: selectedTag?.name }, settings);
   if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
+    analyzeWithAI({ type: 'image', sourceUrl: tab.url, fileId: result?.fileId || null }, settings)
       .then(r => patchNotionWithAI(notionPageId, r, settings))
       .catch(e => console.warn('[TG Saver] AI on-save error:', e));
   }
