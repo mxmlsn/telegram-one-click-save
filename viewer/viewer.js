@@ -916,6 +916,7 @@ function renderCard(item) {
         </div>
       </div>` : '';
     return `<div class="card card-article" data-id="${item.id}" data-action="open" data-url="${escapeHtml(articleUrl)}">
+      <div class="article-bg"></div>
       ${pendingDot}
       <div class="article-header">
         ${faviconUrl ? `<img class="article-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}

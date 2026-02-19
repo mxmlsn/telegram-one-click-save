@@ -138,9 +138,7 @@
       overflow: hidden;
       cursor: pointer;
       position: relative;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.55); }
     .card.card-quote-new { cursor: zoom-in; }
     .card.card-xpost.xpost-truncated { cursor: zoom-in; }
 
@@ -171,6 +169,11 @@
       border-radius: 0;
       overflow: hidden;
       position: relative;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card-quote-new:hover {
+      background: #ffffff;
+      box-shadow: 0 0 36px 12px rgba(255,255,255,0.25);
     }
     .card-quote-new .quote-body {
       padding: 13px 16px 10px;
@@ -210,6 +213,10 @@
       box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
       overflow: hidden;
       position: relative;
+      transition: background 0.3s ease;
+    }
+    .card-xpost:hover {
+      background: #1a1a1a;
     }
     .card-xpost .xpost-header {
       display: flex; align-items: center; gap: 10px;
@@ -312,10 +319,14 @@
       border: none;
       cursor: pointer;
       opacity: 0.4;
-      transition: opacity 0.15s;
+      transition: opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease;
       flex-shrink: 0;
     }
-    .card-video:hover .video-share-btn { opacity: 0.8; }
+    .card-video:hover .video-share-btn {
+      opacity: 0.8;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));
+      transform: translateX(3px);
+    }
     .card-video .video-preview {
       padding: 0 10px 10px;
     }
@@ -332,6 +343,11 @@
       opacity: 0.7;
       pointer-events: none;
       z-index: 0;
+      transition: filter 0.3s ease, opacity 0.3s ease;
+    }
+    .card-video:hover .video-glow {
+      filter: blur(60px) saturate(2);
+      opacity: 1;
     }
     .card-video .video-screenshot {
       position: relative;
@@ -381,11 +397,14 @@
       border: none;
       cursor: pointer;
       opacity: 0.2;
-      transition: opacity 0.15s;
+      transition: opacity 0.3s ease, filter 0.3s ease;
       flex-shrink: 0;
       padding: 0;
     }
-    .card-link-new:hover .link-arrow-btn { opacity: 0.4; }
+    .card-link-new:hover .link-arrow-btn {
+      opacity: 0.8;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));
+    }
     .card-link-new .link-arrow-btn svg { width: 34px; height: 34px; }
     .card-link-new .link-preview {
       padding: 0 10px 10px;
@@ -501,6 +520,10 @@
       width: 100%;
       height: auto;
       display: block;
+      transition: filter 0.3s ease;
+    }
+    .card-tool:hover .tool-ruler svg {
+      filter: brightness(2.5);
     }
     .card-tool .tool-screen {
       margin: 9px 12px 0;
@@ -541,11 +564,25 @@
       overflow: hidden;
     }
     .card-article {
-      background: url('../savecloud.png') center/cover no-repeat;
       border: none;
       border-radius: 20px;
       overflow: hidden;
       position: relative;
+    }
+    .card-article .article-bg {
+      position: absolute;
+      inset: 0;
+      background: url('../savecloud.png') center/cover no-repeat;
+      transition: transform 0.4s ease;
+      z-index: 0;
+    }
+    .card-article:hover .article-bg {
+      transform: scale(1.04);
+    }
+    .card-article .article-header,
+    .card-article .article-book {
+      position: relative;
+      z-index: 1;
     }
     .card-article .article-header {
       display: flex; align-items: center; justify-content: center;
@@ -609,6 +646,13 @@
       transform: skewY(4deg);
       transform-origin: right bottom;
       border-radius: 50% 50% 0 4px / 12px 12px 0 4px;
+      transition: transform 0.4s ease;
+    }
+    .card-article:hover .article-book-main .article-page-left {
+      transform: skewY(4deg) scaleX(0.97);
+    }
+    .card-article:hover .article-book-shadow .article-page-left {
+      transform: skewY(4deg) scaleX(0.96);
     }
     .card-article .article-page-left::after {
       right: 0;
@@ -618,6 +662,13 @@
       transform: skewY(-4deg);
       transform-origin: left bottom;
       border-radius: 50% 50% 4px 0 / 12px 12px 4px 0;
+      transition: transform 0.4s ease;
+    }
+    .card-article:hover .article-book-main .article-page-right {
+      transform: skewY(-4deg) scaleX(0.97);
+    }
+    .card-article:hover .article-book-shadow .article-page-right {
+      transform: skewY(-4deg) scaleX(0.96);
     }
     .card-article .article-page-right::after {
       left: 0;
@@ -677,10 +728,16 @@
     }
     .card-product-new .product-new-preview {
       padding: 0 10px 10px;
+      overflow: hidden;
+      border-radius: 10px;
     }
     .card-product-new .product-new-screenshot {
       display: block;
       object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+    .card-product-new:hover .product-new-screenshot {
+      transform: scale(1.07);
     }
 
     /* AI pending dot */
@@ -744,6 +801,10 @@
       width: 100%;
       height: auto;
       display: block;
+      transition: filter 0.3s ease;
+    }
+    .card-xpost-tool:hover .xpost-tool-ruler svg {
+      filter: brightness(2.5);
     }
 
     /* ── X Post clickable favicon ── */
