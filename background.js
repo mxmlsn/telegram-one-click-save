@@ -369,6 +369,7 @@ Rules:
 - color_palette: the single OVERALL dominant color of the entire image by area. Null if unclear.
 - color_subject: the color of the MAIN SUBJECT/OBJECT (the thing the photo is about, not the background). For product photos — the product color. For portraits — clothing or key object color. Null if no clear subject or same as color_palette.
 - color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Only include colors that cover a meaningful portion of the image. Do NOT pad to 3 — if the image is mostly one color, return just ["black"]. Empty array if no image.
+  IMPORTANT for "black" and "white": Only include "black" or "white" in color_top3 if the image is TRULY DOMINATED by that color — i.e., the image looks dark/black or light/white overall. If the image has vivid chromatic colors (reds, blues, greens, etc.) that catch the eye, do NOT include "black" or "white" even if there are dark shadows or light highlights. A colorful image on a black background should list the chromatic colors, NOT "black". Only use "black"/"white" for images that genuinely LOOK black/white/dark/light to a human viewer.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text.
 - price: the main product price with currency symbol (e.g. "$129"). Empty string if not visible.
 - author: empty string.
@@ -419,6 +420,7 @@ Rules:
 - color_palette: the single OVERALL dominant color of the entire screenshot/image including backgrounds, UI, everything. For websites/apps — include the site background color. A dark-themed site = "black". A white site with a small red button = "white". Null if no image.
 - color_subject: the color of the MAIN SUBJECT/OBJECT only, ignoring backgrounds and UI chrome. For product pages — the product itself. For tools/apps — the key accent/brand color. For articles — the hero image dominant color. Null if no clear subject or same as color_palette.
 - color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Include ALL visually significant colors — backgrounds, UI, objects. Do NOT pad to 3 — if the image is mostly one color, return just ["black"]. Empty array if no image.
+  IMPORTANT for "black" and "white": Only include "black" or "white" in color_top3 if the image is TRULY DOMINATED by that color — i.e., the image looks dark/black or light/white overall. If the image has vivid chromatic colors (reds, blues, greens, etc.) that catch the eye, do NOT include "black" or "white" even if there are dark shadows or light highlights. A colorful website on a white background should list the chromatic colors, NOT "white". Only use "black"/"white" for images that genuinely LOOK black/white/dark/light to a human viewer.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text or no image.
 - price: the main product price with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
 - author: for xpost — @handle from screenshot. Empty string otherwise.

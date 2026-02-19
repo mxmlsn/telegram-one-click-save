@@ -509,10 +509,23 @@ function applyFilters() {
     const target = STATE.activeColor;
     const alsoMatch = REVERSE_ALIASES[target] || []; // e.g. violet → ["purple"]
 
+    // Black/white/bw: strict mode — only match truly monochromatic images
+    const STRICT_COLORS = new Set(['black', 'white', 'bw']);
+    const isStrict = STRICT_COLORS.has(target);
+
     items = items.filter(item => {
       const d = item.ai_data;
       if (!d) return false;
-      // New system: match color_top3
+
+      if (isStrict) {
+        // Strict: must be the dominant color (color_palette) or first in color_top3 or color_subject
+        const palette = d.color_palette;
+        const subject = d.color_subject;
+        const top1 = d.color_top3?.[0];
+        return palette === target || subject === target || top1 === target;
+      }
+
+      // Normal colors: match anywhere in color_top3
       if (d.color_top3?.length) {
         return d.color_top3.includes(target) || d.color_top3.some(c => COLOR_ALIASES[c] === target);
       }
