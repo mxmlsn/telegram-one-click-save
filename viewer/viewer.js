@@ -25,6 +25,7 @@ const STATE = {
   search: '',
   activeTypes: new Set(),
   activeColor: null,
+  linkPlainOnly: false,
   layout: 'adaptive',   // adaptive | 4col | 3col
   align: 'masonry',     // masonry | center
   gap: 10,
@@ -320,6 +321,21 @@ function setupToolbarEvents() {
     applyFilters();
   });
 
+  // Create "plain" sub-pill for Link filter (initially hidden)
+  const plainPill = document.createElement('button');
+  plainPill.className = 'type-pill type-pill-sub';
+  plainPill.dataset.type = 'link-plain';
+  plainPill.textContent = 'plain';
+  plainPill.style.display = 'none';
+  const linkPill = document.querySelector('.type-pill[data-type="link"]');
+  if (linkPill) linkPill.parentNode.insertBefore(plainPill, linkPill.nextSibling);
+
+  plainPill.addEventListener('click', () => {
+    STATE.linkPlainOnly = !STATE.linkPlainOnly;
+    plainPill.classList.toggle('active', STATE.linkPlainOnly);
+    applyFilters();
+  });
+
   document.querySelectorAll('.type-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       const type = pill.dataset.type;
@@ -339,6 +355,13 @@ function setupToolbarEvents() {
           STATE.activeTypes.add(type);
           pill.classList.add('active');
         }
+      }
+      // Toggle plain sub-pill visibility
+      const showPlain = STATE.activeTypes.has('link');
+      plainPill.style.display = showPlain ? '' : 'none';
+      if (!showPlain) {
+        STATE.linkPlainOnly = false;
+        plainPill.classList.remove('active');
       }
       applyFilters();
     });
@@ -481,6 +504,7 @@ function applyGridMode() {
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
 const BASE_TYPES = new Set(['image', 'link', 'quote']);
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool']);
+const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool']);
 
 function applyFilters() {
   let items = STATE.items;
@@ -496,6 +520,11 @@ function applyFilters() {
       const aiMatch = activeAI.length === 0 || activeAI.includes(item.ai_type) || activeAI.includes(item.ai_type_secondary);
       return baseMatch && aiMatch;
     });
+  }
+
+  // Sub-filter: plain links only (no AI type override)
+  if (STATE.linkPlainOnly) {
+    items = items.filter(item => item.type === 'link' && !LINK_AI_OVERRIDES.has(item.ai_type));
   }
 
   if (STATE.activeColor) {
@@ -685,16 +714,22 @@ function renderCard(item) {
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
     const isHybridTool = aiTypeSec === 'tool';
     const hybridClass = isHybridTool ? ' card-xpost-tool' : '';
+    const isCollapsed = !!(aiData.xpost_collapsed);
+    const collapsedClass = isCollapsed ? ' xpost-collapsed' : '';
+    const toggleIcon = isCollapsed
+      ? `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
     // Store data for fullscreen overlay via data attributes
-    return `<div class="card card-xpost${hybridClass}" data-id="${item.id}" data-action="xpost" data-source-url="${escapeHtml(xpostSourceUrl)}" data-tweet-text="${escapeHtml(tweetTextRaw)}" data-author="${author}" data-img="${escapeHtml(imgUrl || '')}">
+    return `<div class="card card-xpost${hybridClass}${collapsedClass}" data-id="${item.id}" data-action="xpost" data-source-url="${escapeHtml(xpostSourceUrl)}" data-tweet-text="${escapeHtml(tweetTextRaw)}" data-author="${author}" data-img="${escapeHtml(imgUrl || '')}">
       ${pendingDot}
+      ${imgUrl ? `<button class="xpost-toggle" data-action="toggle-xpost" title="${isCollapsed ? 'Show screenshot' : 'Hide screenshot'}">${toggleIcon}</button>` : ''}
       <div class="xpost-header">
         ${faviconUrl ? `<img class="xpost-avatar" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'" data-action="open" data-url="${escapeHtml(xpostSourceUrl)}">` : ''}
         ${author ? `<div class="xpost-author">${author}</div>` : ''}
       </div>
       ${tweetText ? `<div class="xpost-body"><div class="xpost-text">${tweetText}</div></div>` : ''}
-      ${imgUrl ? `<div class="xpost-preview"><div class="xpost-screenshot-wrap"><img class="xpost-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div></div>` : ''}
-      ${isHybridTool ? `<div class="xpost-tool-ruler">${RULER_SVG}</div>` : ''}
+      ${!isCollapsed && imgUrl ? `<div class="xpost-preview"><div class="xpost-screenshot-wrap"><img class="xpost-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div></div>` : ''}
+      ${!isCollapsed && isHybridTool ? `<div class="xpost-tool-ruler">${RULER_SVG}</div>` : ''}
     </div>`;
   }
 
@@ -712,7 +747,6 @@ function renderCard(item) {
   }
 
   // ── Link (base type = link, and not article/product/xpost/tool) ──
-  const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool']);
   if (item.type === 'link' && !LINK_AI_OVERRIDES.has(aiType)) {
     const linkUrl = item.sourceUrl || item.url || '';
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
@@ -838,13 +872,134 @@ function renderAll(items) {
   }
   applyGridMode();
 
-  // Mark truncated xpost cards for zoom-in cursor
+  // Mark truncated xpost cards for zoom-in cursor + collapsed fade
   masonry.querySelectorAll('.card-xpost').forEach(card => {
     const textEl = card.querySelector('.xpost-text');
     if (textEl && textEl.scrollHeight > textEl.clientHeight + 2) {
       card.classList.add('xpost-truncated');
+      if (card.classList.contains('xpost-collapsed')) {
+        textEl.classList.add('truncated-collapsed');
+      }
     }
   });
+}
+
+// ─── Notion mutation helpers ──────────────────────────────────────────────────
+async function deleteItem(pageId) {
+  try {
+    const res = await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ archived: true })
+    });
+    if (!res.ok) { console.error('[Viewer] Delete failed:', res.status); return; }
+  } catch (e) { console.error('[Viewer] Delete error:', e); return; }
+  STATE.items = STATE.items.filter(item => item.id !== pageId);
+  applyFilters();
+}
+
+async function changeItemType(pageId, newAiType, newSecondary) {
+  const item = STATE.items.find(i => i.id === pageId);
+  if (!item) return;
+
+  const properties = { 'ai_analyzed': { checkbox: true } };
+
+  if (newAiType !== null) {
+    if (newAiType === 'link' || newAiType === '') {
+      properties['ai_type'] = { select: null };
+      item.ai_type = null;
+    } else {
+      properties['ai_type'] = { select: { name: newAiType } };
+      item.ai_type = newAiType;
+    }
+    item.ai_analyzed = true;
+  }
+
+  if (newSecondary !== null) {
+    if (newSecondary === '') {
+      properties['ai_type_secondary'] = { select: null };
+      item.ai_type_secondary = null;
+    } else {
+      properties['ai_type_secondary'] = { select: { name: newSecondary } };
+      item.ai_type_secondary = newSecondary;
+    }
+  }
+
+  try {
+    const res = await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ properties })
+    });
+    if (!res.ok) { console.error('[Viewer] Type change failed:', res.status); return; }
+  } catch (e) { console.error('[Viewer] Type change error:', e); return; }
+
+  const cardEl = document.querySelector(`.card[data-id="${pageId}"]`);
+  if (cardEl) cardEl.outerHTML = renderCard(item);
+}
+
+async function toggleXpostCollapse(pageId) {
+  const item = STATE.items.find(i => i.id === pageId);
+  if (!item) return;
+
+  const newCollapsed = !item.ai_data.xpost_collapsed;
+  item.ai_data.xpost_collapsed = newCollapsed;
+
+  // Optimistic re-render
+  const cardEl = document.querySelector(`.card[data-id="${pageId}"]`);
+  if (cardEl) {
+    cardEl.outerHTML = renderCard(item);
+    // Re-check truncation on the new card element
+    const newCard = document.querySelector(`.card[data-id="${pageId}"]`);
+    if (newCard) {
+      const textEl = newCard.querySelector('.xpost-text');
+      if (textEl && textEl.scrollHeight > textEl.clientHeight + 2) {
+        newCard.classList.add('xpost-truncated');
+        if (newCard.classList.contains('xpost-collapsed')) textEl.classList.add('truncated-collapsed');
+      }
+    }
+  }
+
+  // Persist to Notion
+  const aiDataStr = JSON.stringify(item.ai_data);
+  try {
+    await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        properties: {
+          'ai_data': { rich_text: [{ text: { content: aiDataStr.slice(0, 2000) } }] }
+        }
+      })
+    });
+  } catch (e) {
+    console.error('[Viewer] Toggle collapse error:', e);
+    item.ai_data.xpost_collapsed = !newCollapsed;
+    const revertCard = document.querySelector(`.card[data-id="${pageId}"]`);
+    if (revertCard) {
+      revertCard.outerHTML = renderCard(item);
+      const rc = document.querySelector(`.card[data-id="${pageId}"]`);
+      if (rc) {
+        const t = rc.querySelector('.xpost-text');
+        if (t && t.scrollHeight > t.clientHeight + 2) {
+          rc.classList.add('xpost-truncated');
+          if (rc.classList.contains('xpost-collapsed')) t.classList.add('truncated-collapsed');
+        }
+      }
+    }
+  }
 }
 
 // ─── Download helper ─────────────────────────────────────────────────────────
@@ -930,6 +1085,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // "toggle-xpost" — collapse/expand xpost screenshot
+    if (action === 'toggle-xpost') {
+      e.stopPropagation();
+      const card = actionEl.closest('.card[data-id]');
+      if (card) toggleXpostCollapse(card.dataset.id);
+      return;
+    }
+
     // "xpost" — tweet card click: check truncation
     if (action === 'xpost') {
       const card = actionEl;
@@ -1003,12 +1166,71 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   co.querySelector('.overlay-close').addEventListener('click', closeContentOverlay);
 
+  // ── Custom context menu ──
+  let ctxTargetItemId = null;
+  const ctxMenu = document.getElementById('ctx-menu');
+
+  masonry.addEventListener('contextmenu', e => {
+    const card = e.target.closest('.card[data-id]');
+    if (!card) return;
+    e.preventDefault();
+    ctxTargetItemId = card.dataset.id;
+
+    // Highlight current type
+    const item = STATE.items.find(i => i.id === ctxTargetItemId);
+    if (item) {
+      document.querySelectorAll('.ctx-type-item').forEach(el => {
+        const val = el.dataset.typeValue;
+        const isCurrent = (val === 'link' && !item.ai_type) || (val === item.ai_type);
+        el.classList.toggle('ctx-current', isCurrent);
+      });
+      document.querySelectorAll('.ctx-sec-item').forEach(el => {
+        const val = el.dataset.typeValue;
+        el.classList.toggle('ctx-current', val === (item.ai_type_secondary || ''));
+      });
+    }
+
+    // Position at cursor, clamp to viewport
+    ctxMenu.classList.remove('hidden');
+    let x = e.clientX, y = e.clientY;
+    const rect = ctxMenu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+    ctxMenu.style.left = x + 'px';
+    ctxMenu.style.top = y + 'px';
+  });
+
+  function closeCtxMenu() {
+    ctxMenu.classList.add('hidden');
+    ctxTargetItemId = null;
+  }
+
+  document.addEventListener('click', closeCtxMenu);
+  window.addEventListener('scroll', closeCtxMenu, true);
+
+  ctxMenu.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-ctx-action]');
+    if (!btn || !ctxTargetItemId) return;
+    const action = btn.dataset.ctxAction;
+    const targetId = ctxTargetItemId;
+    closeCtxMenu();
+
+    if (action === 'delete') {
+      await deleteItem(targetId);
+    } else if (action === 'set-type') {
+      await changeItemType(targetId, btn.dataset.typeValue, null);
+    } else if (action === 'set-secondary') {
+      await changeItemType(targetId, null, btn.dataset.typeValue);
+    }
+  });
+
   // ── Escape key closes any overlay ──
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       lb.classList.add('hidden');
       document.getElementById('lightbox-img').src = '';
       closeContentOverlay();
+      closeCtxMenu();
     }
   });
 });

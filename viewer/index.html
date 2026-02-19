@@ -985,6 +985,140 @@
     @media (max-width: 480px) {
       #masonry.mode-rows.rows-adaptive > .card { width: 100%; }
     }
+
+    /* ── Custom context menu ── */
+    #ctx-menu {
+      position: fixed;
+      z-index: 400;
+      min-width: 180px;
+    }
+    #ctx-menu.hidden { display: none; }
+    .ctx-menu-inner {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 4px 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      overflow: hidden;
+    }
+    .ctx-section-label {
+      padding: 6px 14px 2px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      user-select: none;
+    }
+    .ctx-item {
+      display: block;
+      width: 100%;
+      padding: 7px 14px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .ctx-item:hover {
+      background: rgba(255,255,255,0.08);
+    }
+    .ctx-item-danger {
+      color: #e74c3c;
+    }
+    .ctx-item-danger:hover {
+      background: rgba(231,76,60,0.15);
+    }
+    .ctx-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      margin: 4px 0;
+    }
+    .ctx-type-item.ctx-current,
+    .ctx-sec-item.ctx-current {
+      color: var(--accent);
+    }
+    .ctx-type-item.ctx-current::before,
+    .ctx-sec-item.ctx-current::before {
+      content: '\2022\00a0';
+    }
+
+    /* ── Link sub-filter pill ── */
+    .type-pill-sub {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 16px;
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .type-pill-sub:hover {
+      border-color: rgba(255,255,255,0.18);
+      color: var(--text-muted);
+    }
+    .type-pill-sub.active {
+      background: var(--text-muted);
+      color: #000;
+      border-color: var(--text-muted);
+      border-style: solid;
+    }
+
+    /* ── xpost collapsed state ── */
+    .card-xpost.xpost-collapsed .xpost-text {
+      font-size: 16px;
+      -webkit-line-clamp: 15;
+      line-clamp: 15;
+      mask-image: none;
+      -webkit-mask-image: none;
+    }
+    .card-xpost.xpost-collapsed .xpost-text.truncated-collapsed {
+      mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+    }
+    .card-xpost.xpost-collapsed .xpost-body {
+      padding-bottom: 18px;
+    }
+
+    /* ── xpost collapse toggle ── */
+    .xpost-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 10;
+      padding: 0;
+    }
+    .card-xpost:hover .xpost-toggle {
+      opacity: 1;
+    }
+    .card-xpost.xpost-collapsed .xpost-toggle {
+      opacity: 0.6;
+    }
+    .card-xpost.xpost-collapsed:hover .xpost-toggle {
+      opacity: 1;
+    }
+    .xpost-toggle:hover {
+      background: rgba(0,0,0,0.6);
+    }
+    .xpost-toggle:hover svg line,
+    .xpost-toggle:hover svg circle {
+      stroke: rgba(255,255,255,0.7);
+    }
   </style>
 </head>
 <body>
@@ -1074,6 +1208,26 @@
   <div id="lightbox-bottom">
     <a id="lightbox-link" href="#" target="_blank"></a>
     <button id="lightbox-download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+  </div>
+</div>
+
+<!-- Custom context menu -->
+<div id="ctx-menu" class="hidden">
+  <div class="ctx-menu-inner">
+    <div class="ctx-section-label">Type</div>
+    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="article">Article</button>
+    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="video">Video</button>
+    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="product">Product</button>
+    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="xpost">X Post</button>
+    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="tool">Tool</button>
+    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="link">Link (plain)</button>
+    <div class="ctx-divider"></div>
+    <div class="ctx-section-label">Secondary</div>
+    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="tool">+ Tool</button>
+    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="product">+ Product</button>
+    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="">Clear secondary</button>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item ctx-item-danger" data-ctx-action="delete">Delete</button>
   </div>
 </div>
 
