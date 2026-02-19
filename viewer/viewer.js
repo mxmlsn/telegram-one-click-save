@@ -107,6 +107,8 @@ function disconnect() {
 }
 
 // ─── App start ────────────────────────────────────────────────────────────────
+const FIRST_BATCH_SIZE = 16;
+
 async function startApp() {
   document.getElementById('toolbar').classList.remove('hidden');
   document.getElementById('display-bar').classList.remove('hidden');
@@ -118,11 +120,29 @@ async function startApp() {
   setupDisplayBar();
 
   try {
+    // 1. Fetch all items from Notion
     const pages = await fetchNotion();
     STATE.items = pages.map(parseItem);
-    STATE.imageMap = await resolveAllImages(STATE.items, STATE.botToken);
+
+    // 2. Load file URL cache
+    const fileCache = await loadFileCache();
+
+    // 3. Resolve images for the first batch (newest items) — show ASAP
+    const firstItems = STATE.items.slice(0, FIRST_BATCH_SIZE);
+    const firstMap = await resolveImagesBatch(firstItems, STATE.botToken, fileCache);
+    Object.assign(STATE.imageMap, firstMap);
+
+    // 4. Render immediately — first 16 with images, rest without
     applyFilters();
     document.getElementById('ai-status').textContent = '';
+
+    // 5. Resolve remaining images in background, patch cards as they come
+    const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId);
+    if (restItems.length > 0) {
+      resolveRemainingImages(restItems, fileCache);
+    } else {
+      saveFileCache(fileCache);
+    }
 
     if (STATE.aiEnabled && STATE.aiAutoInViewer) {
       runAiBackgroundProcessing();
@@ -131,6 +151,45 @@ async function startApp() {
     document.getElementById('ai-status').textContent = 'Error: ' + e.message;
     console.error('[Viewer] load error:', e);
   }
+}
+
+async function resolveRemainingImages(items, fileCache) {
+  const now = Date.now();
+  const toFetch = [];
+
+  // Apply cached URLs first and patch those cards immediately
+  const cachedItems = [];
+  for (const item of items) {
+    const cached = fileCache[item.fileId];
+    if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
+      STATE.imageMap[item.fileId] = cached.url;
+      item._resolvedImg = cached.url;
+      cachedItems.push(item);
+    } else {
+      toFetch.push(item);
+    }
+  }
+  if (cachedItems.length) patchCardImages(cachedItems);
+
+  // Fetch uncached in batches, patching cards after each batch
+  const BATCH = 15;
+  for (let i = 0; i < toFetch.length; i += BATCH) {
+    const batch = toFetch.slice(i, i + BATCH);
+    const urls = await Promise.all(batch.map(item => resolveFileId(STATE.botToken, item.fileId)));
+    const resolved = [];
+    batch.forEach((item, idx) => {
+      if (urls[idx]) {
+        STATE.imageMap[item.fileId] = urls[idx];
+        item._resolvedImg = urls[idx];
+        fileCache[item.fileId] = { url: urls[idx], ts: now };
+        resolved.push(item);
+      }
+    });
+    if (resolved.length) patchCardImages(resolved);
+    if (i + BATCH < toFetch.length) await new Promise(r => setTimeout(r, 200));
+  }
+
+  saveFileCache(fileCache);
 }
 
 // ─── Notion fetch ─────────────────────────────────────────────────────────────
@@ -185,7 +244,28 @@ function parseItem(page) {
   };
 }
 
-// ─── Image resolution ─────────────────────────────────────────────────────────
+// ─── Image resolution with cache ──────────────────────────────────────────────
+const FILE_CACHE_KEY = 'tgFileUrlCache';
+const FILE_CACHE_TTL = 50 * 60 * 1000; // 50 minutes (TG links live ~1hr)
+
+async function loadFileCache() {
+  return new Promise(resolve => {
+    chrome.storage.local.get(FILE_CACHE_KEY, data => {
+      resolve(data[FILE_CACHE_KEY] || {});
+    });
+  });
+}
+
+function saveFileCache(cache) {
+  // Prune expired entries before saving
+  const now = Date.now();
+  const pruned = {};
+  for (const [k, v] of Object.entries(cache)) {
+    if (now - v.ts < FILE_CACHE_TTL) pruned[k] = v;
+  }
+  chrome.storage.local.set({ [FILE_CACHE_KEY]: pruned });
+}
+
 async function resolveFileId(tgToken, fileId) {
   if (!fileId) return null;
   try {
@@ -197,22 +277,59 @@ async function resolveFileId(tgToken, fileId) {
   } catch { return null; }
 }
 
-async function resolveAllImages(items, tgToken) {
-  const withImages = items.filter(i => i.fileId);
+// Resolve a batch of items, using cache where possible
+async function resolveImagesBatch(items, tgToken, cache) {
+  const now = Date.now();
+  const toFetch = [];
   const map = {};
-  const BATCH = 10;
-  for (let i = 0; i < withImages.length; i += BATCH) {
-    const batch = withImages.slice(i, i + BATCH);
+
+  for (const item of items) {
+    if (!item.fileId) continue;
+    const cached = cache[item.fileId];
+    if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
+      map[item.fileId] = cached.url;
+      item._resolvedImg = cached.url;
+    } else {
+      toFetch.push(item);
+    }
+  }
+
+  // Fetch uncached in batches of 15
+  const BATCH = 15;
+  for (let i = 0; i < toFetch.length; i += BATCH) {
+    const batch = toFetch.slice(i, i + BATCH);
     const urls = await Promise.all(batch.map(item => resolveFileId(tgToken, item.fileId)));
     batch.forEach((item, idx) => {
       if (urls[idx]) {
         map[item.fileId] = urls[idx];
         item._resolvedImg = urls[idx];
+        cache[item.fileId] = { url: urls[idx], ts: now };
       }
     });
-    if (i + BATCH < withImages.length) await new Promise(r => setTimeout(r, 350));
+    if (i + BATCH < toFetch.length) await new Promise(r => setTimeout(r, 200));
   }
+
   return map;
+}
+
+// Patch already-rendered cards with resolved image URLs
+function patchCardImages(items) {
+  for (const item of items) {
+    if (!item._resolvedImg) continue;
+    const card = document.querySelector(`.card[data-id="${item.id}"]`);
+    if (!card) continue;
+    // Replace the whole card HTML to get correct card type rendering
+    card.outerHTML = renderCard(item);
+    // Re-check xpost truncation on the new card
+    const newCard = document.querySelector(`.card[data-id="${item.id}"]`);
+    if (newCard && newCard.classList.contains('card-xpost')) {
+      const textEl = newCard.querySelector('.xpost-text');
+      if (textEl && textEl.scrollHeight > textEl.clientHeight + 2) {
+        newCard.classList.add('xpost-truncated');
+        if (newCard.classList.contains('xpost-collapsed')) textEl.classList.add('truncated-collapsed');
+      }
+    }
+  }
 }
 
 
