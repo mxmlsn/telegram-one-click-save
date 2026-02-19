@@ -833,7 +833,6 @@ function renderCard(item) {
     const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
     return `<div class="card card-image card-gif" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
       ${pendingDot}
-      <div class="gif-badge">GIF</div>
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
     </div>`;

@@ -402,12 +402,12 @@ const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no o
 
 Rules:
 - content_type: set ONLY if confident, otherwise null. Must be one of:
-  - "article" — URL is clearly an article/essay/instruction/journalism piece
+  - "article" — URL is clearly an article/essay/instruction/journalism piece. NOT for book/document viewers with page navigation (use "pdf" instead)
   - "video" — URL is youtube.com/youtu.be/vimeo.com/instagram. OR screenshot shows video indicators: mute/unmute speaker icon, progress bar + playhead, play button overlay. Instagram posts with a mute/unmute icon are ALWAYS video.
   - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. No visible price = null.
   - "xpost" — URL contains x.com or twitter.com
   - "tool" — URL is a digital tool, app, SaaS service, template marketplace, font foundry/specimen, browser extension, CLI utility, framework/library page, AI tool, online generator/converter, or a showcase/launch post ("I made X", "I built X", Product Hunt, etc.)
-  - "pdf" — screenshot shows a PDF document viewer (browser PDF viewer, Google Drive PDF preview, embedded PDF). Look for: PDF toolbar/controls, page navigation, ".pdf" in URL bar or title, document-style layout with page borders. Set this when the page is clearly displaying a PDF file.
+  - "pdf" — screenshot shows a document/book being viewed. This includes: browser PDF viewer, Google Drive PDF preview, embedded PDF, Internet Archive book reader, any online document/book viewer with page navigation. Look for: PDF toolbar/controls, page navigation (e.g. "Page 1/141"), ".pdf" in URL bar or title, document-style layout with page borders, book covers being displayed in a reader interface, digital library/archive interfaces showing downloadable documents. Set "pdf" (NOT "article") when the page is displaying a PDF file, book, or document in a viewer/reader — even if the viewer is not a standard browser PDF viewer.
 - content_type_secondary: If the content fits TWO categories, set the secondary one here. Same allowed values as content_type. Must be DIFFERENT from content_type (or null). Common cases:
   - xpost about a tool/app/SaaS → content_type="xpost", content_type_secondary="tool"
   - xpost about a product with price → content_type="xpost", content_type_secondary="product"
