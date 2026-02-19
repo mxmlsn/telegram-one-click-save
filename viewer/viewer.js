@@ -495,7 +495,7 @@ function renderCard(item) {
   // image from TG is always image — AI type cannot override it
   const effectiveType = item.type === 'image' ? 'image' : (isInstagramReel ? 'video' : (aiType || item.type));
 
-  const pendingDot = !item.ai_analyzed ? '<div class="badge-pending"></div>' : '';
+  const pendingDot = (!item.ai_analyzed && item.type !== 'quote') ? '<div class="badge-pending"></div>' : '';
 
   // ── Video card ──
   if (effectiveType === 'video') {
@@ -673,33 +673,24 @@ function renderCard(item) {
 
   // ── Text / Quote ──
   const quoteTextRaw = item.content || item.ai_description || '';
-  const quoteText = escapeHtml(quoteTextRaw);
+  const isTruncated = quoteTextRaw.length > 700;
+  const quoteTextDisplay = isTruncated ? quoteTextRaw.slice(0, 700) : quoteTextRaw;
+  const quoteText = escapeHtml(quoteTextDisplay);
+  const truncatedClass = isTruncated ? ' truncated' : '';
   const quoteSourceUrl = item.sourceUrl || item.url || '';
   const quoteDomainHtml = domain
     ? (quoteSourceUrl
         ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(quoteSourceUrl)}">${escapeHtml(domain)}</a>`
         : `<span class="quote-source">${escapeHtml(domain)}</span>`)
     : '<span></span>';
-  const quoteSignSvg = `<svg class="quote-sign" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M0 22V13.2C0 9.86667 0.733333 7.06667 2.2 4.8C3.73333 2.53333 6.13333 0.866667 9.4 -4.57764e-07L11 3C9 3.53333 7.46667 4.53333 6.4 6C5.4 7.4 4.86667 9.13333 4.8 11.2H9.4V22H0ZM14.6 22V13.2C14.6 9.86667 15.3333 7.06667 16.8 4.8C18.3333 2.53333 20.7333 0.866667 24 -4.57764e-07L25.6 3C23.6 3.53333 22.0667 4.53333 21 6C20 7.4 19.4667 9.13333 19.4 11.2H24V22H14.6Z" fill="rgba(230,184,120,0.31)"/>
-  </svg>`;
-
-  // Spikes border — triangular teeth pointing down, card bg color, glued to bottom
-  const diamondBorder = `<svg class="quote-diamonds-svg" viewBox="0 0 280 10" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:8px;display:block;">
-    <rect width="280" height="10" fill="#080808"/>
-    <path d="M0,0 ${Array.from({length: 35}, (_,i) => `L${i*8+4},8 L${i*8+8},0`).join(' ')} L280,0 Z" fill="#FFFAF3"/>
-  </svg>`;
-
   return `<div class="card card-quote-new" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteTextRaw)}" data-source-url="${escapeHtml(quoteSourceUrl)}" data-domain="${escapeHtml(domain)}">
     ${pendingDot}
     <div class="quote-body">
-      <div class="quote-text">${quoteText}</div>
+      <div class="quote-text${truncatedClass}">${quoteText}</div>
     </div>
     <div class="quote-footer">
       ${quoteDomainHtml}
-      ${quoteSignSvg}
     </div>
-    ${diamondBorder}
   </div>`;
 }
 
@@ -847,17 +838,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const sourceUrl = card.dataset.sourceUrl || '';
       const domain = card.dataset.domain || '';
 
-      const quoteSignSvg = `<svg style="width:26px;height:22px;" viewBox="0 0 26 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M0 22V13.2C0 9.86667 0.733333 7.06667 2.2 4.8C3.73333 2.53333 6.13333 0.866667 9.4 -4.57764e-07L11 3C9 3.53333 7.46667 4.53333 6.4 6C5.4 7.4 4.86667 9.13333 4.8 11.2H9.4V22H0ZM14.6 22V13.2C14.6 9.86667 15.3333 7.06667 16.8 4.8C18.3333 2.53333 20.7333 0.866667 24 -4.57764e-07L25.6 3C23.6 3.53333 22.0667 4.53333 21 6C20 7.4 19.4667 9.13333 19.4 11.2H24V22H14.6Z" fill="rgba(230,184,120,0.31)"/>
-      </svg>`;
-
       let html = '<div class="overlay-quote">';
       html += '<div class="overlay-quote-body">';
       html += `<div class="overlay-quote-text">${escapeHtml(quoteText)}</div>`;
       html += '</div>';
       html += '<div class="overlay-quote-footer">';
       html += domain ? `<span class="overlay-quote-source">${escapeHtml(domain)}</span>` : '<span></span>';
-      html += quoteSignSvg;
       html += '</div>';
       if (sourceUrl) {
         html += `<div style="padding: 0 28px 20px;"><a class="overlay-quote-link" href="${escapeHtml(sourceUrl)}" target="_blank">Open source →</a></div>`;
@@ -898,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ─── AI background processing ─────────────────────────────────────────────────
 async function runAiBackgroundProcessing() {
-  const pending = STATE.items.filter(item => !item.ai_analyzed && item.id);
+  const pending = STATE.items.filter(item => !item.ai_analyzed && item.id && item.type !== 'quote');
   if (!pending.length) {
     document.getElementById('ai-status').textContent = '✓ All analyzed';
     setTimeout(() => { document.getElementById('ai-status').textContent = ''; }, 3000);

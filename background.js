@@ -449,6 +449,7 @@ async function callAnthropic(messages, settings) {
 
 async function analyzeWithAI(item, settings) {
   if (!settings.aiEnabled || !settings.aiApiKey) return null;
+  if (item.type === 'quote') return null;
 
   try {
     const provider = settings.aiProvider || 'google';
@@ -1084,11 +1085,6 @@ async function sendQuoteWithTabId(text, pageUrl, settings, tabId) {
     const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
     await sendTextMessage(caption, settings);
     const notionPageId = await saveToNotion({ type: 'quote', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
-    if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-      analyzeWithAI({ type: 'quote', sourceUrl: pageUrl, content: text }, settings)
-        .then(r => patchNotionWithAI(notionPageId, r, settings))
-        .catch(e => console.warn('[TG Saver] AI on-save error:', e));
-    }
 
     if (tabId) await showToast(tabId, 'success', 'Success');
   } catch (err) {
@@ -1318,11 +1314,6 @@ async function sendQuoteDirect(text, pageUrl, settings, tabId, selectedTag) {
   const caption = buildCaption(pageUrl, settings.tagQuote, text, settings, selectedTag);
   await sendTextMessage(caption, settings);
   const notionPageId = await saveToNotion({ type: 'quote', sourceUrl: pageUrl, content: text, tagName: selectedTag?.name }, settings);
-  if (settings.aiEnabled && settings.aiAutoOnSave && notionPageId) {
-    analyzeWithAI({ type: 'quote', sourceUrl: pageUrl, content: text }, settings)
-      .then(r => patchNotionWithAI(notionPageId, r, settings))
-      .catch(e => console.warn('[TG Saver] AI on-save error:', e));
-  }
   if (tabId) await showToast(tabId, 'success', 'Success');
 }
 
