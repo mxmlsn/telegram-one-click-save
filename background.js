@@ -338,6 +338,7 @@ async function saveToNotion(data, settings) {
 const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no other text:
 {
   "content_type": null,
+  "content_type_secondary": null,
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "color_palette": null,
@@ -349,6 +350,7 @@ const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no
 
 Rules:
 - content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the image next to a product. Otherwise content_type MUST be null. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
+- content_type_secondary: null for direct photos (not applicable).
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none.
 - color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD. Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if unclear.
@@ -361,6 +363,7 @@ Rules:
 const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no other text:
 {
   "content_type": null,
+  "content_type_secondary": null,
   "description": "detailed description: what is shown, composition, who/what is where, context",
   "materials": [],
   "color_palette": null,
@@ -377,6 +380,12 @@ Rules:
   - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. No visible price = null.
   - "xpost" — URL contains x.com or twitter.com
   - "tool" — URL is a digital tool, app, SaaS service, template marketplace, font foundry/specimen, browser extension, CLI utility, framework/library page, AI tool, online generator/converter, or a showcase/launch post ("I made X", "I built X", Product Hunt, etc.)
+- content_type_secondary: If the content fits TWO categories, set the secondary one here. Same allowed values as content_type. Must be DIFFERENT from content_type (or null). Common cases:
+  - xpost about a tool/app/SaaS → content_type="xpost", content_type_secondary="tool"
+  - xpost about a product with price → content_type="xpost", content_type_secondary="product"
+  - article reviewing a tool → content_type="article", content_type_secondary="tool"
+  - video about a product → content_type="video", content_type_secondary="product"
+  Set null if only one category applies.
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
 - materials: list of textures/materials visible (e.g. ["leather", "denim"]). Empty array if none or no image.
 - color_palette: pick EXACTLY ONE tag that best describes the dominant COLOR MOOD of the image (ignore UI chrome, white backgrounds of websites). Must be one of: "red", "orange", "yellow", "green", "blue", "purple", "pink", "brown", "white", "black", "bw". Use "bw" only for genuine black-and-white/monochrome photography. Null if no image.
@@ -520,6 +529,10 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
   // Always write ai_type — explicitly null if no content_type, to clear stale values
   properties['ai_type'] = aiResult.content_type
     ? { select: { name: aiResult.content_type } }
+    : { select: null };
+  // Secondary AI type for hybrid content (e.g. xpost + tool)
+  properties['ai_type_secondary'] = aiResult.content_type_secondary
+    ? { select: { name: aiResult.content_type_secondary } }
     : { select: null };
   if (aiResult.description) {
     properties['ai_description'] = {
