@@ -904,7 +904,7 @@ function renderCard(item) {
       ${pendingDot}
       ${imgUrl ? `<button class="xpost-toggle" data-action="toggle-xpost" title="${isCollapsed ? 'Show screenshot' : 'Hide screenshot'}">${toggleIcon}</button>` : ''}
       <div class="xpost-header">
-        ${faviconUrl ? `<img class="xpost-avatar" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'" data-action="open" data-url="${escapeHtml(xpostSourceUrl)}">` : ''}
+        ${faviconUrl ? `<span class="xpost-avatar-wrap" data-action="open" data-url="${escapeHtml(xpostSourceUrl)}"><img class="xpost-avatar xpost-avatar-orig" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.parentElement.style.display='none'"><img class="xpost-avatar xpost-avatar-x" src="x-logo.png" alt=""></span>` : ''}
         ${author ? `<div class="xpost-author">${author}</div>` : ''}
       </div>
       ${tweetText ? `<div class="xpost-body"><div class="xpost-text">${tweetText}</div></div>` : ''}

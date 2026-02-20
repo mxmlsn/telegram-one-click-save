@@ -274,7 +274,7 @@
       padding: 10px 13px 6px;
     }
     .card-xpost .xpost-avatar {
-      width: 27px; height: 27px; flex-shrink: 0;
+      width: 27px; height: 27px;
       object-fit: cover;
     }
     .card-xpost .xpost-author {
@@ -882,9 +882,19 @@
       filter: brightness(2.5);
     }
 
-    /* ── X Post clickable favicon ── */
-    .card-xpost .xpost-avatar { cursor: pointer; }
-    .card-xpost .xpost-avatar:hover { opacity: 0.8; }
+    /* ── X Post clickable favicon crossfade ── */
+    .xpost-avatar-wrap {
+      position: relative; width: 27px; height: 27px; flex-shrink: 0; cursor: pointer;
+    }
+    .card-xpost .xpost-avatar {
+      position: absolute; top: 0; left: 0; width: 27px; height: 27px;
+      border-radius: 6px; object-fit: cover; transition: opacity 0.18s ease;
+    }
+    .xpost-avatar-orig { opacity: 1; }
+    .xpost-avatar-x { opacity: 0; }
+    .card-xpost:hover .xpost-avatar-orig { opacity: 0; }
+    .card-xpost:hover .xpost-avatar-x { opacity: 1; }
+    .xpost-avatar-wrap:hover .xpost-avatar-x { opacity: 0.8; }
 
     /* ── Quote source clickable ── */
     .card-quote-new .quote-source-link {
