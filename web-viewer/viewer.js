@@ -662,7 +662,7 @@ function applyGridMode() {
 // Filtering: if base type selected → match item.type
 //            if AI type selected → match item.ai_type
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
-const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf']);
+const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost']);
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 
@@ -985,6 +985,32 @@ function renderCard(item) {
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
+    </div>`;
+  }
+
+  // ── Telegram Post card (media + text) ──
+  if (item.type === 'tgpost') {
+    const sourceUrl = item.sourceUrl || item.url || '';
+    const tgDomain = getDomain(sourceUrl);
+    const textContent = item.content || item.ai_description || '';
+    const isTruncated = textContent.length > 300;
+    const displayText = isTruncated ? textContent.slice(0, 300) : textContent;
+    const truncatedClass = isTruncated ? ' truncated' : '';
+    const domainHtml = (sourceUrl && tgDomain)
+      ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgDomain)}</a>`
+      : '';
+    const imgHtml = imgUrl
+      ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`
+      : '';
+    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgDomain || 'telegram')}">
+      ${pendingDot}
+      ${imgHtml}
+      <div class="tgpost-body">
+        <div class="quote-text${truncatedClass}">${escapeHtml(displayText)}</div>
+      </div>
+      <div class="quote-footer">
+        ${domainHtml}
+      </div>
     </div>`;
   }
 

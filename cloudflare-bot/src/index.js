@@ -63,6 +63,8 @@ function parseMessage(message) {
     sourceUrl: null,
     caption: message.caption || '',
     messageId: message.message_id,
+    // Media sub-type for tgpost (what kind of media is attached)
+    mediaType: null,      // 'image' | 'gif' | 'video' | 'pdf' | 'document' | null
   };
 
   // Extract forward origin info
@@ -77,45 +79,90 @@ function parseMessage(message) {
     }
   }
 
+  const isForward = !!message.forward_origin;
+  const caption = result.caption;
+  // A post with caption text is a tgpost (rich content: media + text together)
+  const hasSubstantialCaption = caption && caption.trim().length > 0;
+
   // Photo (array of sizes, take largest)
   if (message.photo && message.photo.length > 0) {
-    result.type = 'image';
     result.fileId = message.photo[message.photo.length - 1].file_id;
-    result.content += result.caption;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = 'image';
+      result.content += caption;
+    } else {
+      result.type = 'image';
+      result.content += caption;
+    }
     return result;
   }
 
   // Animation (GIF)
   if (message.animation) {
-    result.type = 'gif';
     result.fileId = message.animation.file_id;
-    result.content += result.caption;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = 'gif';
+      result.content += caption;
+    } else {
+      result.type = 'gif';
+      result.content += caption;
+    }
     return result;
   }
 
   // Video
   if (message.video) {
-    result.type = 'video';
     result.fileId = message.video.file_id;
-    result.content += result.caption;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = 'video';
+      result.content += caption;
+    } else {
+      result.type = 'video';
+      result.content += caption;
+    }
     return result;
   }
 
   // Document (PDF or other)
   if (message.document) {
     const mime = message.document.mime_type || '';
-    result.type = mime === 'application/pdf' ? 'pdf' : 'document';
+    const docType = mime === 'application/pdf' ? 'pdf' : 'document';
     result.fileId = message.document.file_id;
-    result.content += result.caption;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = docType;
+      result.content += caption;
+    } else {
+      result.type = docType;
+      result.content += caption;
+    }
     return result;
   }
 
   // Text message
   if (message.text) {
-    // Extract URL from text
-    const urlEntity = (message.entities || []).find(e => e.type === 'url');
-    if (urlEntity) {
-      const url = message.text.substring(urlEntity.offset, urlEntity.offset + urlEntity.length);
+    // Extract URLs from text
+    const urlEntities = (message.entities || []).filter(e => e.type === 'url');
+
+    if (isForward) {
+      // Forwarded text message → tgpost
+      result.type = 'tgpost';
+      result.content += message.text;
+      // Extract first URL as sourceUrl if not already set from forward origin
+      if (urlEntities.length > 0 && !result.sourceUrl) {
+        result.sourceUrl = message.text.substring(
+          urlEntities[0].offset,
+          urlEntities[0].offset + urlEntities[0].length
+        );
+      }
+    } else if (urlEntities.length > 0) {
+      const url = message.text.substring(
+        urlEntities[0].offset,
+        urlEntities[0].offset + urlEntities[0].length
+      );
       result.type = 'link';
       result.sourceUrl = result.sourceUrl || url;
       // Content = text without the URL itself
@@ -138,7 +185,7 @@ async function saveToNotion(parsed, env) {
     return null;
   }
 
-  const { type, sourceUrl, content, fileId } = parsed;
+  const { type, sourceUrl, content, fileId, mediaType } = parsed;
   const domain = sourceUrl
     ? sourceUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
     : 'telegram';
@@ -152,6 +199,13 @@ async function saveToNotion(parsed, env) {
   if (sourceUrl) properties['Source URL'] = { url: sourceUrl };
   if (content) properties['Content'] = { rich_text: [{ text: { content: content.slice(0, 2000) } }] };
   if (fileId) properties['File ID'] = { rich_text: [{ text: { content: fileId } }] };
+
+  // For tgpost: store mediaType in ai_data so viewer knows what media is attached
+  if (type === 'tgpost' && mediaType) {
+    properties['ai_data'] = {
+      rich_text: [{ text: { content: JSON.stringify({ mediaType }) } }]
+    };
+  }
 
   const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
@@ -355,7 +409,8 @@ async function callAnthropic(messages, env) {
 
 async function analyzeAndPatch(parsed, notionPageId, env) {
   const provider = env.AI_PROVIDER || 'google';
-  const isDirectImage = parsed.type === 'image' || parsed.type === 'gif';
+  const isDirectImage = parsed.type === 'image' || parsed.type === 'gif'
+    || (parsed.type === 'tgpost' && (parsed.mediaType === 'image' || parsed.mediaType === 'gif'));
   let responseText = null;
 
   // For items with file_id — fetch image from Telegram and send to AI
@@ -444,7 +499,9 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
     };
   }
 
+  // Preserve existing ai_data fields (e.g. mediaType for tgpost) and merge AI results
   const aiDataPayload = {};
+  if (parsed.mediaType) aiDataPayload.mediaType = parsed.mediaType;
   if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;

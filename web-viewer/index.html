@@ -253,6 +253,45 @@
       color: rgba(92, 70, 39, 0.49);
     }
 
+    /* Telegram post card (media + text) */
+    .card-tgpost {
+      background: #F5F5F4;
+      border-radius: 0;
+      overflow: hidden;
+      position: relative;
+      cursor: zoom-in;
+      transition: background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card-tgpost:hover {
+      background: #ffffff;
+      box-shadow: 0 0 36px 12px rgba(255,255,255,0.25);
+    }
+    .card-tgpost .card-img {
+      width: 100%;
+      display: block;
+      cursor: zoom-in;
+    }
+    .card-tgpost .tgpost-body {
+      padding: 13px 16px 10px;
+    }
+    .card-tgpost .quote-text {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+      color: #000;
+      white-space: pre-wrap;
+    }
+    .card-tgpost .quote-text.truncated {
+      mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    }
+    .card-tgpost .quote-footer {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding: 6px 16px 12px;
+    }
+
     /* X post card */
     .card.card-xpost {
       border-radius: 20px;
