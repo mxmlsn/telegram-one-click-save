@@ -369,6 +369,13 @@ function setupSettingsPanel() {
   document.getElementById('settings-overlay')?.addEventListener('click', closeSettingsPanel);
   document.getElementById('settings-close')?.addEventListener('click', closeSettingsPanel);
 
+  // Eye toggle for secret fields
+  document.querySelectorAll('.settings-reveal-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.settings-secret-group').classList.toggle('revealed');
+    });
+  });
+
   document.getElementById('sp-ai-provider')?.addEventListener('change', e => {
     const provider = e.target.value;
     populateSpModels(provider, AI_DEFAULT_MODEL[provider]);
