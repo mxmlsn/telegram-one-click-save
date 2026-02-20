@@ -80,18 +80,72 @@ async function handleUpdate(update, env, ctx) {
   }
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function normalizeUrl(url) {
+  if (!url) return url;
+  if (!/^https?:\/\//i.test(url)) return 'https://' + url;
+  return url;
+}
+
+function escapeHtmlBot(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatTextWithEntities(text, entities) {
+  if (!entities || entities.length === 0) return text;
+  const sorted = [...entities].sort((a, b) => a.offset - b.offset);
+  let result = '';
+  let lastIdx = 0;
+  for (const entity of sorted) {
+    result += escapeHtmlBot(text.substring(lastIdx, entity.offset));
+    const entityText = text.substring(entity.offset, entity.offset + entity.length);
+    const escaped = escapeHtmlBot(entityText);
+    switch (entity.type) {
+      case 'text_link':
+        result += `<a href="${escapeHtmlBot(entity.url)}">${escaped}</a>`;
+        break;
+      case 'url':
+        result += `<a href="${entityText}">${escaped}</a>`;
+        break;
+      case 'bold':
+        result += `<b>${escaped}</b>`;
+        break;
+      case 'italic':
+        result += `<i>${escaped}</i>`;
+        break;
+      case 'code':
+        result += `<code>${escaped}</code>`;
+        break;
+      case 'underline':
+        result += `<u>${escaped}</u>`;
+        break;
+      case 'strikethrough':
+        result += `<s>${escaped}</s>`;
+        break;
+      default:
+        result += escaped;
+    }
+    lastIdx = entity.offset + entity.length;
+  }
+  result += escapeHtmlBot(text.substring(lastIdx));
+  return result;
+}
+
 // ─── Message Parser ──────────────────────────────────────────────────────────
 
 function parseMessage(message) {
   const result = {
     type: 'quote',       // default
     fileId: null,
+    thumbnailFileId: null,
     content: '',
+    contentHasHtml: false,
     sourceUrl: null,
     caption: message.caption || '',
     messageId: message.message_id,
-    // Media sub-type for tgpost (what kind of media is attached)
     mediaType: null,      // 'image' | 'gif' | 'video' | 'pdf' | 'document' | null
+    mediaGroupId: message.media_group_id || null,
   };
 
   // Extract forward origin info
@@ -117,7 +171,11 @@ function parseMessage(message) {
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       result.mediaType = 'image';
-      result.content += caption;
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
     } else {
       result.type = 'image';
       result.content += caption;
@@ -131,7 +189,11 @@ function parseMessage(message) {
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       result.mediaType = 'gif';
-      result.content += caption;
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
     } else {
       result.type = 'gif';
       result.content += caption;
@@ -142,10 +204,17 @@ function parseMessage(message) {
   // Video
   if (message.video) {
     result.fileId = message.video.file_id;
+    if (message.video.thumbnail?.file_id) {
+      result.thumbnailFileId = message.video.thumbnail.file_id;
+    }
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       result.mediaType = 'video';
-      result.content += caption;
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
     } else {
       result.type = 'video';
       result.content += caption;
@@ -161,7 +230,11 @@ function parseMessage(message) {
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       result.mediaType = docType;
-      result.content += caption;
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
     } else {
       result.type = docType;
       result.content += caption;
@@ -171,19 +244,22 @@ function parseMessage(message) {
 
   // Text message
   if (message.text) {
-    // Extract URLs from text
-    const urlEntities = (message.entities || []).filter(e => e.type === 'url');
+    const allEntities = message.entities || [];
+    const urlEntities = allEntities.filter(e => e.type === 'url');
 
     if (isForward) {
-      // Forwarded text message → tgpost
+      // Forwarded text message → tgpost with entity formatting
       result.type = 'tgpost';
-      result.content += message.text;
+      result.content += allEntities.length
+        ? formatTextWithEntities(message.text, allEntities)
+        : message.text;
+      result.contentHasHtml = allEntities.length > 0;
       // Extract first URL as sourceUrl if not already set from forward origin
       if (urlEntities.length > 0 && !result.sourceUrl) {
-        result.sourceUrl = message.text.substring(
+        result.sourceUrl = normalizeUrl(message.text.substring(
           urlEntities[0].offset,
           urlEntities[0].offset + urlEntities[0].length
-        );
+        ));
       }
     } else if (urlEntities.length > 0) {
       const url = message.text.substring(
@@ -191,7 +267,7 @@ function parseMessage(message) {
         urlEntities[0].offset + urlEntities[0].length
       );
       result.type = 'link';
-      result.sourceUrl = result.sourceUrl || url;
+      result.sourceUrl = result.sourceUrl || normalizeUrl(url);
       // Content = text without the URL itself
       result.content += message.text.replace(url, '').trim();
     } else {
@@ -227,10 +303,15 @@ async function saveToNotion(parsed, env) {
   if (content) properties['Content'] = { rich_text: [{ text: { content: content.slice(0, 2000) } }] };
   if (fileId) properties['File ID'] = { rich_text: [{ text: { content: fileId } }] };
 
-  // For tgpost: store mediaType in ai_data so viewer knows what media is attached
-  if (type === 'tgpost' && mediaType) {
+  // Store ai_data for tgpost and video items
+  const aiDataInit = {};
+  if (parsed.mediaType) aiDataInit.mediaType = parsed.mediaType;
+  if (parsed.thumbnailFileId) aiDataInit.thumbnailFileId = parsed.thumbnailFileId;
+  if (parsed.contentHasHtml) aiDataInit.htmlContent = true;
+  if (parsed.mediaGroupId) aiDataInit.mediaGroupId = parsed.mediaGroupId;
+  if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
-      rich_text: [{ text: { content: JSON.stringify({ mediaType }) } }]
+      rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
     };
   }
 
@@ -276,7 +357,8 @@ async function setReaction(env, chatId, messageId, emoji) {
 async function captureAndUploadScreenshot(url, chatId, env) {
   try {
     // Fetch screenshot from thum.io
-    const screenshotUrl = `https://image.thum.io/get/width/1280/crop/960/noanimate/${url}`;
+    const normalizedUrl = normalizeUrl(url);
+    const screenshotUrl = `https://image.thum.io/get/width/1280/crop/960/noanimate/${normalizedUrl}`;
     const imgRes = await fetch(screenshotUrl, { redirect: 'follow' });
     if (!imgRes.ok) {
       console.warn('Screenshot fetch failed:', imgRes.status);
@@ -475,14 +557,19 @@ async function callAnthropic(messages, env) {
 
 async function analyzeAndPatch(parsed, notionPageId, env) {
   const provider = env.AI_PROVIDER || 'google';
+  const isVideo = parsed.type === 'video' || parsed.mediaType === 'video';
   const isDirectImage = parsed.type === 'image' || parsed.type === 'gif'
-    || (parsed.type === 'tgpost' && (parsed.mediaType === 'image' || parsed.mediaType === 'gif'));
+    || (parsed.type === 'tgpost' && (parsed.mediaType === 'image' || parsed.mediaType === 'gif'))
+    || isVideo; // video thumbnail is an image
   let responseText = null;
 
+  // For video: use thumbnail instead of full video file
+  const fileIdForAI = isVideo && parsed.thumbnailFileId ? parsed.thumbnailFileId : parsed.fileId;
+
   // For items with file_id — fetch image from Telegram and send to AI
-  if (parsed.fileId) {
+  if (fileIdForAI) {
     const fileRes = await fetch(
-      `https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${parsed.fileId}`
+      `https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${fileIdForAI}`
     );
     const fileData = await fileRes.json();
     if (fileData.ok) {
@@ -565,9 +652,12 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
     };
   }
 
-  // Preserve existing ai_data fields (e.g. mediaType for tgpost) and merge AI results
+  // Preserve existing ai_data fields and merge AI results
   const aiDataPayload = {};
   if (parsed.mediaType) aiDataPayload.mediaType = parsed.mediaType;
+  if (parsed.thumbnailFileId) aiDataPayload.thumbnailFileId = parsed.thumbnailFileId;
+  if (parsed.contentHasHtml) aiDataPayload.htmlContent = true;
+  if (parsed.mediaGroupId) aiDataPayload.mediaGroupId = parsed.mediaGroupId;
   if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;

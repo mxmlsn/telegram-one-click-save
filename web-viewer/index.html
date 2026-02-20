@@ -285,11 +285,38 @@
       mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
       -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
     }
+    .card-tgpost .quote-text a,
+    .overlay-quote-text a {
+      color: #2a6ab5;
+      text-decoration: underline;
+      text-decoration-color: rgba(42, 106, 181, 0.3);
+    }
+    .card-tgpost .quote-text a:hover,
+    .overlay-quote-text a:hover {
+      text-decoration-color: rgba(42, 106, 181, 0.7);
+    }
     .card-tgpost .quote-footer {
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
       padding: 6px 16px 12px;
+    }
+    .tgpost-album {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2px;
+    }
+    .tgpost-album-img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      cursor: zoom-in;
+    }
+    .tgpost-album:has(> :only-child) {
+      grid-template-columns: 1fr;
+    }
+    .tgpost-album-img:only-child {
+      aspect-ratio: auto;
     }
 
     /* X post card */
@@ -1492,6 +1519,7 @@
     <button class="type-pill" data-type="link">link</button>
     <button class="type-pill" data-type="quote">quote</button>
     <button class="type-pill" data-type="pdf">pdf</button>
+    <button class="type-pill" data-type="tgpost">post</button>
     <div class="filter-divider"></div>
     <button class="type-pill" data-type="video">video</button>
     <button class="type-pill" data-type="product">product</button>

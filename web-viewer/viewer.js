@@ -123,7 +123,7 @@ async function startApp() {
   try {
     // 1. Fetch all items from Notion
     const pages = await fetchNotion();
-    STATE.items = pages.map(parseItem);
+    STATE.items = mergeMediaGroups(pages.map(parseItem));
 
     // 2. Load file URL cache
     const fileCache = await loadFileCache();
@@ -138,7 +138,7 @@ async function startApp() {
     document.getElementById('ai-status').textContent = '';
 
     // 5. Resolve remaining images in background, patch cards as they come
-    const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId);
+    const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId || i.fileIds?.length > 1);
     if (restItems.length > 0) {
       resolveRemainingImages(restItems, fileCache);
     } else {
@@ -156,38 +156,55 @@ async function startApp() {
 
 async function resolveRemainingImages(items, fileCache) {
   const now = Date.now();
-  const toFetch = [];
 
-  // Apply cached URLs first and patch those cards immediately
+  // Collect all unique fileIds (main + album extras)
+  const allFileIds = new Set();
+  for (const item of items) {
+    if (item.fileId) allFileIds.add(item.fileId);
+    if (item.fileIds?.length > 1) {
+      for (const fid of item.fileIds) if (fid) allFileIds.add(fid);
+    }
+  }
+
+  const toFetchIds = [];
+  // Apply cached URLs first
+  for (const fid of allFileIds) {
+    const cached = fileCache[fid];
+    if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
+      STATE.imageMap[fid] = cached.url;
+    } else {
+      toFetchIds.push(fid);
+    }
+  }
+
+  // Set _resolvedImg from cache
   const cachedItems = [];
   for (const item of items) {
-    const cached = fileCache[item.fileId];
-    if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
-      STATE.imageMap[item.fileId] = cached.url;
-      item._resolvedImg = cached.url;
+    if (item.fileId && STATE.imageMap[item.fileId]) {
+      item._resolvedImg = STATE.imageMap[item.fileId];
       cachedItems.push(item);
-    } else {
-      toFetch.push(item);
     }
   }
   if (cachedItems.length) patchCardImages(cachedItems);
 
   // Fetch uncached in batches, patching cards after each batch
   const BATCH = 15;
-  for (let i = 0; i < toFetch.length; i += BATCH) {
-    const batch = toFetch.slice(i, i + BATCH);
-    const urls = await Promise.all(batch.map(item => resolveFileId(STATE.botToken, item.fileId)));
-    const resolved = [];
-    batch.forEach((item, idx) => {
+  for (let i = 0; i < toFetchIds.length; i += BATCH) {
+    const batch = toFetchIds.slice(i, i + BATCH);
+    const urls = await Promise.all(batch.map(fid => resolveFileId(STATE.botToken, fid)));
+    batch.forEach((fid, idx) => {
       if (urls[idx]) {
-        STATE.imageMap[item.fileId] = urls[idx];
-        item._resolvedImg = urls[idx];
-        fileCache[item.fileId] = { url: urls[idx], ts: now };
-        resolved.push(item);
+        STATE.imageMap[fid] = urls[idx];
+        fileCache[fid] = { url: urls[idx], ts: now };
       }
     });
+    // Patch cards that now have their main fileId resolved
+    const resolved = items.filter(it =>
+      it.fileId && STATE.imageMap[it.fileId] && !it._resolvedImg
+    );
+    for (const it of resolved) it._resolvedImg = STATE.imageMap[it.fileId];
     if (resolved.length) patchCardImages(resolved);
-    if (i + BATCH < toFetch.length) await new Promise(r => setTimeout(r, 200));
+    if (i + BATCH < toFetchIds.length) await new Promise(r => setTimeout(r, 200));
   }
 
   saveFileCache(fileCache);
@@ -227,13 +244,23 @@ function parseItem(page) {
   const p = page.properties;
   let aiData = {};
   try { aiData = JSON.parse(p['ai_data']?.rich_text?.[0]?.text?.content || '{}'); } catch {}
+
+  const rawFileId = p['File ID']?.rich_text?.[0]?.text?.content || '';
+  const type = p['Type']?.select?.name || 'link';
+  const isVideoType = type === 'video' || aiData.mediaType === 'video';
+
+  // For video: use thumbnail for display, keep original for playback
+  const displayFileId = (isVideoType && aiData.thumbnailFileId) ? aiData.thumbnailFileId : rawFileId;
+  const videoFileId = (isVideoType && aiData.thumbnailFileId) ? rawFileId : '';
+
   return {
     id: page.id,
     url: p['URL']?.title?.[0]?.text?.content || '',
-    type: p['Type']?.select?.name || 'link',
+    type,
     tag: p['Tag']?.select?.name || '',
     content: p['Content']?.rich_text?.[0]?.text?.content || '',
-    fileId: p['File ID']?.rich_text?.[0]?.text?.content || '',
+    fileId: displayFileId,
+    videoFileId,
     sourceUrl: p['Source URL']?.url || '',
     date: p['Date']?.date?.start || '',
     ai_type: p['ai_type']?.select?.name || null,
@@ -241,8 +268,35 @@ function parseItem(page) {
     ai_description: p['ai_description']?.rich_text?.[0]?.text?.content || '',
     ai_analyzed: p['ai_analyzed']?.checkbox || false,
     ai_data: aiData,
+    fileIds: [],       // populated by mergeMediaGroups for albums
     _resolvedImg: null
   };
+}
+
+// ─── Media group merging (albums) ────────────────────────────────────────────
+function mergeMediaGroups(items) {
+  const groups = {};
+  const result = [];
+  for (const item of items) {
+    const gid = item.ai_data?.mediaGroupId;
+    if (gid) {
+      if (!groups[gid]) {
+        groups[gid] = item;
+        item.fileIds = item.fileId ? [item.fileId] : [];
+        result.push(item);
+      } else {
+        // Merge into existing group item
+        if (item.fileId) groups[gid].fileIds.push(item.fileId);
+        // Use content from whichever has it (caption is usually on first message)
+        if (!groups[gid].content && item.content) {
+          groups[gid].content = item.content;
+        }
+      }
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
 }
 
 // ─── Image resolution with cache ──────────────────────────────────────────────
@@ -284,30 +338,51 @@ async function resolveImagesBatch(items, tgToken, cache) {
   const toFetch = [];
   const map = {};
 
+  // Collect all fileIds that need resolution (main + album extras)
+  const allFileIds = new Set();
   for (const item of items) {
-    if (!item.fileId) continue;
-    const cached = cache[item.fileId];
+    if (item.fileId) allFileIds.add(item.fileId);
+    if (item.fileIds?.length > 1) {
+      for (const fid of item.fileIds) if (fid) allFileIds.add(fid);
+    }
+  }
+
+  const toFetchIds = [];
+  for (const fid of allFileIds) {
+    const cached = cache[fid];
     if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
-      map[item.fileId] = cached.url;
-      item._resolvedImg = cached.url;
+      map[fid] = cached.url;
     } else {
-      toFetch.push(item);
+      toFetchIds.push(fid);
+    }
+  }
+
+  // Set _resolvedImg from cache for main items
+  for (const item of items) {
+    if (item.fileId && map[item.fileId]) {
+      item._resolvedImg = map[item.fileId];
     }
   }
 
   // Fetch uncached in batches of 15
   const BATCH = 15;
-  for (let i = 0; i < toFetch.length; i += BATCH) {
-    const batch = toFetch.slice(i, i + BATCH);
-    const urls = await Promise.all(batch.map(item => resolveFileId(tgToken, item.fileId)));
-    batch.forEach((item, idx) => {
+  for (let i = 0; i < toFetchIds.length; i += BATCH) {
+    const batch = toFetchIds.slice(i, i + BATCH);
+    const urls = await Promise.all(batch.map(fid => resolveFileId(tgToken, fid)));
+    batch.forEach((fid, idx) => {
       if (urls[idx]) {
-        map[item.fileId] = urls[idx];
-        item._resolvedImg = urls[idx];
-        cache[item.fileId] = { url: urls[idx], ts: now };
+        map[fid] = urls[idx];
+        cache[fid] = { url: urls[idx], ts: now };
       }
     });
-    if (i + BATCH < toFetch.length) await new Promise(r => setTimeout(r, 200));
+    if (i + BATCH < toFetchIds.length) await new Promise(r => setTimeout(r, 200));
+  }
+
+  // Set _resolvedImg for items resolved in this batch
+  for (const item of items) {
+    if (item.fileId && map[item.fileId] && !item._resolvedImg) {
+      item._resolvedImg = map[item.fileId];
+    }
   }
 
   return map;
@@ -758,6 +833,14 @@ function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function sanitizeHtml(html) {
+  if (!html) return '';
+  // Strip all tags except safe ones
+  return html
+    .replace(/<(?!\/?(?:a|b|i|u|s|code|pre)\b)[^>]*>/gi, '')
+    .replace(/<a\s/gi, '<a target="_blank" rel="noopener" ');
+}
+
 function toTitleCase(str) {
   if (!str) return '';
   return str.replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
@@ -828,13 +911,13 @@ function renderCard(item) {
     const thumbImgAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
 
     // Direct TG video (no YouTube/Vimeo) — play inline via lightbox
-    const isTgDirectVideo = !ytMatch && !vimeoMatch && item.fileId && !/^https?:\/\//i.test(url);
-    const videoSrc = isTgDirectVideo ? (item._resolvedImg || '') : '';
+    const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
+    const playbackFileId = item.videoFileId || item.fileId;
     const cardAction = isTgDirectVideo ? 'video-play' : 'open';
-    const cardUrl = isTgDirectVideo ? videoSrc : url;
+    const cardUrl = isTgDirectVideo ? '' : url;
     const domainLabel = isTgDirectVideo ? 'Telegram video' : domain;
 
-    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}>
+    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(playbackFileId)}"` : ''}>
       ${pendingDot}
       <div class="video-header">
         ${faviconUrl && !isTgDirectVideo ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
@@ -1000,20 +1083,34 @@ function renderCard(item) {
     const sourceUrl = item.sourceUrl || item.url || '';
     const tgDomain = getDomain(sourceUrl);
     const textContent = item.content || item.ai_description || '';
+    const isHtml = aiData.htmlContent;
     const isTruncated = textContent.length > 300;
     const displayText = isTruncated ? textContent.slice(0, 300) : textContent;
     const truncatedClass = isTruncated ? ' truncated' : '';
+    const displayHtml = isHtml ? sanitizeHtml(displayText) : escapeHtml(displayText);
     const domainHtml = (sourceUrl && tgDomain)
       ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgDomain)}</a>`
       : '';
-    const imgHtml = imgUrl
-      ? `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`
-      : '';
+
+    // Album (multiple images)
+    const isAlbum = item.fileIds?.length > 1;
+    let mediaHtml = '';
+    if (isAlbum) {
+      const albumImgs = item.fileIds.map(fid => STATE.imageMap[fid]).filter(Boolean);
+      if (albumImgs.length > 0) {
+        mediaHtml = `<div class="tgpost-album">${albumImgs.map(url =>
+          `<img class="tgpost-album-img" src="${escapeHtml(url)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(url)}">`
+        ).join('')}</div>`;
+      }
+    } else if (imgUrl) {
+      mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
+    }
+
     return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgDomain || 'telegram')}">
       ${pendingDot}
-      ${imgHtml}
+      ${mediaHtml}
       <div class="tgpost-body">
-        <div class="quote-text${truncatedClass}">${escapeHtml(displayText)}</div>
+        <div class="quote-text${truncatedClass}">${displayHtml}</div>
       </div>
       <div class="quote-footer">
         ${domainHtml}
@@ -1423,9 +1520,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const sourceUrl = card.dataset.sourceUrl || '';
       const domain = card.dataset.domain || '';
 
+      // Check if this is a tgpost with HTML content
+      const itemId = card.dataset.id;
+      const item = STATE.items.find(i => i.id === itemId);
+      const isHtml = item?.ai_data?.htmlContent;
+      const textHtml = isHtml ? sanitizeHtml(quoteText) : escapeHtml(quoteText);
+
       let html = '<div class="overlay-quote">';
       html += '<div class="overlay-quote-body">';
-      html += `<div class="overlay-quote-text">${escapeHtml(quoteText)}</div>`;
+      html += `<div class="overlay-quote-text">${textHtml}</div>`;
       html += '</div>';
       html += '<div class="overlay-quote-footer">';
       html += (domain && sourceUrl)
