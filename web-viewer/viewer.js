@@ -1088,7 +1088,6 @@ function renderCard(item) {
 
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
-    console.log('[PDF card]', item.id, { type: item.type, fileId: item.fileId, pdfFileId: item.pdfFileId, imgUrl, aiData: item.ai_data });
     const pdfUrl = item.sourceUrl || item.url || '';
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
@@ -1098,13 +1097,10 @@ function renderCard(item) {
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
     const cardAction = hasTgFile ? 'open-file' : 'open';
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
-    const pdfDesc = item.ai_description || '';
-    const pdfDescHtml = pdfDesc ? `<div class="pdf-desc">${escapeHtml(pdfDesc.length > 150 ? pdfDesc.slice(0, 150) + '...' : pdfDesc)}</div>` : '';
     return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
-      ${pdfDescHtml}
     </div>`;
   }
 

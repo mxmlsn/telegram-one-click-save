@@ -229,6 +229,9 @@ function parseMessage(message) {
     result.fileId = message.document.file_id;
     if (message.document.thumbnail?.file_id) {
       result.thumbnailFileId = message.document.thumbnail.file_id;
+    } else if (message.document.thumb?.file_id) {
+      // Fallback for older Bot API versions
+      result.thumbnailFileId = message.document.thumb.file_id;
     }
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
