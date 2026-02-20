@@ -1088,6 +1088,7 @@ function renderCard(item) {
 
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
+    console.log('[PDF card]', item.id, { type: item.type, fileId: item.fileId, pdfFileId: item.pdfFileId, imgUrl, aiData: item.ai_data });
     const pdfUrl = item.sourceUrl || item.url || '';
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
