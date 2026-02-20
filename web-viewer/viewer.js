@@ -827,12 +827,19 @@ function renderCard(item) {
     const thumbGlowAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
     const thumbImgAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
 
-    return `<div class="card card-video" data-id="${item.id}" data-action="open" data-url="${escapeHtml(url)}">
+    // Direct TG video (no YouTube/Vimeo) — play inline via lightbox
+    const isTgDirectVideo = !ytMatch && !vimeoMatch && item.fileId && !/^https?:\/\//i.test(url);
+    const videoSrc = isTgDirectVideo ? (item._resolvedImg || '') : '';
+    const cardAction = isTgDirectVideo ? 'video-play' : 'open';
+    const cardUrl = isTgDirectVideo ? videoSrc : url;
+    const domainLabel = isTgDirectVideo ? 'Telegram video' : domain;
+
+    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}>
       ${pendingDot}
       <div class="video-header">
-        ${faviconUrl ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
-        <span class="video-domain">${escapeHtml(domain)}</span>
-        <button class="video-share-btn" data-action="open" data-url="${escapeHtml(url)}" title="Open">${shareIcon}</button>
+        ${faviconUrl && !isTgDirectVideo ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        <span class="video-domain">${escapeHtml(domainLabel)}</span>
+        <button class="video-share-btn" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}" title="${isTgDirectVideo ? 'Play' : 'Open'}">${shareIcon}</button>
       </div>
       ${(thumbSrc || vimeoId) ? `<div class="video-preview">
         <div class="video-glow-wrap">
@@ -1263,12 +1270,27 @@ function downloadImage(url) {
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
-function openLightbox(imgUrl, sourceUrl) {
+function openLightbox(imgUrl, sourceUrl, opts) {
   const lb = document.getElementById('lightbox');
   const img = document.getElementById('lightbox-img');
+  const video = document.getElementById('lightbox-video');
   const link = document.getElementById('lightbox-link');
   const dlBtn = document.getElementById('lightbox-download');
-  img.src = imgUrl;
+
+  const isVideo = opts && opts.video;
+  img.classList.toggle('hidden', isVideo);
+  video.classList.toggle('hidden', !isVideo);
+
+  if (isVideo) {
+    video.src = imgUrl;
+    video.play().catch(() => {});
+    img.src = '';
+  } else {
+    img.src = imgUrl;
+    video.pause();
+    video.src = '';
+  }
+
   dlBtn.onclick = (e) => { e.stopPropagation(); downloadImage(imgUrl); };
   if (sourceUrl && /^https?:\/\//i.test(sourceUrl)) {
     link.href = sourceUrl;
@@ -1278,6 +1300,15 @@ function openLightbox(imgUrl, sourceUrl) {
     link.classList.add('hidden');
   }
   lb.classList.remove('hidden');
+}
+
+function closeLightbox() {
+  const lb = document.getElementById('lightbox');
+  const video = document.getElementById('lightbox-video');
+  lb.classList.add('hidden');
+  document.getElementById('lightbox-img').src = '';
+  video.pause();
+  video.src = '';
 }
 
 // ─── Content overlay (shared) ────────────────────────────────────────────────
@@ -1300,7 +1331,7 @@ function closeContentOverlay() {
 document.addEventListener('DOMContentLoaded', () => {
   // ── Masonry grid: single delegated click handler for all cards ──
   const masonry = document.getElementById('masonry');
-  masonry.addEventListener('click', e => {
+  masonry.addEventListener('click', async e => {
     // Find the closest element with a data-action attribute
     const actionEl = e.target.closest('[data-action]');
     if (!actionEl) return;
@@ -1326,6 +1357,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'lightbox') {
       const imgSrc = actionEl.dataset.img || '';
       if (imgSrc) openLightbox(imgSrc, url);
+      return;
+    }
+
+    // "video-play" — play TG video in lightbox
+    if (action === 'video-play') {
+      e.stopPropagation();
+      let videoUrl = url;
+      // If URL is empty/expired, re-resolve from fileId
+      if (!videoUrl) {
+        const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
+        if (fileId && STATE.botToken) {
+          videoUrl = await resolveFileId(STATE.botToken, fileId);
+        }
+      }
+      if (videoUrl) openLightbox(videoUrl, '', { video: true });
       return;
     }
 
@@ -1395,9 +1441,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Lightbox close ──
   const lb = document.getElementById('lightbox');
   lb.addEventListener('click', e => {
-    if (e.target === lb || e.target === document.getElementById('lightbox-img')) {
-      lb.classList.add('hidden');
-      document.getElementById('lightbox-img').src = '';
+    if (e.target === lb || e.target === document.getElementById('lightbox-img') || e.target === document.getElementById('lightbox-video')) {
+      closeLightbox();
     }
   });
 
@@ -1471,8 +1516,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Escape key closes any overlay ──
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      lb.classList.add('hidden');
-      document.getElementById('lightbox-img').src = '';
+      closeLightbox();
       closeContentOverlay();
       closeCtxMenu();
     }

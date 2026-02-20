@@ -957,6 +957,7 @@
     }
     #lightbox.hidden { display: none; }
     #lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 0; object-fit: contain; }
+    #lightbox video { max-width: 90vw; max-height: 88vh; border-radius: 8px; outline: none; }
     #lightbox-bottom { position: absolute; bottom: 28px; display: flex; align-items: center; gap: 12px; }
     #lightbox-link { color: #888; font-size: 13px; text-decoration: none; }
     #lightbox-link:hover { color: #bbb; }
@@ -1544,6 +1545,7 @@
 <!-- Lightbox -->
 <div id="lightbox" class="hidden">
   <img id="lightbox-img" src="" alt="">
+  <video id="lightbox-video" class="hidden" controls playsinline></video>
   <div id="lightbox-bottom">
     <a id="lightbox-link" href="#" target="_blank"></a>
     <button id="lightbox-download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
