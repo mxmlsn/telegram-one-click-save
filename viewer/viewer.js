@@ -110,6 +110,7 @@ function disconnect() {
 const FIRST_BATCH_SIZE = 16;
 
 async function startApp() {
+  document.getElementById('search-pill').classList.remove('hidden');
   document.getElementById('toolbar').classList.remove('hidden');
   document.getElementById('display-bar').classList.remove('hidden');
   document.getElementById('grid-wrap').classList.remove('hidden');
@@ -433,9 +434,38 @@ function closeSettingsPanel() {
 
 // ─── Toolbar events ───────────────────────────────────────────────────────────
 function setupToolbarEvents() {
-  document.getElementById('search-input').addEventListener('input', e => {
+  const searchPill = document.getElementById('search-pill');
+  const searchInput = document.getElementById('search-input');
+
+  searchInput.addEventListener('input', e => {
     STATE.search = e.target.value.toLowerCase();
     applyFilters();
+  });
+
+  // Collapse search pill on scroll, expand on click
+  let scrollCollapsed = false;
+  window.addEventListener('scroll', () => {
+    const shouldCollapse = window.scrollY > 60;
+    if (shouldCollapse === scrollCollapsed) return;
+    scrollCollapsed = shouldCollapse;
+    if (shouldCollapse && document.activeElement !== searchInput) {
+      searchPill.classList.add('collapsed');
+    } else if (!shouldCollapse) {
+      searchPill.classList.remove('collapsed');
+    }
+  }, { passive: true });
+
+  searchPill.addEventListener('click', () => {
+    if (searchPill.classList.contains('collapsed')) {
+      searchPill.classList.remove('collapsed');
+      searchInput.focus();
+    }
+  });
+
+  searchInput.addEventListener('blur', () => {
+    if (window.scrollY > 60) {
+      searchPill.classList.add('collapsed');
+    }
   });
 
   // Create "plain" sub-pill for Link filter (initially hidden)
