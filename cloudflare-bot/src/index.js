@@ -237,7 +237,7 @@ function parseMessage(message) {
       result.contentHasHtml = captionEntities.length > 0;
     } else {
       result.type = docType;
-      result.content += caption;
+      result.content += caption || message.document.file_name || '';
     }
     return result;
   }
@@ -630,7 +630,11 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
     return;
   }
 
-  // Hard guard: direct TG image can only be "product" or null
+  // Hard guard: tgpost type is NEVER overridden by AI
+  if (parsed.type === 'tgpost') {
+    aiResult.content_type = null;
+  }
+  // Direct TG image can only be "product" or null
   if (isDirectImage && aiResult.content_type !== 'product') {
     aiResult.content_type = null;
   }

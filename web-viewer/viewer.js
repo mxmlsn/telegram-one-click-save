@@ -203,7 +203,12 @@ async function resolveRemainingImages(items, fileCache) {
       it.fileId && STATE.imageMap[it.fileId] && !it._resolvedImg
     );
     for (const it of resolved) it._resolvedImg = STATE.imageMap[it.fileId];
-    if (resolved.length) patchCardImages(resolved);
+    // Also re-render album cards that got new album images resolved in this batch
+    const albumsToRepatch = items.filter(it =>
+      it._resolvedImg && it.fileIds?.length > 1 && batch.some(fid => it.fileIds.includes(fid))
+    );
+    const toPatch = [...new Set([...resolved, ...albumsToRepatch])];
+    if (toPatch.length) patchCardImages(toPatch);
     if (i + BATCH < toFetchIds.length) await new Promise(r => setTimeout(r, 200));
   }
 
@@ -869,8 +874,8 @@ function renderCard(item) {
   const domain = getDomain(item.sourceUrl || item.url);
   const url = item.sourceUrl || item.url || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
-  // image/gif from TG is always image/gif — AI type cannot override it
-  const effectiveType = (item.type === 'image' || item.type === 'gif') ? item.type : (isInstagramReel ? 'video' : (aiType || item.type));
+  // image/gif/tgpost from TG keeps its base type — AI type cannot override it
+  const effectiveType = (item.type === 'image' || item.type === 'gif' || item.type === 'tgpost') ? item.type : (isInstagramReel ? 'video' : (aiType || item.type));
 
   const pendingDot = (!item.ai_analyzed && item.type !== 'quote') ? '<div class="badge-pending"></div>' : '';
 
@@ -1067,11 +1072,14 @@ function renderCard(item) {
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
     const pdfUrl = item.sourceUrl || item.url || '';
-    const pdfTitle = toTitleCase(aiData.title || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
+    const hasTgFile = item.fileId && !/^https?:\/\//i.test(pdfUrl);
+    const pdfTitle = toTitleCase(aiData.title || item.content || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     const previewHtml = imgUrl
       ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
-    return `<div class="card card-pdf" data-id="${item.id}" data-action="open" data-url="${escapeHtml(pdfUrl)}">
+    const cardAction = hasTgFile ? 'download-file' : 'open';
+    const cardDataUrl = hasTgFile ? '' : pdfUrl;
+    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
@@ -1083,7 +1091,8 @@ function renderCard(item) {
     const sourceUrl = item.sourceUrl || item.url || '';
     const tgDomain = getDomain(sourceUrl);
     const textContent = item.content || item.ai_description || '';
-    const isHtml = aiData.htmlContent;
+    // Detect HTML content: explicit flag OR auto-detect <a href=, <b>, <i> tags in content
+    const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
     const isTruncated = textContent.length > 300;
     const displayText = isTruncated ? textContent.slice(0, 300) : textContent;
     const truncatedClass = isTruncated ? ' truncated' : '';
@@ -1091,6 +1100,11 @@ function renderCard(item) {
     const domainHtml = (sourceUrl && tgDomain)
       ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgDomain)}</a>`
       : '';
+
+    // Detect YouTube/Vimeo links in sourceUrl or text content for video preview
+    const allText = sourceUrl + ' ' + textContent;
+    const tgYtMatch = allText.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+    const tgVimeoMatch = !tgYtMatch && allText.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
 
     // Album (multiple images)
     const isAlbum = item.fileIds?.length > 1;
@@ -1104,6 +1118,45 @@ function renderCard(item) {
       }
     } else if (imgUrl) {
       mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
+    } else if (tgYtMatch) {
+      const ytId = tgYtMatch[1];
+      const ytThumb = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
+      const ytFallback = `https://img.youtube.com/vi/${ytId}/sddefault.jpg`;
+      const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
+      mediaHtml = `<div class="tgpost-video-preview" data-action="open" data-url="${escapeHtml(ytUrl)}">
+        <img class="card-img" src="${escapeHtml(ytThumb)}" loading="lazy" alt="" onerror="this.src='${ytFallback}'">
+        <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+      </div>`;
+    } else if (tgVimeoMatch) {
+      const vimeoId = tgVimeoMatch[1];
+      const vimeoImgId = `tgpost-vimeo-${item.id}`;
+      const vimeoUrl = `https://vimeo.com/${vimeoId}`;
+      fetch(`https://vimeo.com/api/v2/video/${vimeoId}.json`)
+        .then(r => r.json())
+        .then(data => {
+          const src = data[0]?.thumbnail_large || data[0]?.thumbnail_medium || '';
+          const el = document.getElementById(vimeoImgId);
+          if (el && src) el.src = src;
+        }).catch(() => {});
+      mediaHtml = `<div class="tgpost-video-preview" data-action="open" data-url="${escapeHtml(vimeoUrl)}">
+        <img class="card-img" id="${vimeoImgId}" src="" loading="lazy" alt="">
+        <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+      </div>`;
+    } else if (aiData.mediaType === 'pdf' && item.fileId) {
+      mediaHtml = `<div class="tgpost-pdf-badge" data-action="download-file" data-file-id="${escapeHtml(item.fileId)}">
+        <div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div>
+      </div>`;
+    } else if (aiData.mediaType === 'video' && item.fileId) {
+      // Direct TG video in tgpost — show thumbnail or play icon
+      const thumbUrl = imgUrl || '';
+      mediaHtml = thumbUrl
+        ? `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(item.videoFileId || item.fileId)}">
+            <img class="card-img" src="${escapeHtml(thumbUrl)}" loading="lazy" alt="">
+            <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+          </div>`
+        : `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(item.videoFileId || item.fileId)}">
+            <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:16px auto"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+          </div>`;
     }
 
     return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgDomain || 'telegram')}">
@@ -1457,6 +1510,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // "download-file" — resolve TG file_id and open file in new tab
+    if (action === 'download-file') {
+      e.stopPropagation();
+      const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
+      if (fileId && STATE.botToken) {
+        const fileUrl = await resolveFileId(STATE.botToken, fileId);
+        if (fileUrl) window.open(fileUrl, '_blank');
+      }
+      return;
+    }
+
     // "video-play" — play TG video in lightbox
     if (action === 'video-play') {
       e.stopPropagation();
@@ -1523,7 +1587,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Check if this is a tgpost with HTML content
       const itemId = card.dataset.id;
       const item = STATE.items.find(i => i.id === itemId);
-      const isHtml = item?.ai_data?.htmlContent;
+      const isHtml = item?.ai_data?.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(quoteText);
       const textHtml = isHtml ? sanitizeHtml(quoteText) : escapeHtml(quoteText);
 
       let html = '<div class="overlay-quote">';

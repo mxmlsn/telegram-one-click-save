@@ -318,6 +318,37 @@
     .tgpost-album-img:only-child {
       aspect-ratio: auto;
     }
+    .tgpost-video-preview {
+      position: relative;
+      cursor: pointer;
+    }
+    .tgpost-video-preview .card-img {
+      display: block;
+      width: 100%;
+    }
+    .tgpost-play-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 48px;
+      height: 48px;
+      background: rgba(0,0,0,0.55);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .tgpost-play-icon svg {
+      width: 22px;
+      height: 22px;
+      margin-left: 2px;
+    }
+    .tgpost-pdf-badge {
+      padding: 16px;
+      cursor: pointer;
+    }
 
     /* X post card */
     .card.card-xpost {
