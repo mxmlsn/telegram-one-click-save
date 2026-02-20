@@ -1,0 +1,28 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web-viewer/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    name: Deploy web viewer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 961294ddfea3e6556e27911482ba7360
+          projectName: stash-viewer
+          directory: web-viewer
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
