@@ -337,6 +337,11 @@
     .tgpost-album > :only-child .tgpost-album-img {
       aspect-ratio: auto;
     }
+    /* Spanned last item fills remaining width */
+    .tgpost-album-item[style*="grid-column"] .tgpost-album-img {
+      aspect-ratio: auto;
+      max-height: 300px;
+    }
     .tgpost-video-preview {
       position: relative;
       cursor: pointer;
@@ -364,9 +369,30 @@
       height: 22px;
       margin-left: 2px;
     }
+    .tgpost-pdf-preview {
+      cursor: pointer;
+      position: relative;
+    }
+    .tgpost-pdf-preview .pdf-blur-wrap {
+      border-radius: 0;
+    }
     .tgpost-pdf-badge {
       padding: 16px;
       cursor: pointer;
+    }
+    .tgpost-album-item.is-pdf {
+      cursor: pointer;
+      position: relative;
+    }
+    .tgpost-album-item.is-pdf .blur-preview {
+      filter: blur(6px);
+      transform: scale(1.05);
+    }
+    .tgpost-album-item.is-pdf .pdf-badge {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
     }
 
     /* X post card */

@@ -34,7 +34,7 @@ async function handleUpdate(update, env, ctx) {
   const chatId = String(message.chat.id);
   if (chatId !== env.ALLOWED_CHAT_ID) return;
 
-  const parsed = parseMessage(message);
+  const parsed = parseMessage(message, env);
 
   try {
     // Save to Notion
@@ -134,7 +134,7 @@ function formatTextWithEntities(text, entities) {
 
 // ─── Message Parser ──────────────────────────────────────────────────────────
 
-function parseMessage(message) {
+function parseMessage(message, env) {
   const result = {
     type: 'quote',       // default
     fileId: null,
@@ -153,10 +153,18 @@ function parseMessage(message) {
     const origin = message.forward_origin;
     if (origin.type === 'channel' && origin.chat?.username) {
       result.sourceUrl = `https://t.me/${origin.chat.username}/${origin.message_id}`;
+      if (origin.chat.title) result.channelTitle = origin.chat.title;
+    } else if (origin.type === 'channel' && origin.chat?.title) {
+      // Private channel (no username) — save title only
+      result.channelTitle = origin.chat.title;
     } else if (origin.type === 'user') {
-      const name = [origin.sender_user.first_name, origin.sender_user.last_name]
-        .filter(Boolean).join(' ');
-      if (name) result.content = `[from: ${name}] `;
+      // Skip author for messages forwarded from the bot owner (self)
+      const isSelf = env?.ALLOWED_CHAT_ID && String(origin.sender_user?.id) === env.ALLOWED_CHAT_ID;
+      if (!isSelf) {
+        const name = [origin.sender_user.first_name, origin.sender_user.last_name]
+          .filter(Boolean).join(' ');
+        if (name) result.forwardFrom = name;
+      }
     }
   }
 
@@ -295,9 +303,9 @@ async function saveToNotion(parsed, env) {
   }
 
   const { type, sourceUrl, content, fileId, mediaType } = parsed;
-  const domain = sourceUrl
+  const domain = parsed.channelTitle || parsed.forwardFrom || (sourceUrl
     ? sourceUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
-    : 'telegram';
+    : 'telegram');
 
   const properties = {
     'URL': { title: [{ text: { content: domain } }] },
@@ -315,6 +323,8 @@ async function saveToNotion(parsed, env) {
   if (parsed.thumbnailFileId) aiDataInit.thumbnailFileId = parsed.thumbnailFileId;
   if (parsed.contentHasHtml) aiDataInit.htmlContent = true;
   if (parsed.mediaGroupId) aiDataInit.mediaGroupId = parsed.mediaGroupId;
+  if (parsed.channelTitle) aiDataInit.channelTitle = parsed.channelTitle;
+  if (parsed.forwardFrom) aiDataInit.forwardFrom = parsed.forwardFrom;
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
@@ -725,6 +735,8 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   if (parsed.thumbnailFileId) aiDataPayload.thumbnailFileId = parsed.thumbnailFileId;
   if (parsed.contentHasHtml) aiDataPayload.htmlContent = true;
   if (parsed.mediaGroupId) aiDataPayload.mediaGroupId = parsed.mediaGroupId;
+  if (parsed.channelTitle) aiDataPayload.channelTitle = parsed.channelTitle;
+  if (parsed.forwardFrom) aiDataPayload.forwardFrom = parsed.forwardFrom;
   if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;

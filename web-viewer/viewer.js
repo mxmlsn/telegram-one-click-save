@@ -293,6 +293,7 @@ function mergeMediaGroups(items) {
         fileId: item.fileId,
         mediaType: item.ai_data?.mediaType || 'image',
         videoFileId: item.videoFileId || '',
+        pdfFileId: item.pdfFileId || '',
       };
       if (!groups[gid]) {
         groups[gid] = item;
@@ -312,6 +313,13 @@ function mergeMediaGroups(items) {
         // Merge HTML content flag
         if (item.ai_data?.htmlContent) {
           groups[gid].ai_data.htmlContent = true;
+        }
+        // Merge channel/forward metadata from any group member
+        if (!groups[gid].ai_data.channelTitle && item.ai_data?.channelTitle) {
+          groups[gid].ai_data.channelTitle = item.ai_data.channelTitle;
+        }
+        if (!groups[gid].ai_data.forwardFrom && item.ai_data?.forwardFrom) {
+          groups[gid].ai_data.forwardFrom = item.ai_data.forwardFrom;
         }
       }
     } else {
@@ -1107,7 +1115,7 @@ function renderCard(item) {
   // ── Telegram Post card (media + text) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || item.url || '';
-    const tgDomain = getDomain(sourceUrl);
+    const tgLabel = aiData.channelTitle || aiData.forwardFrom || getDomain(sourceUrl);
     const textContent = item.content || item.ai_description || '';
     // Detect HTML content: explicit flag OR auto-detect <a href=, <b>, <i> tags in content
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
@@ -1115,8 +1123,10 @@ function renderCard(item) {
     const displayText = isTruncated ? textContent.slice(0, 300) : textContent;
     const truncatedClass = isTruncated ? ' truncated' : '';
     const displayHtml = isHtml ? sanitizeHtml(displayText) : escapeHtml(displayText);
-    const domainHtml = (sourceUrl && tgDomain)
-      ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgDomain)}</a>`
+    const domainHtml = tgLabel
+      ? (sourceUrl
+        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>`
+        : `<span class="quote-source">${escapeHtml(tgLabel)}</span>`)
       : '';
 
     // Detect YouTube/Vimeo links in sourceUrl or text content for video preview
@@ -1132,6 +1142,12 @@ function renderCard(item) {
       const colClass = albumMedia.length > 4 ? ' album-3col' : '';
       const albumItems = albumMedia.map(m => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
+        if (m.mediaType === 'pdf') {
+          const pdfFid = m.pdfFileId || m.fileId;
+          return resolvedUrl
+            ? `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><img class="tgpost-album-img blur-preview" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
+            : `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="pdf-badge" style="position:relative;top:auto;left:auto;transform:none"><span class="pdf-badge-text">pdf</span></div></div></div>`;
+        }
         if (m.mediaType === 'video') {
           const playFileId = m.videoFileId || m.fileId;
           return resolvedUrl
@@ -1143,6 +1159,18 @@ function renderCard(item) {
           : '';
       }).filter(Boolean);
       if (albumItems.length > 0) {
+        // Calculate if last item needs to span remaining columns
+        const cols = albumMedia.length > 4 ? 3 : 2;
+        const remainder = albumItems.length % cols;
+        if (remainder !== 0) {
+          const spanCols = cols - remainder + 1;
+          // Replace last item's opening div to add grid-column span
+          const lastIdx = albumItems.length - 1;
+          albumItems[lastIdx] = albumItems[lastIdx].replace(
+            /^<div class="tgpost-album-item/,
+            `<div style="grid-column:span ${spanCols}" class="tgpost-album-item`
+          );
+        }
         mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
     } else if (imgUrl) {
@@ -1172,9 +1200,11 @@ function renderCard(item) {
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
     } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
-      mediaHtml = `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(item.pdfFileId || item.fileId)}">
-        <div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div>
-      </div>`;
+      const pdfFid = item.pdfFileId || item.fileId;
+      const pdfThumbUrl = imgUrl || '';
+      mediaHtml = pdfThumbUrl
+        ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div></div>`
+        : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`;
     } else if (aiData.mediaType === 'video' && item.fileId) {
       // Direct TG video in tgpost — show thumbnail or play icon
       const thumbUrl = imgUrl || '';
@@ -1188,7 +1218,7 @@ function renderCard(item) {
           </div>`;
     }
 
-    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgDomain || 'telegram')}">
+    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
       ${mediaHtml}
       <div class="tgpost-body">
