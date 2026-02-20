@@ -745,6 +745,234 @@
       overflow: hidden;
     }
 
+    /* ── Video Note card (circle video) ── */
+    .card-videonote {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .videonote-circle {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+      background: #1a1a1a;
+      flex-shrink: 0;
+    }
+    .videonote-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .videonote-play-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .videonote-play-icon svg { width: 20px; height: 20px; }
+    .videonote-author {
+      margin-top: 6px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      text-align: center;
+    }
+    /* Video note inside tgpost */
+    .tgpost-videonote {
+      display: flex;
+      justify-content: center;
+      padding: 12px 0 4px;
+    }
+    .tgpost-videonote .videonote-circle {
+      width: 180px;
+      height: 180px;
+    }
+
+    /* ── Voice message card ── */
+    .card-voice {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+    .voice-player {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .voice-play-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      background: #5B68E0;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .voice-play-btn:hover { background: #6B78F0; }
+    .voice-play-btn svg { width: 16px; height: 16px; }
+    .voice-player.is-playing .voice-play-btn svg {
+      /* Swap to pause icon via CSS */
+      display: none;
+    }
+    .voice-player.is-playing .voice-play-btn::after {
+      content: '';
+      display: block;
+      width: 10px;
+      height: 12px;
+      border-left: 3px solid white;
+      border-right: 3px solid white;
+    }
+    .voice-waveform {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+      cursor: pointer;
+    }
+    .voice-progress {
+      height: 100%;
+      width: 0%;
+      background: #5B68E0;
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+    .voice-duration {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      font-variant-numeric: tabular-nums;
+      min-width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .voice-author {
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── Audio file card ── */
+    .card-audio {
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .audio-cover {
+      width: 100%;
+      aspect-ratio: 1;
+      overflow: hidden;
+    }
+    .audio-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .audio-info {
+      padding: 10px 14px 0;
+    }
+    .audio-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .audio-performer {
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      margin-top: 2px;
+    }
+    .audio-player {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    .audio-play-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: #5B68E0;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .audio-play-btn:hover { background: #6B78F0; }
+    .audio-play-btn svg { width: 14px; height: 14px; }
+    .audio-player.is-playing .audio-play-btn svg { display: none; }
+    .audio-player.is-playing .audio-play-btn::after {
+      content: '';
+      display: block;
+      width: 10px;
+      height: 12px;
+      border-left: 3px solid white;
+      border-right: 3px solid white;
+    }
+    .audio-progress-wrap {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 2px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+    }
+    .audio-progress {
+      height: 100%;
+      width: 0%;
+      background: #5B68E0;
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+    .audio-time {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      font-variant-numeric: tabular-nums;
+      min-width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .audio-source {
+      padding: 0 14px 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+
     /* ── Tool card ── */
     .card.card-tool {
       border-radius: 20px;
@@ -1633,6 +1861,9 @@
     <button class="type-pill" data-type="quote">quote</button>
     <button class="type-pill" data-type="pdf">pdf</button>
     <button class="type-pill" data-type="tgpost">post</button>
+    <button class="type-pill" data-type="video_note">circle</button>
+    <button class="type-pill" data-type="voice">voice</button>
+    <button class="type-pill" data-type="audio">audio</button>
     <div class="filter-divider"></div>
     <button class="type-pill" data-type="video">video</button>
     <button class="type-pill" data-type="product">product</button>

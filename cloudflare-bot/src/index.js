@@ -256,6 +256,71 @@ function parseMessage(message, env) {
     return result;
   }
 
+  // Video note (round video message)
+  if (message.video_note) {
+    result.fileId = message.video_note.file_id;
+    if (message.video_note.thumbnail?.file_id) {
+      result.thumbnailFileId = message.video_note.thumbnail.file_id;
+    }
+    result.audioDuration = message.video_note.duration || 0;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = 'video_note';
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
+    } else {
+      result.type = 'video_note';
+      result.content += caption;
+    }
+    return result;
+  }
+
+  // Voice message
+  if (message.voice) {
+    result.fileId = message.voice.file_id;
+    result.audioDuration = message.voice.duration || 0;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = 'voice';
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
+    } else {
+      result.type = 'voice';
+      result.content += caption;
+    }
+    return result;
+  }
+
+  // Audio file (mp3, wav, etc.)
+  if (message.audio) {
+    result.fileId = message.audio.file_id;
+    if (message.audio.thumbnail?.file_id) {
+      result.thumbnailFileId = message.audio.thumbnail.file_id;
+    }
+    result.audioTitle = message.audio.title || '';
+    result.audioPerformer = message.audio.performer || '';
+    result.audioDuration = message.audio.duration || 0;
+    if (isForward || hasSubstantialCaption) {
+      result.type = 'tgpost';
+      result.mediaType = 'audio';
+      const captionEntities = message.caption_entities || [];
+      result.content += captionEntities.length
+        ? formatTextWithEntities(caption, captionEntities)
+        : caption;
+      result.contentHasHtml = captionEntities.length > 0;
+    } else {
+      result.type = 'audio';
+      result.content += caption || [message.audio.performer, message.audio.title].filter(Boolean).join(' — ') || message.audio.file_name || '';
+    }
+    return result;
+  }
+
   // Text message
   if (message.text) {
     const allEntities = message.entities || [];
@@ -325,6 +390,9 @@ async function saveToNotion(parsed, env) {
   if (parsed.mediaGroupId) aiDataInit.mediaGroupId = parsed.mediaGroupId;
   if (parsed.channelTitle) aiDataInit.channelTitle = parsed.channelTitle;
   if (parsed.forwardFrom) aiDataInit.forwardFrom = parsed.forwardFrom;
+  if (parsed.audioTitle) aiDataInit.audioTitle = parsed.audioTitle;
+  if (parsed.audioPerformer) aiDataInit.audioPerformer = parsed.audioPerformer;
+  if (parsed.audioDuration) aiDataInit.audioDuration = parsed.audioDuration;
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
@@ -599,6 +667,11 @@ async function callAnthropic(messages, env) {
 
 async function analyzeAndPatch(parsed, notionPageId, env) {
   const provider = env.AI_PROVIDER || 'google';
+  // Skip AI analysis for audio-only types (nothing visual to analyze)
+  const isAudioOnly = ['voice', 'audio', 'video_note'].includes(parsed.type)
+    || ['voice', 'audio', 'video_note'].includes(parsed.mediaType);
+  if (isAudioOnly) return;
+
   const isPdf = parsed.type === 'pdf' || parsed.mediaType === 'pdf';
   const isVideo = parsed.type === 'video' || parsed.mediaType === 'video';
   const isDirectImage = parsed.type === 'image' || parsed.type === 'gif'

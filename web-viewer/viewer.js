@@ -205,7 +205,7 @@ async function resolveRemainingImages(items, fileCache) {
     for (const it of resolved) it._resolvedImg = STATE.imageMap[it.fileId];
     // Also re-render album cards that got new album images resolved in this batch
     const albumsToRepatch = items.filter(it =>
-      it._resolvedImg && it.fileIds?.length > 1 && batch.some(fid => it.fileIds.includes(fid))
+      it._resolvedImg && (it.fileIds?.length > 1 || it.albumMedia?.length > 1) && batch.some(fid => it.fileIds.includes(fid))
     );
     const toPatch = [...new Set([...resolved, ...albumsToRepatch])];
     if (toPatch.length) patchCardImages(toPatch);
@@ -254,11 +254,14 @@ function parseItem(page) {
   const type = p['Type']?.select?.name || 'link';
   const isVideoType = type === 'video' || aiData.mediaType === 'video';
   const isPdfType = type === 'pdf' || aiData.mediaType === 'pdf';
+  const isVideoNoteType = type === 'video_note' || aiData.mediaType === 'video_note';
+  const isAudioType = type === 'audio' || aiData.mediaType === 'audio';
   const hasThumb = !!aiData.thumbnailFileId;
 
-  // For video/PDF: use thumbnail for display, keep original for playback/download
-  const displayFileId = ((isVideoType || isPdfType) && hasThumb) ? aiData.thumbnailFileId : rawFileId;
-  const videoFileId = (isVideoType && hasThumb) ? rawFileId : '';
+  // For video/PDF/video_note: use thumbnail for display, keep original for playback/download
+  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType) && hasThumb;
+  const displayFileId = needsThumbSwap ? aiData.thumbnailFileId : rawFileId;
+  const videoFileId = ((isVideoType || isVideoNoteType) && hasThumb) ? rawFileId : ((isVideoType || isVideoNoteType) ? rawFileId : '');
   const pdfFileId = (isPdfType && hasThumb) ? rawFileId : (isPdfType ? rawFileId : '');
 
   return {
@@ -270,6 +273,7 @@ function parseItem(page) {
     fileId: displayFileId,
     videoFileId,
     pdfFileId,
+    audioFileId: (isAudioType || type === 'voice' || aiData.mediaType === 'voice') ? rawFileId : '',
     sourceUrl: p['Source URL']?.url || '',
     date: p['Date']?.date?.start || '',
     ai_type: p['ai_type']?.select?.name || null,
@@ -297,14 +301,15 @@ function mergeMediaGroups(items) {
       };
       if (!groups[gid]) {
         groups[gid] = item;
-        item.albumMedia = item.fileId ? [mediaEntry] : [];
+        // Always add media entry (even without fileId — PDF/video can still show badge)
+        item.albumMedia = [mediaEntry];
         item.fileIds = item.fileId ? [item.fileId] : [];
         result.push(item);
       } else {
-        // Merge into existing group item
+        // Merge into existing group item — always add media entry
+        groups[gid].albumMedia.push(mediaEntry);
         if (item.fileId) {
           groups[gid].fileIds.push(item.fileId);
-          groups[gid].albumMedia.push(mediaEntry);
         }
         // Use content from whichever has it (caption is usually on first message)
         if (!groups[gid].content && item.content) {
@@ -324,6 +329,12 @@ function mergeMediaGroups(items) {
       }
     } else {
       result.push(item);
+    }
+  }
+  // Promote merged groups to tgpost so album rendering always triggers
+  for (const item of result) {
+    if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
+      item.type = 'tgpost';
     }
   }
   return result;
@@ -767,7 +778,7 @@ function applyGridMode() {
 // Filtering: if base type selected → match item.type
 //            if AI type selected → match item.ai_type
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
-const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost']);
+const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'video_note', 'voice', 'audio']);
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 
@@ -899,10 +910,12 @@ function renderCard(item) {
   const domain = getDomain(item.sourceUrl || item.url);
   const url = item.sourceUrl || item.url || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
-  // image/gif/tgpost from TG keeps its base type — AI type cannot override it
-  const effectiveType = (item.type === 'image' || item.type === 'gif' || item.type === 'tgpost') ? item.type : (isInstagramReel ? 'video' : (aiType || item.type));
+  // image/gif/tgpost/video_note/voice/audio from TG keeps its base type — AI type cannot override it
+  const KEEP_BASE_TYPES = ['image', 'gif', 'tgpost', 'video_note', 'voice', 'audio'];
+  const effectiveType = KEEP_BASE_TYPES.includes(item.type) ? item.type : (isInstagramReel ? 'video' : (aiType || item.type));
 
-  const pendingDot = (!item.ai_analyzed && item.type !== 'quote') ? '<div class="badge-pending"></div>' : '';
+  const NO_AI_TYPES = ['quote', 'video_note', 'voice', 'audio'];
+  const pendingDot = (!item.ai_analyzed && !NO_AI_TYPES.includes(item.type)) ? '<div class="badge-pending"></div>' : '';
 
   // ── Video card ──
   if (effectiveType === 'video') {
@@ -1094,13 +1107,82 @@ function renderCard(item) {
     </div>`;
   }
 
+  // ── Video Note card (круглое видео) ──
+  if (effectiveType === 'video_note') {
+    const vnFileId = item.videoFileId || item.audioFileId || item.fileId;
+    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
+    const authorHtml = authorLabel
+      ? `<div class="videonote-author">${escapeHtml(authorLabel)}</div>`
+      : '';
+    const duration = aiData.audioDuration || 0;
+    const thumbUrl = imgUrl || '';
+    return `<div class="card card-videonote" data-id="${item.id}">
+      ${pendingDot}
+      <div class="videonote-circle" data-action="videonote-play" data-file-id="${escapeHtml(vnFileId)}">
+        <video class="videonote-video" muted loop playsinline${thumbUrl ? ` poster="${escapeHtml(thumbUrl)}"` : ''} preload="none"></video>
+        <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+      </div>
+      ${authorHtml}
+    </div>`;
+  }
+
+  // ── Voice message card ──
+  if (effectiveType === 'voice') {
+    const voiceFileId = item.audioFileId || item.fileId;
+    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
+    const duration = aiData.audioDuration || 0;
+    const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
+    const authorHtml = authorLabel
+      ? `<div class="voice-author">${escapeHtml(authorLabel)}</div>`
+      : '';
+    return `<div class="card card-voice" data-id="${item.id}">
+      ${pendingDot}
+      <div class="voice-player" data-action="voice-play" data-file-id="${escapeHtml(voiceFileId)}">
+        <button class="voice-play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></button>
+        <div class="voice-waveform"><div class="voice-progress"></div></div>
+        <span class="voice-duration">${durationStr}</span>
+      </div>
+      ${authorHtml}
+    </div>`;
+  }
+
+  // ── Audio file card (mp3, wav) ──
+  if (effectiveType === 'audio') {
+    const audioFileId = item.audioFileId || item.fileId;
+    const title = aiData.audioTitle || item.content || 'Audio';
+    const performer = aiData.audioPerformer || '';
+    const duration = aiData.audioDuration || 0;
+    const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
+    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
+    const coverUrl = imgUrl || '';
+    const authorHtml = authorLabel
+      ? `<div class="audio-source">${escapeHtml(authorLabel)}</div>`
+      : '';
+    return `<div class="card card-audio" data-id="${item.id}">
+      ${pendingDot}
+      ${coverUrl ? `<div class="audio-cover"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt=""></div>` : ''}
+      <div class="audio-info">
+        <div class="audio-title">${escapeHtml(title)}</div>
+        ${performer ? `<div class="audio-performer">${escapeHtml(performer)}</div>` : ''}
+      </div>
+      <div class="audio-player" data-action="audio-play" data-file-id="${escapeHtml(audioFileId)}">
+        <button class="audio-play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></button>
+        <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
+        <span class="audio-time">${durationStr}</span>
+      </div>
+      ${authorHtml}
+    </div>`;
+  }
+
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
     const pdfUrl = item.sourceUrl || item.url || '';
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTitle = toTitleCase(aiData.title || item.content || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
-    const previewHtml = imgUrl
+    // Only use imgUrl as preview if it's from a thumbnail (not the raw PDF binary)
+    const hasPdfThumb = item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId;
+    const previewHtml = (hasPdfThumb && imgUrl)
       ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
     const cardAction = hasTgFile ? 'open-file' : 'open';
@@ -1139,13 +1221,15 @@ function renderCard(item) {
     const isAlbum = albumMedia.length > 1;
     let mediaHtml = '';
     if (isAlbum) {
-      const colClass = albumMedia.length > 4 ? ' album-3col' : '';
       const albumItems = albumMedia.map(m => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
         if (m.mediaType === 'pdf') {
           const pdfFid = m.pdfFileId || m.fileId;
-          return resolvedUrl
-            ? `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><img class="tgpost-album-img blur-preview" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
+          // Only use resolvedUrl as preview if it's from a thumbnail (not the raw PDF binary)
+          const hasThumbnail = m.fileId && m.pdfFileId && m.fileId !== m.pdfFileId;
+          const previewUrl = hasThumbnail ? resolvedUrl : '';
+          return previewUrl
+            ? `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><img class="tgpost-album-img blur-preview" src="${escapeHtml(previewUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
             : `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="pdf-badge" style="position:relative;top:auto;left:auto;transform:none"><span class="pdf-badge-text">pdf</span></div></div></div>`;
         }
         if (m.mediaType === 'video') {
@@ -1156,11 +1240,11 @@ function renderCard(item) {
         }
         return resolvedUrl
           ? `<div class="tgpost-album-item" data-action="lightbox" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
-          : '';
+          : (m.fileId ? `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>` : '');
       }).filter(Boolean);
       if (albumItems.length > 0) {
         // Calculate if last item needs to span remaining columns
-        const cols = albumMedia.length > 4 ? 3 : 2;
+        const cols = albumItems.length > 4 ? 3 : 2;
         const remainder = albumItems.length % cols;
         if (remainder !== 0) {
           const spanCols = cols - remainder + 1;
@@ -1171,15 +1255,56 @@ function renderCard(item) {
             `<div style="grid-column:span ${spanCols}" class="tgpost-album-item`
           );
         }
+        const colClass = albumItems.length > 4 ? ' album-3col' : '';
         mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
     } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
       // PDF preview — must come before generic imgUrl check
       const pdfFid = item.pdfFileId || item.fileId;
-      const pdfThumbUrl = imgUrl || '';
+      // Only use imgUrl as preview if it's from a thumbnail (not the raw PDF binary)
+      const hasPdfThumb = item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId;
+      const pdfThumbUrl = hasPdfThumb ? (imgUrl || '') : '';
       mediaHtml = pdfThumbUrl
         ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div></div>`
         : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`;
+    } else if (aiData.mediaType === 'video_note' && (item.videoFileId || item.fileId)) {
+      // Video note (circle) embedded in tgpost
+      const vnFid = item.videoFileId || item.fileId;
+      const thumbUrl = imgUrl || '';
+      mediaHtml = `<div class="tgpost-videonote">
+        <div class="videonote-circle" data-action="videonote-play" data-file-id="${escapeHtml(vnFid)}">
+          <video class="videonote-video" muted loop playsinline${thumbUrl ? ` poster="${escapeHtml(thumbUrl)}"` : ''} preload="none"></video>
+          <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+        </div>
+      </div>`;
+    } else if (aiData.mediaType === 'voice' && (item.audioFileId || item.fileId)) {
+      // Voice message embedded in tgpost
+      const vFid = item.audioFileId || item.fileId;
+      const duration = aiData.audioDuration || 0;
+      const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
+      mediaHtml = `<div class="voice-player" data-action="voice-play" data-file-id="${escapeHtml(vFid)}" style="margin:12px 14px 0">
+        <button class="voice-play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></button>
+        <div class="voice-waveform"><div class="voice-progress"></div></div>
+        <span class="voice-duration">${durationStr}</span>
+      </div>`;
+    } else if (aiData.mediaType === 'audio' && (item.audioFileId || item.fileId)) {
+      // Audio file embedded in tgpost
+      const aFid = item.audioFileId || item.fileId;
+      const title = aiData.audioTitle || '';
+      const performer = aiData.audioPerformer || '';
+      const duration = aiData.audioDuration || 0;
+      const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
+      const coverUrl = imgUrl || '';
+      mediaHtml = `<div style="padding:12px 14px 0">
+        ${coverUrl ? `<div class="audio-cover" style="margin-bottom:8px"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt=""></div>` : ''}
+        ${title ? `<div class="audio-title">${escapeHtml(title)}</div>` : ''}
+        ${performer ? `<div class="audio-performer">${escapeHtml(performer)}</div>` : ''}
+        <div class="audio-player" data-action="audio-play" data-file-id="${escapeHtml(aFid)}">
+          <button class="audio-play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></button>
+          <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
+          <span class="audio-time">${durationStr}</span>
+        </div>
+      </div>`;
     } else if (imgUrl) {
       mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
     } else if (tgYtMatch) {
@@ -1621,6 +1746,193 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       if (videoUrl) openLightbox(videoUrl, '', { video: true });
+      return;
+    }
+
+    // "videonote-play" — load & play circular video note inline
+    if (action === 'videonote-play') {
+      e.stopPropagation();
+      const circle = actionEl.closest('.videonote-circle') || actionEl;
+      const video = circle.querySelector('.videonote-video');
+      const playIcon = circle.querySelector('.videonote-play-icon');
+      if (!video) return;
+
+      if (video.src && !video.paused) {
+        // Already playing — restart with sound
+        video.currentTime = 0;
+        video.muted = false;
+        return;
+      }
+
+      if (!video.src || video.readyState === 0) {
+        // First click — resolve and load
+        const fileId = circle.dataset.fileId;
+        if (fileId && STATE.botToken) {
+          const videoUrl = await resolveFileId(STATE.botToken, fileId);
+          if (videoUrl) {
+            video.src = videoUrl;
+            video.muted = true;
+            video.play().then(() => {
+              if (playIcon) playIcon.style.display = 'none';
+            }).catch(() => {});
+          }
+        }
+      } else {
+        // Paused — restart with sound
+        video.currentTime = 0;
+        video.muted = false;
+        video.play().catch(() => {});
+        if (playIcon) playIcon.style.display = 'none';
+      }
+      return;
+    }
+
+    // "voice-play" — play/pause voice message inline
+    if (action === 'voice-play') {
+      e.stopPropagation();
+      const playerEl = actionEl.closest('.voice-player') || actionEl;
+      const fileId = playerEl.dataset.fileId;
+      let audio = playerEl._audio;
+
+      if (!audio) {
+        // Create audio element on first play
+        audio = new Audio();
+        playerEl._audio = audio;
+        const progressBar = playerEl.querySelector('.voice-progress');
+        const durationEl = playerEl.querySelector('.voice-duration');
+
+        audio.addEventListener('timeupdate', () => {
+          if (audio.duration) {
+            const pct = (audio.currentTime / audio.duration) * 100;
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (durationEl) {
+              const rem = Math.ceil(audio.duration - audio.currentTime);
+              durationEl.textContent = `${Math.floor(rem / 60)}:${String(rem % 60).padStart(2, '0')}`;
+            }
+          }
+        });
+        audio.addEventListener('ended', () => {
+          playerEl.classList.remove('is-playing');
+          if (progressBar) progressBar.style.width = '0%';
+        });
+
+        // Seek on click
+        const waveform = playerEl.querySelector('.voice-waveform');
+        if (waveform) {
+          waveform.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (audio.duration) {
+              const rect = waveform.getBoundingClientRect();
+              const pct = (ev.clientX - rect.left) / rect.width;
+              audio.currentTime = pct * audio.duration;
+            }
+          });
+        }
+
+        // Resolve and set src
+        if (fileId && STATE.botToken) {
+          const audioUrl = await resolveFileId(STATE.botToken, fileId);
+          if (audioUrl) audio.src = audioUrl;
+        }
+      }
+
+      if (audio.paused) {
+        // Pause any other playing audio
+        document.querySelectorAll('.voice-player.is-playing, .audio-player.is-playing').forEach(p => {
+          if (p !== playerEl && p._audio) { p._audio.pause(); p.classList.remove('is-playing'); }
+        });
+        audio.play().catch(() => {});
+        playerEl.classList.add('is-playing');
+      } else {
+        audio.pause();
+        playerEl.classList.remove('is-playing');
+      }
+      return;
+    }
+
+    // "audio-play" — play/pause audio file inline (via CORS proxy)
+    if (action === 'audio-play') {
+      e.stopPropagation();
+      const playerEl = actionEl.closest('.audio-player') || actionEl;
+      const fileId = playerEl.dataset.fileId;
+      let audio = playerEl._audio;
+
+      if (!audio) {
+        audio = new Audio();
+        playerEl._audio = audio;
+        const progressBar = playerEl.querySelector('.audio-progress');
+        const timeEl = playerEl.querySelector('.audio-time');
+
+        audio.addEventListener('timeupdate', () => {
+          if (audio.duration) {
+            const pct = (audio.currentTime / audio.duration) * 100;
+            if (progressBar) progressBar.style.width = pct + '%';
+            if (timeEl) {
+              const rem = Math.ceil(audio.duration - audio.currentTime);
+              timeEl.textContent = `${Math.floor(rem / 60)}:${String(rem % 60).padStart(2, '0')}`;
+            }
+          }
+        });
+        audio.addEventListener('ended', () => {
+          playerEl.classList.remove('is-playing');
+          if (progressBar) progressBar.style.width = '0%';
+        });
+
+        // Seek on click
+        const progressWrap = playerEl.querySelector('.audio-progress-wrap');
+        if (progressWrap) {
+          progressWrap.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            if (audio.duration) {
+              const rect = progressWrap.getBoundingClientRect();
+              const pct = (ev.clientX - rect.left) / rect.width;
+              audio.currentTime = pct * audio.duration;
+            }
+          });
+        }
+
+        // Fetch via CORS proxy for audio files
+        if (fileId && STATE.botToken) {
+          try {
+            const getFileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${fileId}`);
+            const getFileData = await getFileRes.json();
+            if (getFileData.ok) {
+              const filePath = getFileData.result.file_path;
+              const ext = filePath.split('.').pop()?.toLowerCase();
+              const mimeMap = { mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac' };
+              const mime = mimeMap[ext] || 'audio/mpeg';
+              const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
+              const res = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  service: 'telegram', token: STATE.botToken,
+                  path: `/file/${filePath}`, method: 'GET',
+                  binary: true, contentType: mime
+                })
+              });
+              const buf = await res.arrayBuffer();
+              const blob = new Blob([buf], { type: mime });
+              audio.src = URL.createObjectURL(blob);
+            }
+          } catch (err) {
+            // Fallback: direct URL
+            const audioUrl = await resolveFileId(STATE.botToken, fileId);
+            if (audioUrl) audio.src = audioUrl;
+          }
+        }
+      }
+
+      if (audio.paused) {
+        document.querySelectorAll('.voice-player.is-playing, .audio-player.is-playing').forEach(p => {
+          if (p !== playerEl && p._audio) { p._audio.pause(); p.classList.remove('is-playing'); }
+        });
+        audio.play().catch(() => {});
+        playerEl.classList.add('is-playing');
+      } else {
+        audio.pause();
+        playerEl.classList.remove('is-playing');
+      }
       return;
     }
 
