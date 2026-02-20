@@ -1090,7 +1090,7 @@ function renderCard(item) {
     const previewHtml = imgUrl
       ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
-    const cardAction = hasTgFile ? 'download-file' : 'open';
+    const cardAction = hasTgFile ? 'open-file' : 'open';
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
     const pdfDesc = item.ai_description || '';
     const pdfDescHtml = pdfDesc ? `<div class="pdf-desc">${escapeHtml(pdfDesc.length > 150 ? pdfDesc.slice(0, 150) + '...' : pdfDesc)}</div>` : '';
@@ -1170,7 +1170,7 @@ function renderCard(item) {
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
     } else if (aiData.mediaType === 'pdf' && item.fileId) {
-      mediaHtml = `<div class="tgpost-pdf-badge" data-action="download-file" data-file-id="${escapeHtml(item.fileId)}">
+      mediaHtml = `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(item.fileId)}">
         <div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div>
       </div>`;
     } else if (aiData.mediaType === 'video' && item.fileId) {
@@ -1537,13 +1537,23 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "download-file" — resolve TG file_id and open file in new tab
-    if (action === 'download-file') {
+    // "open-file" — resolve TG file_id and open in browser viewer (PDF etc.)
+    if (action === 'open-file') {
       e.stopPropagation();
       const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
       if (fileId && STATE.botToken) {
         const fileUrl = await resolveFileId(STATE.botToken, fileId);
-        if (fileUrl) window.open(fileUrl, '_blank');
+        if (fileUrl) {
+          // Fetch as blob to force browser viewer (bypasses Content-Disposition: attachment)
+          try {
+            const res = await fetch(fileUrl);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl, '_blank');
+          } catch {
+            window.open(fileUrl, '_blank');
+          }
+        }
       }
       return;
     }
