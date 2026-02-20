@@ -280,6 +280,8 @@
     .card-xpost .xpost-author {
       font-size: 14px; font-weight: 700;
       color: #fff; line-height: 1.19;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      min-width: 0;
     }
     .card-xpost .xpost-body {
       padding: 0 13px 10px;
@@ -362,6 +364,11 @@
       color: rgba(255,255,255,0.3);
       font-weight: 400;
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+      -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
     }
     .card-video .video-share-btn {
       width: 34px; height: 34px;
@@ -441,6 +448,11 @@
       color: rgba(255,255,255,0.3);
       font-weight: 400;
       flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+      -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
     }
     .card-link-new .link-arrow-btn {
       width: 34px; height: 34px;
@@ -607,7 +619,8 @@
       font-size: 12px;
       color: #525252;
       text-align: center;
-      padding: 10px 0 8px;
+      padding: 10px 12px 8px;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
     }
 
     /* ── Article card (open book) ── */
@@ -651,6 +664,8 @@
       font-size: 12px;
       color: #000;
       font-weight: 400;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      min-width: 0;
     }
     .card-article .article-book {
       padding: 0 14px 14px;
@@ -781,7 +796,8 @@
       line-height: 1;
       text-align: center;
       white-space: nowrap;
-      padding: 4px 0;
+      overflow: hidden; text-overflow: ellipsis;
+      padding: 4px 12px;
       position: relative;
       top: -3px;
     }
@@ -1112,7 +1128,6 @@
       background: rgba(8,8,8,0.92);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
       display: flex; align-items: center; gap: 16px;
       padding: 0 18px;
       z-index: 99;
@@ -1130,12 +1145,14 @@
     }
     .db-btn {
       background: transparent; border: 1px solid var(--border);
-      border-radius: 5px; padding: 3px 9px;
-      font-size: 11px; color: var(--text-muted); cursor: pointer;
-      transition: all 0.15s; white-space: nowrap; line-height: 1.2;
+      border-radius: 5px; padding: 4px 6px;
+      font-size: 0; color: var(--text-muted); cursor: pointer;
+      transition: all 0.15s; white-space: nowrap; line-height: 0;
+      display: flex; align-items: center; justify-content: center;
     }
+    .db-btn svg { display: block; }
     .db-btn:hover { border-color: rgba(255,255,255,0.18); color: var(--text); }
-    .db-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .db-btn.active { background: rgba(255,255,255,0.12); color: var(--text); border-color: rgba(255,255,255,0.18); }
 
     .db-divider { width: 1px; height: 16px; background: var(--border); }
 
@@ -1382,32 +1399,26 @@
 <!-- Display settings bar -->
 <div id="display-bar" class="hidden">
   <div class="db-group">
-    <span class="db-label">Layout</span>
-    <button class="db-btn active" data-layout="adaptive">Auto</button>
-    <button class="db-btn" data-layout="4col">4 col</button>
-    <button class="db-btn" data-layout="3col">3 col</button>
+    <button class="db-btn active" data-layout="adaptive" title="Auto"><span style="font-size:11px;font-weight:600;line-height:1">A</span></button>
+    <button class="db-btn" data-layout="4col" title="4 columns"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="0.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="4.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="12.5" y="3" width="3" height="10" rx="1" fill="currentColor"/></svg></button>
+    <button class="db-btn" data-layout="3col" title="3 columns"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="4" height="10" rx="1" fill="currentColor"/><rect x="6" y="3" width="4" height="10" rx="1" fill="currentColor"/><rect x="11" y="3" width="4" height="10" rx="1" fill="currentColor"/></svg></button>
   </div>
   <div class="db-divider"></div>
   <div class="db-group">
-    <span class="db-label">Gap</span>
     <div class="db-range-wrap">
-      <input type="range" class="db-range" id="gap-range" min="0" max="64" value="10">
-      <span class="db-range-val" id="gap-val">10</span>
+      <input type="range" class="db-range" id="gap-range" min="0" max="64" value="10" title="Gap">
     </div>
   </div>
   <div class="db-divider"></div>
   <div class="db-group">
-    <span class="db-label">Padding</span>
     <div class="db-range-wrap">
-      <input type="range" class="db-range" id="padding-range" min="0" max="120" value="14">
-      <span class="db-range-val" id="padding-val">14</span>
+      <input type="range" class="db-range" id="padding-range" min="0" max="120" value="14" title="Padding">
     </div>
   </div>
   <div class="db-divider"></div>
   <div class="db-group">
-    <span class="db-label">Rows</span>
-    <button class="db-btn active" data-align="masonry">Masonry</button>
-    <button class="db-btn" data-align="center">Center</button>
+    <button class="db-btn active" data-align="masonry" title="Masonry"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="5" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="8" rx="1" fill="currentColor"/><rect x="1" y="8" width="6" height="7" rx="1" fill="currentColor"/><rect x="9" y="11" width="6" height="4" rx="1" fill="currentColor"/></svg></button>
+    <button class="db-btn" data-align="center" title="Center rows"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/></svg></button>
   </div>
 </div>
 

@@ -561,11 +561,11 @@ function setupDisplayBar() {
   const gapRange = document.getElementById('gap-range');
   const gapVal = document.getElementById('gap-val');
   gapRange.value = STATE.gap;
-  gapVal.textContent = STATE.gap;
+  if (gapVal) gapVal.textContent = STATE.gap;
   const padRange = document.getElementById('padding-range');
   const padVal = document.getElementById('padding-val');
   padRange.value = STATE.padding;
-  padVal.textContent = STATE.padding;
+  if (padVal) padVal.textContent = STATE.padding;
 
   // Layout buttons
   document.querySelectorAll('#display-bar [data-layout]').forEach(btn => {
@@ -581,7 +581,7 @@ function setupDisplayBar() {
   // Gap range
   gapRange.addEventListener('input', () => {
     STATE.gap = parseInt(gapRange.value, 10);
-    gapVal.textContent = STATE.gap;
+    if (gapVal) gapVal.textContent = STATE.gap;
     applyGridMode();
     scheduleDisplaySave();
   });
@@ -589,7 +589,7 @@ function setupDisplayBar() {
   // Padding range
   padRange.addEventListener('input', () => {
     STATE.padding = parseInt(padRange.value, 10);
-    padVal.textContent = STATE.padding;
+    if (padVal) padVal.textContent = STATE.padding;
     applyGridMode();
     scheduleDisplaySave();
   });
