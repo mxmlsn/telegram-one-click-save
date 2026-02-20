@@ -505,6 +505,32 @@ Rules:
 - tweet_text: for xpost — full tweet text from screenshot. Empty string otherwise.
 - All fields must be present. No markdown, no extra fields.`;
 
+const AI_PROMPT_PDF = `Analyze this PDF document and return ONLY valid JSON, no other text:
+{
+  "content_type": "pdf",
+  "content_type_secondary": null,
+  "title": "",
+  "description": "detailed description: what the document is about, key topics, structure",
+  "materials": [],
+  "color_palette": null,
+  "color_subject": null,
+  "color_top3": [],
+  "text_on_image": "",
+  "price": "",
+  "author": "",
+  "tweet_text": ""
+}
+
+Rules:
+- content_type: always "pdf" for PDF documents.
+- content_type_secondary: null (unless the PDF is clearly about a product with price, tool, etc.).
+- title: the document title — extract from the first page heading, cover, or metadata. Keep it short (under 80 chars).
+- description: 2-4 sentences in English summarizing the document content, purpose, and key topics.
+- text_on_image: extract the first ~500 characters of visible text from the document.
+- author: document author if visible on cover/title page. Empty string otherwise.
+- color_palette, color_subject, color_top3: analyze the visual appearance of the document pages (cover design, diagrams, etc.). Null/empty if plain text.
+- All fields must be present. No markdown, no extra fields.`;
+
 async function fetchBase64(url) {
   const res = await fetch(url);
   const buffer = await res.arrayBuffer();
@@ -557,6 +583,7 @@ async function callAnthropic(messages, env) {
 
 async function analyzeAndPatch(parsed, notionPageId, env) {
   const provider = env.AI_PROVIDER || 'google';
+  const isPdf = parsed.type === 'pdf' || parsed.mediaType === 'pdf';
   const isVideo = parsed.type === 'video' || parsed.mediaType === 'video';
   const isDirectImage = parsed.type === 'image' || parsed.type === 'gif'
     || (parsed.type === 'tgpost' && (parsed.mediaType === 'image' || parsed.mediaType === 'gif'))
@@ -566,8 +593,38 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   // For video: use thumbnail instead of full video file
   const fileIdForAI = isVideo && parsed.thumbnailFileId ? parsed.thumbnailFileId : parsed.fileId;
 
-  // For items with file_id — fetch image from Telegram and send to AI
-  if (fileIdForAI) {
+  // PDF files — send as application/pdf to Gemini (supports native PDF)
+  if (isPdf && parsed.fileId) {
+    try {
+      const fileRes = await fetch(
+        `https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${parsed.fileId}`
+      );
+      const fileData = await fileRes.json();
+      if (fileData.ok) {
+        const filePath = fileData.result.file_path;
+        const pdfUrl = `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`;
+        if (provider === 'google') {
+          const base64 = await fetchBase64(pdfUrl);
+          responseText = await callGemini(AI_PROMPT_PDF, base64, env, 'application/pdf');
+        } else {
+          // Claude supports PDF via document content type
+          const base64 = await fetchBase64(pdfUrl);
+          responseText = await callAnthropic([{
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+              { type: 'text', text: AI_PROMPT_PDF }
+            ]
+          }], env);
+        }
+      }
+    } catch (e) {
+      console.warn('PDF AI analysis failed:', e.message);
+    }
+  }
+
+  // For items with file_id (non-PDF) — fetch image from Telegram and send to AI
+  if (!responseText && fileIdForAI && !isPdf) {
     const fileRes = await fetch(
       `https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${fileIdForAI}`
     );

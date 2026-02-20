@@ -285,16 +285,29 @@ function mergeMediaGroups(items) {
   for (const item of items) {
     const gid = item.ai_data?.mediaGroupId;
     if (gid) {
+      const mediaEntry = {
+        fileId: item.fileId,
+        mediaType: item.ai_data?.mediaType || 'image',
+        videoFileId: item.videoFileId || '',
+      };
       if (!groups[gid]) {
         groups[gid] = item;
+        item.albumMedia = item.fileId ? [mediaEntry] : [];
         item.fileIds = item.fileId ? [item.fileId] : [];
         result.push(item);
       } else {
         // Merge into existing group item
-        if (item.fileId) groups[gid].fileIds.push(item.fileId);
+        if (item.fileId) {
+          groups[gid].fileIds.push(item.fileId);
+          groups[gid].albumMedia.push(mediaEntry);
+        }
         // Use content from whichever has it (caption is usually on first message)
         if (!groups[gid].content && item.content) {
           groups[gid].content = item.content;
+        }
+        // Merge HTML content flag
+        if (item.ai_data?.htmlContent) {
+          groups[gid].ai_data.htmlContent = true;
         }
       }
     } else {
@@ -1079,10 +1092,13 @@ function renderCard(item) {
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
     const cardAction = hasTgFile ? 'download-file' : 'open';
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
+    const pdfDesc = item.ai_description || '';
+    const pdfDescHtml = pdfDesc ? `<div class="pdf-desc">${escapeHtml(pdfDesc.length > 150 ? pdfDesc.slice(0, 150) + '...' : pdfDesc)}</div>` : '';
     return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
+      ${pdfDescHtml}
     </div>`;
   }
 
@@ -1106,15 +1122,26 @@ function renderCard(item) {
     const tgYtMatch = allText.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
     const tgVimeoMatch = !tgYtMatch && allText.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
 
-    // Album (multiple images)
-    const isAlbum = item.fileIds?.length > 1;
+    // Album (multiple media)
+    const albumMedia = item.albumMedia || [];
+    const isAlbum = albumMedia.length > 1;
     let mediaHtml = '';
     if (isAlbum) {
-      const albumImgs = item.fileIds.map(fid => STATE.imageMap[fid]).filter(Boolean);
-      if (albumImgs.length > 0) {
-        mediaHtml = `<div class="tgpost-album">${albumImgs.map(url =>
-          `<img class="tgpost-album-img" src="${escapeHtml(url)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(url)}">`
-        ).join('')}</div>`;
+      const colClass = albumMedia.length > 4 ? ' album-3col' : '';
+      const albumItems = albumMedia.map(m => {
+        const resolvedUrl = STATE.imageMap[m.fileId] || '';
+        if (m.mediaType === 'video') {
+          const playFileId = m.videoFileId || m.fileId;
+          return resolvedUrl
+            ? `<div class="tgpost-album-item is-video" data-action="video-play" data-file-id="${escapeHtml(playFileId)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
+            : `<div class="tgpost-album-item is-video" data-action="video-play" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
+        }
+        return resolvedUrl
+          ? `<div class="tgpost-album-item" data-action="lightbox" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
+          : '';
+      }).filter(Boolean);
+      if (albumItems.length > 0) {
+        mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
     } else if (imgUrl) {
       mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;

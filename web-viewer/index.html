@@ -306,16 +306,35 @@
       grid-template-columns: repeat(2, 1fr);
       gap: 2px;
     }
+    .tgpost-album.album-3col {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .tgpost-album-item {
+      position: relative;
+      overflow: hidden;
+      cursor: zoom-in;
+    }
+    .tgpost-album-item.is-video {
+      cursor: pointer;
+    }
     .tgpost-album-img {
       width: 100%;
       aspect-ratio: 1;
       object-fit: cover;
-      cursor: zoom-in;
+      display: block;
+    }
+    .tgpost-album-item .tgpost-play-icon {
+      width: 36px;
+      height: 36px;
+    }
+    .tgpost-album-item .tgpost-play-icon svg {
+      width: 16px;
+      height: 16px;
     }
     .tgpost-album:has(> :only-child) {
       grid-template-columns: 1fr;
     }
-    .tgpost-album-img:only-child {
+    .tgpost-album > :only-child .tgpost-album-img {
       aspect-ratio: auto;
     }
     .tgpost-video-preview {
@@ -648,7 +667,7 @@
       letter-spacing: 0.4px;
     }
     .card-pdf .pdf-title {
-      padding: 0 18px 16px;
+      padding: 0 18px 8px;
       margin-top: -10px;
       position: relative;
       z-index: 1;
@@ -661,6 +680,14 @@
       line-clamp: 4;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    .card-pdf .pdf-desc {
+      padding: 0 18px 16px;
+      position: relative;
+      z-index: 1;
+      font-size: 13px;
+      line-height: 1.4;
+      color: rgba(255,255,255,0.45);
     }
 
     /* ── Tool card ── */
