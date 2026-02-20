@@ -43,9 +43,36 @@ async function handleUpdate(update, env, ctx) {
     // React with ✅
     await setReaction(env, chatId, message.message_id, '✅');
 
-    // Run AI analysis in background (after response is sent)
-    if (notionPageId && env.AI_API_KEY) {
-      ctx.waitUntil(analyzeAndPatch(parsed, notionPageId, env));
+    // Background tasks: screenshot for links + AI analysis
+    if (notionPageId) {
+      ctx.waitUntil((async () => {
+        // For links: capture screenshot, send to TG silently, update Notion with file_id
+        if (parsed.type === 'link' && parsed.sourceUrl && !parsed.fileId) {
+          const fileId = await captureAndUploadScreenshot(parsed.sourceUrl, chatId, env);
+          if (fileId) {
+            parsed.fileId = fileId;
+            // Patch Notion with the screenshot file_id
+            await fetch(`https://api.notion.com/v1/pages/${notionPageId}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+                'Notion-Version': '2022-06-28',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                properties: {
+                  'File ID': { rich_text: [{ text: { content: fileId } }] }
+                }
+              })
+            });
+          }
+        }
+
+        // AI analysis
+        if (env.AI_API_KEY) {
+          await analyzeAndPatch(parsed, notionPageId, env);
+        }
+      })());
     }
   } catch (e) {
     console.error('Save error:', e);
@@ -241,6 +268,45 @@ async function setReaction(env, chatId, messageId, emoji) {
     });
   } catch (e) {
     console.warn('Reaction failed:', e);
+  }
+}
+
+// ─── Screenshot Capture ──────────────────────────────────────────────────────
+
+async function captureAndUploadScreenshot(url, chatId, env) {
+  try {
+    // Fetch screenshot from thum.io
+    const screenshotUrl = `https://image.thum.io/get/width/1280/crop/960/noanimate/${url}`;
+    const imgRes = await fetch(screenshotUrl, { redirect: 'follow' });
+    if (!imgRes.ok) {
+      console.warn('Screenshot fetch failed:', imgRes.status);
+      return null;
+    }
+
+    const imgBlob = await imgRes.arrayBuffer();
+
+    // Send to Telegram silently to get file_id
+    const formData = new FormData();
+    formData.append('chat_id', chatId);
+    formData.append('photo', new Blob([imgBlob], { type: 'image/png' }), 'screenshot.png');
+    formData.append('disable_notification', 'true');
+
+    const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendPhoto`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!tgRes.ok) {
+      console.warn('TG screenshot upload failed:', tgRes.status);
+      return null;
+    }
+
+    const tgResult = await tgRes.json();
+    const photos = tgResult.result?.photo;
+    return photos && photos.length > 0 ? photos[photos.length - 1].file_id : null;
+  } catch (e) {
+    console.warn('Screenshot capture error:', e);
+    return null;
   }
 }
 
