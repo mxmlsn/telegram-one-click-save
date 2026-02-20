@@ -1537,22 +1537,39 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "open-file" — resolve TG file_id and open in browser viewer (PDF etc.)
+    // "open-file" — resolve TG file_id and open PDF in browser viewer
     if (action === 'open-file') {
       e.stopPropagation();
       const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
       if (fileId && STATE.botToken) {
-        const fileUrl = await resolveFileId(STATE.botToken, fileId);
-        if (fileUrl) {
-          // Fetch as blob to force browser viewer (bypasses Content-Disposition: attachment)
-          try {
-            const res = await fetch(fileUrl);
-            const blob = await res.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            window.open(blobUrl, '_blank');
-          } catch {
-            window.open(fileUrl, '_blank');
-          }
+        try {
+          // Resolve file_id to get the file path
+          const getFileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${fileId}`);
+          const getFileData = await getFileRes.json();
+          if (!getFileData.ok) throw new Error('getFile failed');
+          const filePath = getFileData.result.file_path;
+
+          // Fetch binary via CORS proxy with forced PDF Content-Type
+          const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
+          const res = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              service: 'telegram',
+              token: STATE.botToken,
+              path: `/file/${filePath}`,
+              method: 'GET',
+              binary: true,
+              contentType: 'application/pdf'
+            })
+          });
+          const buf = await res.arrayBuffer();
+          const pdfBlob = new Blob([buf], { type: 'application/pdf' });
+          window.open(URL.createObjectURL(pdfBlob), '_blank');
+        } catch (err) {
+          // Fallback: resolve and open directly (will likely download)
+          const fileUrl = await resolveFileId(STATE.botToken, fileId);
+          if (fileUrl) window.open(fileUrl, '_blank');
         }
       }
       return;

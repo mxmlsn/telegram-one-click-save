@@ -36,7 +36,7 @@ export default {
 
     try {
       const body = await request.json();
-      const { service, token, path, method = 'POST', data } = body;
+      const { service, token, path, method = 'POST', data, binary, contentType } = body;
 
       // Validate service
       if (!BASE_URLS[service]) {
@@ -47,9 +47,8 @@ export default {
       }
 
       // Build headers based on service
-      const headers = {
-        'Content-Type': 'application/json'
-      };
+      const headers = {};
+      if (!binary) headers['Content-Type'] = 'application/json';
 
       if (service === 'notion') {
         headers['Authorization'] = `Bearer ${token}`;
@@ -67,7 +66,12 @@ export default {
       // Build URL
       let url = `${BASE_URLS[service]}${path}`;
       if (service === 'telegram') {
-        url = `${BASE_URLS[service]}/bot${token}${path}`;
+        // /file/<path> → file download; otherwise API call
+        if (path.startsWith('/file/')) {
+          url = `${BASE_URLS[service]}/file/bot${token}/${path.slice(6)}`;
+        } else {
+          url = `${BASE_URLS[service]}/bot${token}${path}`;
+        }
       } else if (service === 'google' && token) {
         url += (url.includes('?') ? '&' : '?') + `key=${token}`;
       }
@@ -78,6 +82,19 @@ export default {
         headers,
         body: data ? JSON.stringify(data) : undefined
       });
+
+      // Binary mode: return raw response with specified Content-Type
+      if (binary) {
+        const buf = await response.arrayBuffer();
+        return new Response(buf, {
+          status: response.status,
+          headers: {
+            ...CORS_HEADERS,
+            'Content-Type': contentType || response.headers.get('Content-Type') || 'application/octet-stream',
+            'Content-Disposition': 'inline'
+          }
+        });
+      }
 
       const responseData = await response.text();
 
