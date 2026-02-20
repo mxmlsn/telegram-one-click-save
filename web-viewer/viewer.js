@@ -1111,15 +1111,18 @@ function renderCard(item) {
   if (effectiveType === 'video_note') {
     const vnFileId = item.videoFileId || item.audioFileId || item.fileId;
     const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
+    const vnSourceUrl = item.sourceUrl || '';
     const authorHtml = authorLabel
-      ? `<div class="videonote-author">${escapeHtml(authorLabel)}</div>`
+      ? (vnSourceUrl
+          ? `<a class="videonote-author" data-action="open" data-url="${escapeHtml(vnSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+          : `<div class="videonote-author">${escapeHtml(authorLabel)}</div>`)
       : '';
     const duration = aiData.audioDuration || 0;
     const thumbUrl = imgUrl || '';
     return `<div class="card card-videonote" data-id="${item.id}">
       ${pendingDot}
       <div class="videonote-circle" data-action="videonote-play" data-file-id="${escapeHtml(vnFileId)}">
-        <video class="videonote-video" muted loop playsinline${thumbUrl ? ` poster="${escapeHtml(thumbUrl)}"` : ''} preload="none"></video>
+        <video class="videonote-video" muted loop playsinline preload="none"></video>
         <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>
       ${authorHtml}
@@ -1130,10 +1133,13 @@ function renderCard(item) {
   if (effectiveType === 'voice') {
     const voiceFileId = item.audioFileId || item.fileId;
     const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
+    const voiceSourceUrl = item.sourceUrl || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const authorHtml = authorLabel
-      ? `<div class="voice-author">${escapeHtml(authorLabel)}</div>`
+      ? (voiceSourceUrl
+          ? `<a class="voice-author" data-action="open" data-url="${escapeHtml(voiceSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+          : `<div class="voice-author">${escapeHtml(authorLabel)}</div>`)
       : '';
     return `<div class="card card-voice" data-id="${item.id}">
       ${pendingDot}
@@ -1155,12 +1161,15 @@ function renderCard(item) {
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const coverUrl = imgUrl || '';
+    const audioSourceUrl = item.sourceUrl || '';
     const authorHtml = authorLabel
-      ? `<div class="audio-source">${escapeHtml(authorLabel)}</div>`
+      ? (audioSourceUrl
+          ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(audioSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+          : `<div class="audio-source">${escapeHtml(authorLabel)}</div>`)
       : '';
     return `<div class="card card-audio" data-id="${item.id}">
       ${pendingDot}
-      ${coverUrl ? `<div class="audio-cover"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt=""></div>` : ''}
+      ${coverUrl ? `<div class="audio-cover"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt="" onerror="this.parentElement.remove()"></div>` : ''}
       <div class="audio-info">
         <div class="audio-title">${escapeHtml(title)}</div>
         ${performer ? `<div class="audio-performer">${escapeHtml(performer)}</div>` : ''}
@@ -1273,7 +1282,7 @@ function renderCard(item) {
       const thumbUrl = imgUrl || '';
       mediaHtml = `<div class="tgpost-videonote">
         <div class="videonote-circle" data-action="videonote-play" data-file-id="${escapeHtml(vnFid)}">
-          <video class="videonote-video" muted loop playsinline${thumbUrl ? ` poster="${escapeHtml(thumbUrl)}"` : ''} preload="none"></video>
+          <video class="videonote-video" muted loop playsinline preload="none"></video>
           <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
         </div>
       </div>`;
@@ -1296,7 +1305,7 @@ function renderCard(item) {
       const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
       const coverUrl = imgUrl || '';
       mediaHtml = `<div style="padding:12px 14px 0">
-        ${coverUrl ? `<div class="audio-cover" style="margin-bottom:8px"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt=""></div>` : ''}
+        ${coverUrl ? `<div class="audio-cover" style="margin-bottom:8px"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt="" onerror="this.parentElement.remove()"></div>` : ''}
         ${title ? `<div class="audio-title">${escapeHtml(title)}</div>` : ''}
         ${performer ? `<div class="audio-performer">${escapeHtml(performer)}</div>` : ''}
         <div class="audio-player" data-action="audio-play" data-file-id="${escapeHtml(aFid)}">
@@ -1467,6 +1476,22 @@ function renderAll(items) {
       if (card.classList.contains('xpost-collapsed')) {
         textEl.classList.add('truncated-collapsed');
       }
+    }
+  });
+
+  // Auto-load and play video notes (muted loop)
+  masonry.querySelectorAll('.videonote-circle').forEach(async (circle) => {
+    const fileId = circle.dataset.fileId;
+    const video = circle.querySelector('.videonote-video');
+    const playIcon = circle.querySelector('.videonote-play-icon');
+    if (!fileId || !video || !STATE.botToken) return;
+    const videoUrl = await resolveFileId(STATE.botToken, fileId);
+    if (videoUrl) {
+      video.src = videoUrl;
+      video.muted = true;
+      video.play().then(() => {
+        if (playIcon) playIcon.style.display = 'none';
+      }).catch(() => {});
     }
   });
 }
@@ -1749,7 +1774,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "videonote-play" — load & play circular video note inline
+    // "videonote-play" — click restarts video from beginning with sound
     if (action === 'videonote-play') {
       e.stopPropagation();
       const circle = actionEl.closest('.videonote-circle') || actionEl;
@@ -1757,33 +1782,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const playIcon = circle.querySelector('.videonote-play-icon');
       if (!video) return;
 
-      if (video.src && !video.paused) {
-        // Already playing — restart with sound
-        video.currentTime = 0;
-        video.muted = false;
-        return;
-      }
-
+      // If video not loaded yet (autoplay failed), load it first
       if (!video.src || video.readyState === 0) {
-        // First click — resolve and load
         const fileId = circle.dataset.fileId;
         if (fileId && STATE.botToken) {
           const videoUrl = await resolveFileId(STATE.botToken, fileId);
-          if (videoUrl) {
-            video.src = videoUrl;
-            video.muted = true;
-            video.play().then(() => {
-              if (playIcon) playIcon.style.display = 'none';
-            }).catch(() => {});
-          }
+          if (videoUrl) video.src = videoUrl;
         }
-      } else {
-        // Paused — restart with sound
-        video.currentTime = 0;
-        video.muted = false;
-        video.play().catch(() => {});
-        if (playIcon) playIcon.style.display = 'none';
       }
+
+      // Restart from beginning with sound
+      video.currentTime = 0;
+      video.muted = false;
+      video.play().then(() => {
+        if (playIcon) playIcon.style.display = 'none';
+      }).catch(() => {});
       return;
     }
 
