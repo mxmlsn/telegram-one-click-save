@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Telegram Instant Saver",
-  "version": "1.1.0",
-  "description": "Save screenshots, images, and quotes to Telegram in one click",
+  "name": "Stash · Quick Save",
+  "version": "2.0.0",
+  "description": "Save anything from the web to your Notion database via Telegram storage",
   "icons": {
     "16": "icons/icon-clip1-16.png",
     "48": "icons/icon-clip1-48.png",
@@ -50,8 +50,7 @@
     {
       "resources": [
         "MartianMono-Regular.ttf",
-        "icons/*.png",
-        "viewer/libs/tesseract-worker.min.js"
+        "icons/*.png"
       ],
       "matches": [
         "<all_urls>"
