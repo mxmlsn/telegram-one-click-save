@@ -291,6 +291,7 @@
       border-radius: 20px;
       box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
       overflow: hidden;
+      isolation: isolate;
     }
     .card-video .video-header {
       height: 56px;
@@ -695,6 +696,11 @@
       overflow: hidden;
       position: relative;
       container-type: inline-size;
+      filter: brightness(1);
+      transition: filter 0.15s ease;
+    }
+    .card-product-new:hover {
+      filter: brightness(1.25);
     }
     .card-product-new .product-new-notch {
       display: flex; justify-content: center;
@@ -736,10 +742,10 @@
     .card-product-new .product-new-screenshot {
       display: block;
       object-fit: cover;
-      transition: transform 0.3s ease;
+      transition: transform 0.2s ease;
     }
     .card-product-new:hover .product-new-screenshot {
-      transform: scale(1.07);
+      transform: scale(1.02);
     }
 
     /* AI pending dot */

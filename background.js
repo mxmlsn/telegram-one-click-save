@@ -358,7 +358,7 @@ const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no
 }
 
 Rules:
-- content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if the image shows a product/item that could be purchased (clothing, shoes, furniture, gadgets, etc.) — a visible price is NOT required. But if the image is a generic photo (landscape, selfie, meme, art) with no purchasable item, content_type MUST be null. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
+- content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if the image shows a product/item that could be purchased AND a price is clearly visible on the image. If there is no visible price — content_type MUST be null, even if the image shows clothing, shoes, gadgets, etc. A photo of a person wearing a t-shirt, a fashion lookbook shot, or any image without an explicit price tag is NOT a product. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
 - content_type_secondary: null for direct photos (not applicable).
 - title: the single most important headline or title visible on the screen. Extract the primary heading/title text — the biggest, most prominent text that describes what this content is about. Keep it short (under 80 chars). If no clear title/headline exists, empty string.
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.

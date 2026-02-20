@@ -715,6 +715,11 @@ function escapeHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function toTitleCase(str) {
+  if (!str) return '';
+  return str.replace(/\b\w+/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
+}
+
 function getDomain(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url || ''; }
 }
@@ -929,7 +934,7 @@ function renderCard(item) {
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
     const pdfUrl = item.sourceUrl || item.url || '';
-    const pdfTitle = aiData.title || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf';
+    const pdfTitle = toTitleCase(aiData.title || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     const previewHtml = imgUrl
       ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
