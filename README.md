@@ -134,12 +134,23 @@
 
 ## 📦 Установка и настройка
 
-### 1. Установить extension (Chrome/Edge/Brave)
+### 1. Установить Chrome Extension
+
+**Вариант A: готовый .zip (быстро)**
+
+1. Скачать [stash-extension-v2.0.zip](https://github.com/mxmlsn/telegram-one-click-save/raw/main/stash-extension-v2.0.zip)
+2. Распаковать архив
+3. Открыть `chrome://extensions`
+4. Включить **Developer mode** (переключатель справа вверху)
+5. **Load unpacked** → выбрать распакованную папку
+
+**Вариант B: из исходников**
 
 ```bash
 git clone https://github.com/mxmlsn/telegram-one-click-save
+cd telegram-one-click-save
 # Открыть chrome://extensions
-# Developer mode → Load unpacked → выбрать папку проекта
+# Developer mode → Load unpacked → выбрать эту папку
 ```
 
 ### 2. Создать Telegram бота (2 минуты)
@@ -177,19 +188,20 @@ git clone https://github.com/mxmlsn/telegram-one-click-save
 
 ### 5. Готово! 🎉
 
-Правый клик на любом элементе → "Send to Telegram" → выбери тег → сохранено.
+**Extension:** правый клик на любом элементе → "Send to Telegram" → выбери тег → сохранено.
 
-Открыть viewer: правый клик на странице → "Open Viewer".
+**Web Viewer:** открой [stash.mxml.sn](https://stash.mxml.sn) (или свой домен если настроил), введи те же credentials → просматривай сохранённое с любого устройства.
 
 ---
 
 ## 🛠 Tech Stack
 
 - **Extension:** Vanilla JS, Chrome Manifest V3
-- **Viewer:** HTML/CSS/JS, masonry layout (CSS columns)
+- **Web Viewer:** HTML/CSS/JS, masonry layout (CSS columns)
+- **CORS Proxy:** Cloudflare Worker (serverless)
+- **Hosting:** Cloudflare Pages (static site)
 - **AI:** Anthropic Claude API / Google Gemini API (vision models)
 - **Storage:** Notion API, Telegram Bot API
-- **Future web:** Vercel Functions / Cloudflare Workers (CORS proxy)
 
 ---
 
@@ -368,10 +380,11 @@ Open viewer: right-click page → "Open Viewer".
 ## 🛠 Tech Stack
 
 - **Extension:** Vanilla JS, Chrome Manifest V3
-- **Viewer:** HTML/CSS/JS, masonry layout (CSS columns)
+- **Web Viewer:** HTML/CSS/JS, masonry layout (CSS columns)
+- **CORS Proxy:** Cloudflare Worker (serverless)
+- **Hosting:** Cloudflare Pages (static site)
 - **AI:** Anthropic Claude API / Google Gemini API (vision models)
 - **Storage:** Notion API, Telegram Bot API
-- **Future web:** Vercel Functions / Cloudflare Workers (CORS proxy)
 
 ---
 
