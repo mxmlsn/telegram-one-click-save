@@ -227,6 +227,9 @@ function parseMessage(message) {
     const mime = message.document.mime_type || '';
     const docType = mime === 'application/pdf' ? 'pdf' : 'document';
     result.fileId = message.document.file_id;
+    if (message.document.thumbnail?.file_id) {
+      result.thumbnailFileId = message.document.thumbnail.file_id;
+    }
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       result.mediaType = docType;

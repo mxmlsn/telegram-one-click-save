@@ -253,10 +253,13 @@ function parseItem(page) {
   const rawFileId = p['File ID']?.rich_text?.[0]?.text?.content || '';
   const type = p['Type']?.select?.name || 'link';
   const isVideoType = type === 'video' || aiData.mediaType === 'video';
+  const isPdfType = type === 'pdf' || aiData.mediaType === 'pdf';
+  const hasThumb = !!aiData.thumbnailFileId;
 
-  // For video: use thumbnail for display, keep original for playback
-  const displayFileId = (isVideoType && aiData.thumbnailFileId) ? aiData.thumbnailFileId : rawFileId;
-  const videoFileId = (isVideoType && aiData.thumbnailFileId) ? rawFileId : '';
+  // For video/PDF: use thumbnail for display, keep original for playback/download
+  const displayFileId = ((isVideoType || isPdfType) && hasThumb) ? aiData.thumbnailFileId : rawFileId;
+  const videoFileId = (isVideoType && hasThumb) ? rawFileId : '';
+  const pdfFileId = (isPdfType && hasThumb) ? rawFileId : (isPdfType ? rawFileId : '');
 
   return {
     id: page.id,
@@ -266,6 +269,7 @@ function parseItem(page) {
     content: p['Content']?.rich_text?.[0]?.text?.content || '',
     fileId: displayFileId,
     videoFileId,
+    pdfFileId,
     sourceUrl: p['Source URL']?.url || '',
     date: p['Date']?.date?.start || '',
     ai_type: p['ai_type']?.select?.name || null,
@@ -1085,7 +1089,8 @@ function renderCard(item) {
   // ── PDF card (base type OR AI-detected) ──
   if (item.type === 'pdf' || effectiveType === 'pdf') {
     const pdfUrl = item.sourceUrl || item.url || '';
-    const hasTgFile = item.fileId && !/^https?:\/\//i.test(pdfUrl);
+    const pdfFid = item.pdfFileId || item.fileId;
+    const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTitle = toTitleCase(aiData.title || item.content || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     const previewHtml = imgUrl
       ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
@@ -1094,7 +1099,7 @@ function renderCard(item) {
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
     const pdfDesc = item.ai_description || '';
     const pdfDescHtml = pdfDesc ? `<div class="pdf-desc">${escapeHtml(pdfDesc.length > 150 ? pdfDesc.slice(0, 150) + '...' : pdfDesc)}</div>` : '';
-    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}>
+    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
@@ -1169,8 +1174,8 @@ function renderCard(item) {
         <img class="card-img" id="${vimeoImgId}" src="" loading="lazy" alt="">
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
-    } else if (aiData.mediaType === 'pdf' && item.fileId) {
-      mediaHtml = `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(item.fileId)}">
+    } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
+      mediaHtml = `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(item.pdfFileId || item.fileId)}">
         <div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div>
       </div>`;
     } else if (aiData.mediaType === 'video' && item.fileId) {
