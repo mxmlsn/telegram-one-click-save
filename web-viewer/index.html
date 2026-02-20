@@ -375,6 +375,43 @@
     }
     .tgpost-pdf-preview .pdf-blur-wrap {
       border-radius: 0;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: -20px;
+      padding-bottom: 20px;
+    }
+    .tgpost-pdf-preview .pdf-blur-img {
+      display: block;
+      width: calc(100% + 40px);
+      margin: -20px -20px 0;
+      filter: blur(6px);
+      transition: filter 0.25s ease;
+      will-change: filter;
+      mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
+      -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
+    }
+    .tgpost-pdf-preview:hover .pdf-blur-img {
+      filter: blur(0px);
+    }
+    .tgpost-pdf-preview .pdf-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border-radius: 5px;
+      padding: 3px 8px;
+      z-index: 2;
+    }
+    .tgpost-pdf-preview .pdf-badge-text {
+      font-family: 'Anybody', sans-serif;
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      line-height: 1;
+      letter-spacing: 0.4px;
     }
     .tgpost-pdf-badge {
       padding: 16px;
