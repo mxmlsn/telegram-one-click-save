@@ -836,7 +836,7 @@ function renderCard(item) {
       ${pendingDot}
       <div class="product-new-notch">${notchSvg}</div>
       <div class="product-new-header">
-        ${rawPrice ? `<div class="product-new-price" style="color:${theme.price}">${escapeHtml(formattedPrice)}</div>` : ''}
+        ${rawPrice ? `<div class="product-new-price" style="color:${theme.price}">${escapeHtml(formattedPrice)}</div>` : (domain ? `<div class="product-new-domain" style="color:${theme.price}">${escapeHtml(domain)}</div>` : '')}
       </div>
       <div class="product-new-preview">
         <div class="screenshot-crop"><img class="product-new-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>

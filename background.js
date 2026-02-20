@@ -358,7 +358,7 @@ const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no
 }
 
 Rules:
-- content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the image next to a product. Otherwise content_type MUST be null. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
+- content_type: This is a photo sent directly (not a link). The ONLY allowed non-null value is "product". Set "product" ONLY if the image shows a product/item that could be purchased (clothing, shoes, furniture, gadgets, etc.) — a visible price is NOT required. But if the image is a generic photo (landscape, selfie, meme, art) with no purchasable item, content_type MUST be null. Do NOT set "video", "article", or "xpost" — these are impossible for a direct photo.
 - content_type_secondary: null for direct photos (not applicable).
 - title: the single most important headline or title visible on the screen. Extract the primary heading/title text — the biggest, most prominent text that describes what this content is about. Keep it short (under 80 chars). If no clear title/headline exists, empty string.
 - description: 2-4 sentences in English, describe composition, objects, people, mood, setting. Be specific.
@@ -379,7 +379,7 @@ Rules:
 - color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Only include colors that cover a meaningful portion of the image. Do NOT pad to 3 — if the image is mostly one color, return just ["black"]. Empty array if no image.
   IMPORTANT for "black" and "white": Only include "black" or "white" in color_top3 if the image is TRULY DOMINATED by that color — i.e., the image looks dark/black or light/white overall. If the image has vivid chromatic colors (reds, blues, greens, etc.) that catch the eye, do NOT include "black" or "white" even if there are dark shadows or light highlights. A colorful image on a black background should list the chromatic colors, NOT "black". Only use "black"/"white" for images that genuinely LOOK black/white/dark/light to a human viewer.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text.
-- price: the main product price with currency symbol (e.g. "$129"). Empty string if not visible.
+- price: the main product price with currency symbol (e.g. "$129"). ONLY extract the price if there is clearly ONE main product in focus AND its price is prominently displayed next to it. If the screenshot shows a gallery, listing, or grid of multiple equivalent products (e.g. a category page on Farfetch, SSENSE, etc.) — set price to empty string even if individual prices are visible. The rule: no single obvious hero product with one clear price = empty string.
 - author: empty string.
 - tweet_text: empty string.
 - All fields must be present. No markdown, no extra fields.`;
@@ -404,7 +404,7 @@ Rules:
 - content_type: set ONLY if confident, otherwise null. Must be one of:
   - "article" — URL is clearly an article/essay/instruction/journalism piece. NOT for book/document viewers with page navigation (use "pdf" instead)
   - "video" — URL is youtube.com/youtu.be/vimeo.com/instagram. OR screenshot shows video indicators: mute/unmute speaker icon, progress bar + playhead, play button overlay. Instagram posts with a mute/unmute icon are ALWAYS video.
-  - "product" — ONLY if a price (any currency symbol: $, €, £, ¥, ₽, etc.) is CLEARLY VISIBLE in the screenshot next to a product. No visible price = null.
+  - "product" — the page shows a purchasable product (clothing, shoes, furniture, gadgets, etc.). This includes product pages, gallery/listing pages, and category pages from online stores. A visible price is NOT required — set "product" based on the commercial/shopping nature of the content.
   - "xpost" — URL contains x.com or twitter.com
   - "tool" — URL is a digital tool, app, SaaS service, template marketplace, font foundry/specimen, browser extension, CLI utility, framework/library page, AI tool, online generator/converter, or a showcase/launch post ("I made X", "I built X", Product Hunt, etc.). IMPORTANT: "tool" means the TOOL ITSELF is being saved (its homepage, landing page, or launch post). If the URL points to USER-GENERATED CONTENT hosted on a platform (e.g. a specific board/channel on Are.na, a specific project on Behance, a specific collection on Pinterest, a post on a forum, a user's profile page) — that is NOT "tool". The platform is just a host; what matters is the content being viewed.
   - "pdf" — screenshot shows a document/book being viewed. This includes: browser PDF viewer, Google Drive PDF preview, embedded PDF, Internet Archive book reader, any online document/book viewer with page navigation. Look for: PDF toolbar/controls, page navigation (e.g. "Page 1/141"), ".pdf" in URL bar or title, document-style layout with page borders, book covers being displayed in a reader interface, digital library/archive interfaces showing downloadable documents. Set "pdf" (NOT "article") when the page is displaying a PDF file, book, or document in a viewer/reader — even if the viewer is not a standard browser PDF viewer.
@@ -433,7 +433,7 @@ Rules:
 - color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Include ALL visually significant colors — backgrounds, UI, objects. Do NOT pad to 3 — if the image is mostly one color, return just ["black"]. Empty array if no image.
   IMPORTANT for "black" and "white": Only include "black" or "white" in color_top3 if the image is TRULY DOMINATED by that color — i.e., the image looks dark/black or light/white overall. If the image has vivid chromatic colors (reds, blues, greens, etc.) that catch the eye, do NOT include "black" or "white" even if there are dark shadows or light highlights. A colorful website on a white background should list the chromatic colors, NOT "white". Only use "black"/"white" for images that genuinely LOOK black/white/dark/light to a human viewer.
 - text_on_image: transcribe ALL visible text verbatim, preserving original language. Empty string if no text or no image.
-- price: the main product price with currency symbol (e.g. "$129", "€49.99"). Empty string if not applicable.
+- price: the main product price with currency symbol (e.g. "$129", "€49.99"). ONLY extract the price if there is clearly ONE main product in focus AND its price is prominently displayed next to it. If the screenshot shows a gallery, listing, or grid of multiple equivalent products (e.g. a category page on Farfetch, SSENSE, etc.) — set price to empty string even if individual prices are visible. The rule: no single obvious hero product with one clear price = empty string.
 - author: for xpost — @handle from screenshot. Empty string otherwise.
 - tweet_text: for xpost — full tweet text from screenshot. Empty string otherwise.
 - All fields must be present. No markdown, no extra fields.`;
