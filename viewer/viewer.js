@@ -586,10 +586,16 @@ function setupDisplayBar() {
     scheduleDisplaySave();
   });
 
-  // Padding range
+  // Padding range (track only shows left of thumb)
+  function updatePadFill() {
+    const pct = (padRange.value - padRange.min) / (padRange.max - padRange.min) * 100;
+    padRange.style.setProperty('--fill', pct + '%');
+  }
+  updatePadFill();
   padRange.addEventListener('input', () => {
     STATE.padding = parseInt(padRange.value, 10);
     if (padVal) padVal.textContent = STATE.padding;
+    updatePadFill();
     applyGridMode();
     scheduleDisplaySave();
   });

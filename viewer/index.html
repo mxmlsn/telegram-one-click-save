@@ -1129,7 +1129,7 @@
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       display: flex; align-items: center; gap: 16px;
-      padding: 0 18px;
+      padding: 0 26px;
       z-index: 99;
       font-size: 11px;
       color: var(--text-muted);
@@ -1175,6 +1175,31 @@
     .db-range::-moz-range-thumb {
       width: 12px; height: 12px; border-radius: 50%;
       background: var(--text-muted); border: none; cursor: pointer;
+    }
+    /* Padding range: only show track left of thumb */
+    #padding-range {
+      background: transparent;
+      height: 12px;
+    }
+    #padding-range::-webkit-slider-runnable-track {
+      height: 3px; border-radius: 2px;
+      background: linear-gradient(to right, var(--surface2) var(--fill, 0%), transparent var(--fill, 0%));
+    }
+    #padding-range::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--text-muted); cursor: pointer;
+      transition: background 0.15s;
+      margin-top: -4.5px;
+    }
+    #padding-range::-webkit-slider-thumb:hover { background: var(--text); }
+    #padding-range::-moz-range-track {
+      height: 3px; border-radius: 2px;
+      background: transparent;
+    }
+    #padding-range::-moz-range-progress {
+      height: 3px; border-radius: 2px;
+      background: var(--surface2);
     }
     .db-range-val {
       font-size: 10px; color: var(--text-dim); min-width: 22px; text-align: center;
@@ -1399,7 +1424,12 @@
 <!-- Display settings bar -->
 <div id="display-bar" class="hidden">
   <div class="db-group">
-    <button class="db-btn active" data-layout="adaptive" title="Auto"><span style="font-size:11px;font-weight:600;line-height:1">A</span></button>
+    <button class="db-btn active" data-align="masonry" title="Masonry"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="5" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="8" rx="1" fill="currentColor"/><rect x="1" y="8" width="6" height="7" rx="1" fill="currentColor"/><rect x="9" y="11" width="6" height="4" rx="1" fill="currentColor"/></svg></button>
+    <button class="db-btn" data-align="center" title="Center rows"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/></svg></button>
+  </div>
+  <div class="db-divider"></div>
+  <div class="db-group">
+    <button class="db-btn active" data-layout="adaptive" title="Auto"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><text x="8" y="12.5" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor" font-family="system-ui,sans-serif">A</text></svg></button>
     <button class="db-btn" data-layout="4col" title="4 columns"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="0.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="4.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="12.5" y="3" width="3" height="10" rx="1" fill="currentColor"/></svg></button>
     <button class="db-btn" data-layout="3col" title="3 columns"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="4" height="10" rx="1" fill="currentColor"/><rect x="6" y="3" width="4" height="10" rx="1" fill="currentColor"/><rect x="11" y="3" width="4" height="10" rx="1" fill="currentColor"/></svg></button>
   </div>
@@ -1414,11 +1444,6 @@
     <div class="db-range-wrap">
       <input type="range" class="db-range" id="padding-range" min="0" max="120" value="14" title="Padding">
     </div>
-  </div>
-  <div class="db-divider"></div>
-  <div class="db-group">
-    <button class="db-btn active" data-align="masonry" title="Masonry"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="5" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="8" rx="1" fill="currentColor"/><rect x="1" y="8" width="6" height="7" rx="1" fill="currentColor"/><rect x="9" y="11" width="6" height="4" rx="1" fill="currentColor"/></svg></button>
-    <button class="db-btn" data-align="center" title="Center rows"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/></svg></button>
   </div>
 </div>
 
