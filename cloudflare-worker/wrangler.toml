@@ -1,0 +1,8 @@
+name = "stash-cors-proxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+account_id = "961294ddfea3e6556e27911482ba7360"
+workers_dev = true
+
+[observability]
+enabled = true
