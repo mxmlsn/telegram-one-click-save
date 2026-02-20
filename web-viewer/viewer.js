@@ -1173,6 +1173,13 @@ function renderCard(item) {
         }
         mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
+    } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
+      // PDF preview — must come before generic imgUrl check
+      const pdfFid = item.pdfFileId || item.fileId;
+      const pdfThumbUrl = imgUrl || '';
+      mediaHtml = pdfThumbUrl
+        ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div></div>`
+        : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`;
     } else if (imgUrl) {
       mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
     } else if (tgYtMatch) {
@@ -1199,12 +1206,6 @@ function renderCard(item) {
         <img class="card-img" id="${vimeoImgId}" src="" loading="lazy" alt="">
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
-    } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
-      const pdfFid = item.pdfFileId || item.fileId;
-      const pdfThumbUrl = imgUrl || '';
-      mediaHtml = pdfThumbUrl
-        ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div></div>`
-        : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`;
     } else if (aiData.mediaType === 'video' && item.fileId) {
       // Direct TG video in tgpost — show thumbnail or play icon
       const thumbUrl = imgUrl || '';
@@ -1269,12 +1270,13 @@ function renderCard(item) {
   const quoteText = escapeHtml(quoteTextDisplay);
   const truncatedClass = isTruncated ? ' truncated' : '';
   const quoteSourceUrl = item.sourceUrl || item.url || '';
-  const quoteDomainHtml = domain
+  const quoteDomain = (domain && domain !== 'telegram') ? domain : '';
+  const quoteDomainHtml = quoteDomain
     ? (quoteSourceUrl
-        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(quoteSourceUrl)}">${escapeHtml(domain)}</a>`
-        : `<span class="quote-source">${escapeHtml(domain)}</span>`)
+        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(quoteSourceUrl)}">${escapeHtml(quoteDomain)}</a>`
+        : `<span class="quote-source">${escapeHtml(quoteDomain)}</span>`)
     : '<span></span>';
-  return `<div class="card card-quote-new" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteTextRaw)}" data-source-url="${escapeHtml(quoteSourceUrl)}" data-domain="${escapeHtml(domain)}">
+  return `<div class="card card-quote-new" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteTextRaw)}" data-source-url="${escapeHtml(quoteSourceUrl)}" data-domain="${escapeHtml(quoteDomain)}">
     ${pendingDot}
     <div class="quote-body">
       <div class="quote-text${truncatedClass}">${quoteText}</div>
