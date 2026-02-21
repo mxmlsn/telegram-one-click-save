@@ -498,10 +498,12 @@ async function resolveImagesBatch(items, tgToken, cache) {
 
 // Patch already-rendered cards with resolved image URLs
 function patchCardImages(items) {
+  let hasVideoNotes = false;
   for (const item of items) {
     if (!item._resolvedImg) continue;
     const card = document.querySelector(`.card[data-id="${item.id}"]`);
     if (!card) continue;
+    if (card.querySelector('.videonote-circle')) hasVideoNotes = true;
     // Replace the whole card HTML to get correct card type rendering
     card.outerHTML = renderCard(item);
     // Re-check xpost truncation on the new card
@@ -513,7 +515,11 @@ function patchCardImages(items) {
         if (newCard.classList.contains('xpost-collapsed')) textEl.classList.add('truncated-collapsed');
       }
     }
+    // Check if new card has video notes
+    if (!hasVideoNotes && newCard?.querySelector('.videonote-circle')) hasVideoNotes = true;
   }
+  // Re-autoload video notes if any were re-rendered
+  if (hasVideoNotes) autoloadVideoNotes();
 }
 
 
@@ -1715,55 +1721,88 @@ function renderAll(items) {
     }
   });
 
-  // Auto-load and play ALL video notes immediately on page open (muted loop)
-  // Uses concurrency limit to avoid Telegram API throttling
-  const videoCircles = masonry.querySelectorAll('.videonote-circle');
-  if (videoCircles.length && STATE.botToken) {
-    const vnEntries = [...videoCircles].map(circle => ({
-      circle,
-      fileId: circle.dataset.fileId,
-      video: circle.querySelector('.videonote-video'),
-      playIcon: circle.querySelector('.videonote-play-icon'),
-    })).filter(e => e.fileId && e.video);
+  // Auto-load video notes
+  autoloadVideoNotes();
+}
 
+// ─── Video note autoload (survives DOM re-renders) ──────────────────────────
+// Cache resolved URLs so re-renders don't re-fetch from Telegram API
+const _vnUrlCache = {};
+
+function autoloadVideoNotes() {
+  const masonry = document.getElementById('masonry');
+  if (!masonry || !STATE.botToken) return;
+  const circles = masonry.querySelectorAll('.videonote-circle');
+  if (!circles.length) return;
+
+  const entries = [...circles]
+    .filter(c => !c._vnLoading && !c._vnLoaded)
+    .map(c => ({
+      circle: c,
+      fileId: c.dataset.fileId,
+      video: c.querySelector('.videonote-video'),
+      playIcon: c.querySelector('.videonote-play-icon'),
+    }))
+    .filter(e => e.fileId && e.video);
+  if (!entries.length) return;
+
+  const playVideo = (entry, url) => {
+    const { video, playIcon, circle } = entry;
+    video.preload = 'auto';
+    video.src = url;
+    video.muted = true;
+    circle._vnLoaded = true;
+    video.play().then(() => {
+      if (playIcon) playIcon.style.display = 'none';
+    }).catch(() => {
+      const retry = () => {
+        video.play().then(() => {
+          if (playIcon) playIcon.style.display = 'none';
+        }).catch(() => {});
+        document.removeEventListener('click', retry);
+        document.removeEventListener('scroll', retry);
+      };
+      document.addEventListener('click', retry, { once: true });
+      document.addEventListener('scroll', retry, { once: true });
+    });
+  };
+
+  // Split: cached (instant) vs uncached (need API call)
+  const cached = [];
+  const uncached = [];
+  for (const e of entries) {
+    e.circle._vnLoading = true;
+    if (_vnUrlCache[e.fileId]) {
+      cached.push(e);
+    } else {
+      uncached.push(e);
+    }
+  }
+
+  // Play cached ones immediately
+  for (const e of cached) playVideo(e, _vnUrlCache[e.fileId]);
+
+  // Resolve uncached with concurrency limit
+  if (uncached.length) {
     const CONCURRENCY = 3;
     let idx = 0;
-    const loadOne = async () => {
-      while (idx < vnEntries.length) {
-        const entry = vnEntries[idx++];
-        const { video, playIcon, fileId } = entry;
-        // Try up to 2 times (retry once on failure)
+    const worker = async () => {
+      while (idx < uncached.length) {
+        const entry = uncached[idx++];
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
-            const videoUrl = await resolveFileId(STATE.botToken, fileId);
-            if (videoUrl) {
-              video.preload = 'auto';
-              video.src = videoUrl;
-              video.muted = true;
-              try {
-                await video.play();
-                if (playIcon) playIcon.style.display = 'none';
-              } catch {
-                // Autoplay blocked — retry on user interaction
-                const retry = () => {
-                  video.play().then(() => {
-                    if (playIcon) playIcon.style.display = 'none';
-                  }).catch(() => {});
-                  document.removeEventListener('click', retry);
-                  document.removeEventListener('scroll', retry);
-                };
-                document.addEventListener('click', retry, { once: true });
-                document.addEventListener('scroll', retry, { once: true });
-              }
-              break; // success, move to next entry
+            const url = await resolveFileId(STATE.botToken, entry.fileId);
+            if (url) {
+              _vnUrlCache[entry.fileId] = url;
+              playVideo(entry, url);
+              break;
             }
           } catch { /* retry */ }
-          if (attempt === 0) await new Promise(r => setTimeout(r, 500)); // wait before retry
+          if (attempt === 0) await new Promise(r => setTimeout(r, 500));
         }
       }
     };
-    // Launch CONCURRENCY workers
-    for (let i = 0; i < Math.min(CONCURRENCY, vnEntries.length); i++) loadOne();
+    for (let i = 0; i < Math.min(CONCURRENCY, uncached.length); i++) worker();
   }
 }
 
