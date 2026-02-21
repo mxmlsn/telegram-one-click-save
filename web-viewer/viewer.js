@@ -1345,7 +1345,6 @@ function renderCard(item) {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
         if (m.mediaType === 'pdf') {
           const pdfFid = m.pdfFileId || m.fileId;
-          // Only use resolvedUrl as preview if it's from a thumbnail (not the raw PDF binary)
           const hasThumbnail = m.fileId && m.pdfFileId && m.fileId !== m.pdfFileId;
           const previewUrl = hasThumbnail ? resolvedUrl : '';
           return previewUrl
@@ -1354,12 +1353,14 @@ function renderCard(item) {
         }
         if (m.mediaType === 'video') {
           const playFileId = m.videoFileId || m.fileId;
+          // Album gallery item: video with thumbnail
           return resolvedUrl
-            ? `<div class="tgpost-album-item is-video" data-action="video-play" data-file-id="${escapeHtml(playFileId)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
-            : `<div class="tgpost-album-item is-video" data-action="video-play" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
+            ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
+            : `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
         }
+        // Album gallery item: image
         return resolvedUrl
-          ? `<div class="tgpost-album-item" data-action="lightbox" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
+          ? `<div class="tgpost-album-item" data-action="album-gallery" data-gallery-type="image" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
           : `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
       }).filter(Boolean);
       if (albumItems.length > 0) {
@@ -1802,8 +1803,7 @@ function openLightbox(imgUrl, sourceUrl, opts) {
   lb.classList.remove('hidden');
 }
 
-function _showLightboxItem() {
-  const lb = document.getElementById('lightbox');
+async function _showLightboxItem() {
   const img = document.getElementById('lightbox-img');
   const video = document.getElementById('lightbox-video');
   const link = document.getElementById('lightbox-link');
@@ -1812,7 +1812,13 @@ function _showLightboxItem() {
   const item = _gallery.items[_gallery.index];
   if (!item) return;
 
-  const isVideo = item.video;
+  // Resolve video file_id on demand if not yet resolved
+  if (item.video && !item.url && item.fileId && STATE.botToken) {
+    const resolved = await resolveFileId(STATE.botToken, item.fileId);
+    if (resolved) item.url = resolved;
+  }
+
+  const isVideo = item.video && item.url;
   img.classList.toggle('hidden', !!isVideo);
   video.classList.toggle('hidden', !isVideo);
 
@@ -1821,7 +1827,7 @@ function _showLightboxItem() {
     video.play().catch(() => {});
     img.src = '';
   } else {
-    img.src = item.url;
+    img.src = item.url || '';
     video.pause();
     video.src = '';
   }
@@ -1916,26 +1922,38 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "lightbox" — open image lightbox (with gallery support for albums)
+    // "lightbox" — open image lightbox
     if (action === 'lightbox') {
       const imgSrc = actionEl.dataset.img || '';
-      if (!imgSrc) return;
-      // Check if inside an album — collect all lightbox siblings for gallery
+      if (imgSrc) openLightbox(imgSrc, url);
+      return;
+    }
+
+    // "album-gallery" — open unified gallery for album (images + videos)
+    if (action === 'album-gallery') {
+      e.stopPropagation();
       const album = actionEl.closest('.tgpost-album');
-      if (album) {
-        const siblings = album.querySelectorAll('[data-action="lightbox"][data-img]');
-        if (siblings.length > 1) {
-          const gallery = [];
-          let idx = 0;
-          siblings.forEach((el, i) => {
-            gallery.push({ url: el.dataset.img, sourceUrl: '' });
-            if (el === actionEl) idx = i;
-          });
-          openLightbox(imgSrc, '', { gallery, galleryIndex: idx });
-          return;
+      if (!album) return;
+      const siblings = album.querySelectorAll('[data-action="album-gallery"]');
+      const gallery = [];
+      let idx = 0;
+      siblings.forEach((el, i) => {
+        const gType = el.dataset.galleryType || 'image';
+        if (gType === 'video') {
+          gallery.push({ url: '', fileId: el.dataset.fileId || '', video: true, sourceUrl: '' });
+        } else {
+          gallery.push({ url: el.dataset.img || '', sourceUrl: '' });
         }
+        if (el === actionEl) idx = i;
+      });
+      if (gallery.length === 0) return;
+      // For the clicked item, if it's a video, resolve it now
+      const clicked = gallery[idx];
+      if (clicked.video && clicked.fileId && !clicked.url) {
+        const resolved = await resolveFileId(STATE.botToken, clicked.fileId);
+        if (resolved) clicked.url = resolved;
       }
-      openLightbox(imgSrc, url);
+      openLightbox(clicked.url, '', { gallery, galleryIndex: idx });
       return;
     }
 
