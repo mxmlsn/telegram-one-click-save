@@ -326,12 +326,19 @@ function mergeMediaGroups(items) {
         mediaType: mType,
         videoFileId: item.videoFileId || '',
         pdfFileId: item.pdfFileId || '',
+        audioFileId: item.audioFileId || item.ai_data?.audioFileId || '',
+        audioTitle: item.ai_data?.audioTitle || '',
+        audioPerformer: item.ai_data?.audioPerformer || '',
+        audioDuration: item.ai_data?.audioDuration || 0,
+        coverFileId: (mType === 'audio' && item.ai_data?.thumbnailFileId) ? item.ai_data.thumbnailFileId : '',
       };
       if (!groups[gid]) {
         groups[gid] = item;
         // Always add media entry (even without fileId — PDF/video can still show badge)
         item.albumMedia = [mediaEntry];
         item.fileIds = item.fileId ? [item.fileId] : [];
+        // Add audio cover thumbnail for resolution
+        if (mediaEntry.coverFileId) item.fileIds.push(mediaEntry.coverFileId);
         result.push(item);
       } else {
         // Merge into existing group item — always add media entry
@@ -339,9 +346,17 @@ function mergeMediaGroups(items) {
         if (item.fileId) {
           groups[gid].fileIds.push(item.fileId);
         }
-        // Use content from whichever has it (caption is usually on first message)
-        if (!groups[gid].content && item.content) {
-          groups[gid].content = item.content;
+        // Add audio cover thumbnail for resolution
+        if (mediaEntry.coverFileId) groups[gid].fileIds.push(mediaEntry.coverFileId);
+        // Merge content: collect all unique text parts for multi-audio posts
+        if (item.content) {
+          if (!groups[gid]._contentParts) {
+            groups[gid]._contentParts = groups[gid].content ? [groups[gid].content] : [];
+          }
+          if (!groups[gid]._contentParts.includes(item.content)) {
+            groups[gid]._contentParts.push(item.content);
+          }
+          groups[gid].content = groups[gid]._contentParts.join('\n');
         }
         // Merge HTML content flag
         if (item.ai_data?.htmlContent) {
@@ -364,6 +379,8 @@ function mergeMediaGroups(items) {
     if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
       item.type = 'tgpost';
     }
+    // Clean up temporary merge helper
+    delete item._contentParts;
   }
   return result;
 }
@@ -1344,6 +1361,35 @@ function renderCard(item) {
     const isAlbum = albumMedia.length > 1;
     let mediaHtml = '';
     if (isAlbum) {
+      // ── Audio album: stacked mini-players ──
+      const audioTracks = albumMedia.filter(m => m.mediaType === 'audio');
+      if (audioTracks.length > 1) {
+        const miniPlayers = audioTracks.map(m => {
+          const aFid = m.audioFileId || m.fileId;
+          const title = m.audioTitle || 'Audio';
+          const performer = m.audioPerformer || '';
+          const dur = m.audioDuration || 0;
+          const durStr = dur > 0 ? `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` : '';
+          const coverUrl = m.coverFileId ? (STATE.imageMap[m.coverFileId] || '') : '';
+          const coverHtml = coverUrl
+            ? `<img class="mini-audio-cover" src="${escapeHtml(coverUrl)}" loading="lazy" alt="">`
+            : '';
+          const hasCoverClass = coverUrl ? ' has-cover' : '';
+          return `<div class="mini-audio-player audio-player" data-action="audio-play" data-file-id="${escapeHtml(aFid)}">
+            <button class="mini-audio-btn${hasCoverClass}">
+              ${coverHtml}
+              <svg class="mini-audio-play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>
+            </button>
+            <div class="mini-audio-info">
+              <div class="mini-audio-label">${escapeHtml(title)}${performer ? ' — ' + escapeHtml(performer) : ''}</div>
+              <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
+            </div>
+            <span class="audio-time">${durStr}</span>
+          </div>`;
+        }).join('');
+        mediaHtml = `<div class="audio-album-list">${miniPlayers}</div>`;
+      } else {
+      // ── Non-audio album: image/video/pdf grid ──
       const albumItems = albumMedia.map(m => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
         if (m.mediaType === 'pdf') {
@@ -1382,6 +1428,7 @@ function renderCard(item) {
         const colClass = albumItems.length > 4 ? ' album-3col' : '';
         mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
+      } // end else (non-audio album grid)
     } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
       // PDF preview — must come before generic imgUrl check
       const pdfFid = item.pdfFileId || item.fileId;
