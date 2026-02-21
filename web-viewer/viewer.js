@@ -212,6 +212,29 @@ async function resolveRemainingImages(items, fileCache) {
     if (i + BATCH < toFetchIds.length) await new Promise(r => setTimeout(r, 200));
   }
 
+  // Fallback: items whose fileId failed but have a thumbnailFileId — try thumbnail
+  const fallbackItems = items.filter(it => !it._resolvedImg && it.ai_data?.thumbnailFileId && it.ai_data.thumbnailFileId !== it.fileId);
+  if (fallbackItems.length > 0) {
+    const thumbIds = [...new Set(fallbackItems.map(it => it.ai_data.thumbnailFileId))];
+    const thumbUrls = await Promise.all(thumbIds.map(fid => resolveFileId(STATE.botToken, fid)));
+    thumbIds.forEach((fid, idx) => {
+      if (thumbUrls[idx]) {
+        STATE.imageMap[fid] = thumbUrls[idx];
+        fileCache[fid] = { url: thumbUrls[idx], ts: now };
+      }
+    });
+    const thumbPatched = [];
+    for (const item of fallbackItems) {
+      const thumbFid = item.ai_data.thumbnailFileId;
+      if (STATE.imageMap[thumbFid]) {
+        item._resolvedImg = STATE.imageMap[thumbFid];
+        STATE.imageMap[item.fileId] = STATE.imageMap[thumbFid];
+        thumbPatched.push(item);
+      }
+    }
+    if (thumbPatched.length) patchCardImages(thumbPatched);
+  }
+
   saveFileCache(fileCache);
 }
 
@@ -258,10 +281,10 @@ function parseItem(page) {
   const isAudioType = type === 'audio' || aiData.mediaType === 'audio';
   const hasThumb = !!aiData.thumbnailFileId;
 
-  // For video/PDF/video_note/large images/documents: use thumbnail for display
+  // For video/PDF/video_note/audio: use thumbnail for display, keep original for playback
+  // For images/documents: use full file (falls back to thumbnail in resolution pipeline)
   const isDocType = type === 'document';
-  const isLargeImage = (type === 'image' || aiData.mediaType === 'image') && hasThumb && (aiData.fileSize || 0) > 20 * 1024 * 1024;
-  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType || isLargeImage || isDocType) && hasThumb;
+  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType) && hasThumb;
   const displayFileId = needsThumbSwap ? aiData.thumbnailFileId : rawFileId;
   const videoFileId = ((isVideoType || isVideoNoteType) && hasThumb) ? rawFileId : ((isVideoType || isVideoNoteType) ? rawFileId : '');
   const pdfFileId = (isPdfType && hasThumb) ? rawFileId : (isPdfType ? rawFileId : '');
@@ -425,6 +448,27 @@ async function resolveImagesBatch(items, tgToken, cache) {
   for (const item of items) {
     if (item.fileId && map[item.fileId] && !item._resolvedImg) {
       item._resolvedImg = map[item.fileId];
+    }
+  }
+
+  // Fallback: items whose fileId failed but have a thumbnailFileId — try thumbnail
+  const fallbackItems = items.filter(it => !it._resolvedImg && it.ai_data?.thumbnailFileId && it.ai_data.thumbnailFileId !== it.fileId);
+  if (fallbackItems.length > 0) {
+    const thumbIds = [...new Set(fallbackItems.map(it => it.ai_data.thumbnailFileId))];
+    const thumbUrls = await Promise.all(thumbIds.map(fid => resolveFileId(tgToken, fid)));
+    thumbIds.forEach((fid, idx) => {
+      if (thumbUrls[idx]) {
+        map[fid] = thumbUrls[idx];
+        cache[fid] = { url: thumbUrls[idx], ts: now };
+      }
+    });
+    for (const item of fallbackItems) {
+      const thumbFid = item.ai_data.thumbnailFileId;
+      if (map[thumbFid]) {
+        item._resolvedImg = map[thumbFid];
+        // Update fileId to thumbnail so rendering uses it
+        STATE.imageMap[item.fileId] = map[thumbFid];
+      }
     }
   }
 
@@ -882,6 +926,21 @@ function applyFilters() {
 function escapeHtml(str) {
   if (!str) return '';
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, duration = 4000) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;align-items:center';
+    document.body.appendChild(container);
+  }
+  const el = document.createElement('div');
+  el.style.cssText = 'background:rgba(30,30,30,0.95);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;max-width:360px;text-align:center;backdrop-filter:blur(10px);box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity .3s';
+  el.innerHTML = msg;
+  container.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, duration);
 }
 
 function sanitizeHtml(html) {
@@ -1818,9 +1877,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = actionEl.closest('.card[data-id]');
             const srcUrl = card?.dataset?.sourceUrl;
             if (srcUrl && /^https?:\/\//.test(srcUrl)) {
+              showToast('Файл &gt;20 МБ — открываю в Telegram');
               window.open(srcUrl, '_blank');
             } else {
-              alert('Файл слишком большой (>20MB). Откройте в Telegram.');
+              showToast('Файл &gt;20 МБ — недоступен через Bot API');
             }
           }
         }
@@ -1846,9 +1906,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const card = actionEl.closest('.card[data-id]');
         const srcUrl = card?.dataset?.sourceUrl;
         if (srcUrl && /^https?:\/\//.test(srcUrl)) {
+          showToast('Видео &gt;20 МБ — открываю в Telegram');
           window.open(srcUrl, '_blank');
         } else {
-          alert('Файл слишком большой для воспроизведения (>20MB). Откройте в Telegram.');
+          showToast('Видео &gt;20 МБ — недоступно через Bot API');
         }
       }
       return;
