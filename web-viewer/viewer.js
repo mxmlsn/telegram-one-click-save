@@ -1774,7 +1774,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "videonote-play" — click restarts video from beginning with sound
+    // "videonote-play" — toggle sound on circular video note
+    // Muted loop by default. Click → restart with sound (plays once, then back to muted loop).
+    // Click while unmuted → mute immediately (back to silent loop).
     if (action === 'videonote-play') {
       e.stopPropagation();
       const circle = actionEl.closest('.videonote-circle') || actionEl;
@@ -1791,12 +1793,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // Restart from beginning with sound
-      video.currentTime = 0;
-      video.muted = false;
-      video.play().then(() => {
-        if (playIcon) playIcon.style.display = 'none';
-      }).catch(() => {});
+      if (!video.muted) {
+        // Currently playing with sound → mute and continue looping
+        video.muted = true;
+        video.loop = true;
+      } else {
+        // Currently muted → restart from beginning with sound, play once
+        video.currentTime = 0;
+        video.muted = false;
+        video.loop = false;
+        // When this playthrough ends, go back to muted loop
+        const onEnded = () => {
+          video.removeEventListener('ended', onEnded);
+          video.muted = true;
+          video.loop = true;
+          video.play().catch(() => {});
+        };
+        video.addEventListener('ended', onEnded);
+        video.play().then(() => {
+          if (playIcon) playIcon.style.display = 'none';
+        }).catch(() => {});
+      }
       return;
     }
 
