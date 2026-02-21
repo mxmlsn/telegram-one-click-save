@@ -337,12 +337,14 @@ function mergeMediaGroups(items) {
         // Always add media entry (even without fileId — PDF/video can still show badge)
         item.albumMedia = [mediaEntry];
         item.fileIds = item.fileId ? [item.fileId] : [];
+        item._groupPageIds = [item.id]; // track all Notion page IDs in this album
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) item.fileIds.push(mediaEntry.coverFileId);
         result.push(item);
       } else {
         // Merge into existing group item — always add media entry
         groups[gid].albumMedia.push(mediaEntry);
+        groups[gid]._groupPageIds.push(item.id); // track merged page ID
         if (item.fileId) {
           groups[gid].fileIds.push(item.fileId);
         }
@@ -1808,19 +1810,28 @@ function autoloadVideoNotes() {
 
 // ─── Notion mutation helpers ──────────────────────────────────────────────────
 async function deleteItem(pageId) {
+  const item = STATE.items.find(i => i.id === pageId);
+  // Collect all Notion page IDs: album group pages + the main page
+  const idsToDelete = item?._groupPageIds?.length ? item._groupPageIds : [pageId];
+  const idsSet = new Set(idsToDelete);
+
   try {
-    const res = await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ archived: true })
-    });
-    if (!res.ok) { console.error('[Viewer] Delete failed:', res.status); return; }
+    const results = await Promise.all(idsToDelete.map(id =>
+      bgFetch(`https://api.notion.com/v1/pages/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${STATE.notionToken}`,
+          'Notion-Version': NOTION_VERSION,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ archived: true })
+      })
+    ));
+    const failed = results.filter(r => !r.ok);
+    if (failed.length) { console.error('[Viewer] Delete failed for', failed.length, 'pages'); }
+    if (failed.length === idsToDelete.length) return; // all failed — bail
   } catch (e) { console.error('[Viewer] Delete error:', e); return; }
-  STATE.items = STATE.items.filter(item => item.id !== pageId);
+  STATE.items = STATE.items.filter(item => !idsSet.has(item.id));
   applyFilters();
 }
 
