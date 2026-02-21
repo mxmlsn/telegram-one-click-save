@@ -326,52 +326,41 @@ function mergeMediaGroups(items) {
         mediaType: mType,
         videoFileId: item.videoFileId || '',
         pdfFileId: item.pdfFileId || '',
-        audioFileId: item.audioFileId || '',
-        audioTitle: item.ai_data?.audioTitle || '',
-        audioPerformer: item.ai_data?.audioPerformer || '',
-        audioDuration: item.ai_data?.audioDuration || 0,
-        coverFileId: (mType === 'audio' && item.ai_data?.thumbnailFileId) ? item.ai_data.thumbnailFileId : '',
       };
       if (!groups[gid]) {
         groups[gid] = item;
         // Always add media entry (even without fileId — PDF/video can still show badge)
         item.albumMedia = [mediaEntry];
         item.fileIds = item.fileId ? [item.fileId] : [];
-        item._contentParts = item.content ? [item.content] : [];
         result.push(item);
       } else {
-        const leader = groups[gid];
         // Merge into existing group item — always add media entry
-        leader.albumMedia.push(mediaEntry);
+        groups[gid].albumMedia.push(mediaEntry);
         if (item.fileId) {
-          leader.fileIds.push(item.fileId);
+          groups[gid].fileIds.push(item.fileId);
         }
-        // Collect all content parts (each group member may have its own caption)
-        if (item.content && !leader._contentParts.includes(item.content)) {
-          leader._contentParts.push(item.content);
+        // Use content from whichever has it (caption is usually on first message)
+        if (!groups[gid].content && item.content) {
+          groups[gid].content = item.content;
         }
         // Merge HTML content flag
         if (item.ai_data?.htmlContent) {
-          leader.ai_data.htmlContent = true;
+          groups[gid].ai_data.htmlContent = true;
         }
         // Merge channel/forward metadata from any group member
-        if (!leader.ai_data.channelTitle && item.ai_data?.channelTitle) {
-          leader.ai_data.channelTitle = item.ai_data.channelTitle;
+        if (!groups[gid].ai_data.channelTitle && item.ai_data?.channelTitle) {
+          groups[gid].ai_data.channelTitle = item.ai_data.channelTitle;
         }
-        if (!leader.ai_data.forwardFrom && item.ai_data?.forwardFrom) {
-          leader.ai_data.forwardFrom = item.ai_data.forwardFrom;
+        if (!groups[gid].ai_data.forwardFrom && item.ai_data?.forwardFrom) {
+          groups[gid].ai_data.forwardFrom = item.ai_data.forwardFrom;
         }
       }
     } else {
       result.push(item);
     }
   }
-  // Finalize merged groups
+  // Promote merged groups to tgpost so album rendering always triggers
   for (const item of result) {
-    if (item._contentParts?.length) {
-      item.content = item._contentParts.join('\n');
-    }
-    delete item._contentParts;
     if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
       item.type = 'tgpost';
     }
@@ -1353,33 +1342,8 @@ function renderCard(item) {
     // Album (multiple media)
     const albumMedia = item.albumMedia || [];
     const isAlbum = albumMedia.length > 1;
-    const isAudioAlbum = isAlbum && albumMedia.every(m => m.mediaType === 'audio');
     let mediaHtml = '';
-    if (isAudioAlbum) {
-      // Audio album: render compact mini-players stacked vertically
-      const playSvg = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
-      const miniPlayers = albumMedia.map(m => {
-        const aFid = m.audioFileId || m.fileId;
-        const coverUrl = STATE.imageMap[m.fileId] || '';
-        const title = escapeHtml(m.audioTitle || '');
-        const performer = escapeHtml(m.audioPerformer || '');
-        const dur = m.audioDuration || 0;
-        const durStr = dur > 0 ? `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` : '';
-        const label = title || performer || '';
-        const btnInner = coverUrl
-          ? `<img class="mini-audio-cover" src="${escapeHtml(coverUrl)}" alt="">`
-          : playSvg;
-        return `<div class="audio-player mini-audio-player" data-action="audio-play" data-file-id="${escapeHtml(aFid)}">
-          <button class="audio-play-btn mini-audio-btn${coverUrl ? ' has-cover' : ''}">${btnInner}</button>
-          <div class="mini-audio-info">
-            ${label ? `<div class="mini-audio-label">${label}</div>` : ''}
-            <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
-          </div>
-          ${durStr ? `<span class="audio-time">${durStr}</span>` : ''}
-        </div>`;
-      });
-      mediaHtml = `<div class="audio-album-list">${miniPlayers.join('')}</div>`;
-    } else if (isAlbum) {
+    if (isAlbum) {
       const albumItems = albumMedia.map(m => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
         if (m.mediaType === 'pdf') {
@@ -1397,51 +1361,26 @@ function renderCard(item) {
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
             : `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
         }
-        if (m.mediaType === 'audio') {
-          // Audio in mixed album — render as mini-player
-          const aFid = m.audioFileId || m.fileId;
-          const coverUrl = resolvedUrl;
-          const title = escapeHtml(m.audioTitle || '');
-          const dur = m.audioDuration || 0;
-          const durStr = dur > 0 ? `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` : '';
-          const btnInner = coverUrl
-            ? `<img class="mini-audio-cover" src="${escapeHtml(coverUrl)}" alt="">`
-            : `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
-          return `<div class="audio-player mini-audio-player" data-action="audio-play" data-file-id="${escapeHtml(aFid)}">
-            <button class="audio-play-btn mini-audio-btn${coverUrl ? ' has-cover' : ''}">${btnInner}</button>
-            <div class="mini-audio-info">
-              ${title ? `<div class="mini-audio-label">${title}</div>` : ''}
-              <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
-            </div>
-            ${durStr ? `<span class="audio-time">${durStr}</span>` : ''}
-          </div>`;
-        }
         // Album gallery item: image
         return resolvedUrl
           ? `<div class="tgpost-album-item" data-action="album-gallery" data-gallery-type="image" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
           : `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
       }).filter(Boolean);
       if (albumItems.length > 0) {
-        // Separate audio mini-players from grid items
-        const gridItems = albumItems.filter(h => !h.includes('mini-audio-player'));
-        const audioItems = albumItems.filter(h => h.includes('mini-audio-player'));
-        let gridHtml = '';
-        if (gridItems.length > 0) {
-          const cols = gridItems.length > 4 ? 3 : 2;
-          const remainder = gridItems.length % cols;
-          if (remainder !== 0 && gridItems.length > 1) {
-            const spanCols = cols - remainder + 1;
-            const lastIdx = gridItems.length - 1;
-            gridItems[lastIdx] = gridItems[lastIdx].replace(
-              /^<div class="tgpost-album-item/,
-              `<div style="grid-column:span ${spanCols}" class="tgpost-album-item album-span-${spanCols}`
-            );
-          }
-          const colClass = gridItems.length > 4 ? ' album-3col' : '';
-          gridHtml = `<div class="tgpost-album${colClass}">${gridItems.join('')}</div>`;
+        // Calculate if last item needs to span remaining columns
+        const cols = albumItems.length > 4 ? 3 : 2;
+        const remainder = albumItems.length % cols;
+        if (remainder !== 0) {
+          const spanCols = cols - remainder + 1;
+          // Replace last item's opening div to add grid-column span
+          const lastIdx = albumItems.length - 1;
+          albumItems[lastIdx] = albumItems[lastIdx].replace(
+            /^<div class="tgpost-album-item/,
+            `<div style="grid-column:span ${spanCols}" class="tgpost-album-item album-span-${spanCols}`
+          );
         }
-        const audioHtml = audioItems.length > 0 ? `<div class="audio-album-list">${audioItems.join('')}</div>` : '';
-        mediaHtml = gridHtml + audioHtml;
+        const colClass = albumItems.length > 4 ? ' album-3col' : '';
+        mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
     } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
       // PDF preview — must come before generic imgUrl check
