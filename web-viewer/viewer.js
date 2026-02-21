@@ -337,37 +337,44 @@ function mergeMediaGroups(items) {
         // Always add media entry (even without fileId — PDF/video can still show badge)
         item.albumMedia = [mediaEntry];
         item.fileIds = item.fileId ? [item.fileId] : [];
+        item._contentParts = item.content ? [item.content] : [];
         result.push(item);
       } else {
+        const leader = groups[gid];
         // Merge into existing group item — always add media entry
-        groups[gid].albumMedia.push(mediaEntry);
+        leader.albumMedia.push(mediaEntry);
         if (item.fileId) {
-          groups[gid].fileIds.push(item.fileId);
+          leader.fileIds.push(item.fileId);
         }
-        // Use content from whichever has it (caption is usually on first message)
-        if (!groups[gid].content && item.content) {
-          groups[gid].content = item.content;
+        // Collect all content parts (each group member may have its own caption)
+        if (item.content && !leader._contentParts.includes(item.content)) {
+          leader._contentParts.push(item.content);
         }
         // Merge HTML content flag
         if (item.ai_data?.htmlContent) {
-          groups[gid].ai_data.htmlContent = true;
+          leader.ai_data.htmlContent = true;
         }
         // Merge channel/forward metadata from any group member
-        if (!groups[gid].ai_data.channelTitle && item.ai_data?.channelTitle) {
-          groups[gid].ai_data.channelTitle = item.ai_data.channelTitle;
+        if (!leader.ai_data.channelTitle && item.ai_data?.channelTitle) {
+          leader.ai_data.channelTitle = item.ai_data.channelTitle;
         }
-        if (!groups[gid].ai_data.forwardFrom && item.ai_data?.forwardFrom) {
-          groups[gid].ai_data.forwardFrom = item.ai_data.forwardFrom;
+        if (!leader.ai_data.forwardFrom && item.ai_data?.forwardFrom) {
+          leader.ai_data.forwardFrom = item.ai_data.forwardFrom;
         }
       }
     } else {
       result.push(item);
     }
   }
-  // Promote merged groups to tgpost so album rendering always triggers
+  // Finalize merged groups
   for (const item of result) {
-    if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
-      item.type = 'tgpost';
+    if (item.albumMedia?.length > 1) {
+      if (item.type !== 'tgpost') item.type = 'tgpost';
+      // Join all collected content parts
+      if (item._contentParts?.length) {
+        item.content = item._contentParts.join('\n');
+      }
+      delete item._contentParts;
     }
   }
   return result;
