@@ -348,15 +348,9 @@ function mergeMediaGroups(items) {
         }
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) groups[gid].fileIds.push(mediaEntry.coverFileId);
-        // Merge content: collect all unique text parts for multi-audio posts
-        if (item.content) {
-          if (!groups[gid]._contentParts) {
-            groups[gid]._contentParts = groups[gid].content ? [groups[gid].content] : [];
-          }
-          if (!groups[gid]._contentParts.includes(item.content)) {
-            groups[gid]._contentParts.push(item.content);
-          }
-          groups[gid].content = groups[gid]._contentParts.join('\n');
+        // Use content from whichever has it (caption is usually on first message)
+        if (!groups[gid].content && item.content) {
+          groups[gid].content = item.content;
         }
         // Merge HTML content flag
         if (item.ai_data?.htmlContent) {
@@ -379,8 +373,6 @@ function mergeMediaGroups(items) {
     if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
       item.type = 'tgpost';
     }
-    // Clean up temporary merge helper
-    delete item._contentParts;
   }
   return result;
 }
