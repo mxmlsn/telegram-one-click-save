@@ -1288,7 +1288,7 @@ function renderCard(item) {
           const lastIdx = albumItems.length - 1;
           albumItems[lastIdx] = albumItems[lastIdx].replace(
             /^<div class="tgpost-album-item/,
-            `<div style="grid-column:span ${spanCols}" class="tgpost-album-item`
+            `<div style="grid-column:span ${spanCols}" class="tgpost-album-item album-span-${spanCols}`
           );
         }
         const colClass = albumItems.length > 4 ? ' album-3col' : '';

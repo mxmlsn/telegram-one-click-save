@@ -337,11 +337,9 @@
     .tgpost-album > :only-child .tgpost-album-img {
       aspect-ratio: auto;
     }
-    /* Spanned last item fills remaining width */
-    .tgpost-album-item[style*="grid-column"] .tgpost-album-img {
-      aspect-ratio: auto;
-      max-height: 300px;
-    }
+    /* Spanned last item: aspect ratio matches row height to avoid white gaps */
+    .album-span-2 .tgpost-album-img { aspect-ratio: 2 / 1; }
+    .album-span-3 .tgpost-album-img { aspect-ratio: 3 / 1; }
     .tgpost-video-preview {
       position: relative;
       cursor: pointer;
