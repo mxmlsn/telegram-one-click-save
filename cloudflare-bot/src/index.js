@@ -854,8 +854,9 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
     || isVideo; // video thumbnail is an image
   let responseText = null;
 
-  // For video: use thumbnail instead of full video file
-  const fileIdForAI = isVideo && parsed.thumbnailFileId ? parsed.thumbnailFileId : parsed.fileId;
+  // For video or large files: use thumbnail instead of full file (which may exceed 20MB getFile limit)
+  const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
+  const fileIdForAI = (isVideo || isLargeFile) && parsed.thumbnailFileId ? parsed.thumbnailFileId : parsed.fileId;
 
   // PDF files — send as application/pdf to Gemini (supports native PDF)
   if (isPdf && parsed.fileId) {
