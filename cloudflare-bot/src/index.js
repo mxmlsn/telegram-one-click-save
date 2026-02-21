@@ -43,7 +43,7 @@ async function handleUpdate(update, env, ctx) {
     // React with ✅
     await setReaction(env, chatId, message.message_id, '✅');
 
-    // Background tasks: screenshot for links + AI analysis
+    // Background tasks: screenshot for links + AI analysis + storage channel for large files
     if (notionPageId) {
       ctx.waitUntil((async () => {
         // For links: capture screenshot, send to TG silently, update Notion with file_id
@@ -66,6 +66,11 @@ async function handleUpdate(update, env, ctx) {
               })
             });
           }
+        }
+
+        // For large files (>20MB): forward to storage channel so they're accessible via link
+        if (parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024 && env.STORAGE_CHANNEL_ID) {
+          await forwardToStorageChannel(message, chatId, notionPageId, parsed, env);
         }
 
         // AI analysis
@@ -473,6 +478,80 @@ async function setReaction(env, chatId, messageId, emoji) {
   }
 }
 
+// ─── Storage Channel (for large files >20MB) ────────────────────────────────
+
+async function forwardToStorageChannel(message, chatId, notionPageId, parsed, env) {
+  try {
+    // Copy the message to the storage channel (silent, no "forwarded from" header)
+    const res = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/copyMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: env.STORAGE_CHANNEL_ID,
+        from_chat_id: chatId,
+        message_id: message.message_id,
+        disable_notification: true
+      })
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.warn('Storage channel copy failed:', data.description);
+      return;
+    }
+
+    // Build the public URL: https://t.me/channelname/messageId
+    // STORAGE_CHANNEL_ID can be "@channelname" or numeric id
+    // For the URL we need just the username (without @)
+    const rawId = String(env.STORAGE_CHANNEL_ID);
+    const channelUsername = rawId.startsWith('@') ? rawId.slice(1) : rawId;
+    const copiedMsgId = data.result.message_id;
+    const storageUrl = `https://t.me/${channelUsername}/${copiedMsgId}`;
+
+    // Patch Notion: add storageUrl to ai_data and set Source URL if empty
+    const patchProps = {};
+
+    // Set Source URL only if not already set (don't override real source URLs)
+    if (!parsed.sourceUrl) {
+      patchProps['Source URL'] = { url: storageUrl };
+    }
+
+    // Merge storageUrl into existing ai_data
+    // Read current ai_data to preserve all fields
+    const currentAiData = {};
+    if (parsed.mediaType) currentAiData.mediaType = parsed.mediaType;
+    if (parsed.thumbnailFileId) currentAiData.thumbnailFileId = parsed.thumbnailFileId;
+    if (parsed.contentHasHtml) currentAiData.htmlContent = true;
+    if (parsed.mediaGroupId) currentAiData.mediaGroupId = parsed.mediaGroupId;
+    if (parsed.channelTitle) currentAiData.channelTitle = parsed.channelTitle;
+    if (parsed.forwardFrom) currentAiData.forwardFrom = parsed.forwardFrom;
+    if (parsed.audioTitle) currentAiData.audioTitle = parsed.audioTitle;
+    if (parsed.audioPerformer) currentAiData.audioPerformer = parsed.audioPerformer;
+    if (parsed.audioDuration) currentAiData.audioDuration = parsed.audioDuration;
+    if (parsed.fileSize) currentAiData.fileSize = parsed.fileSize;
+    currentAiData.storageUrl = storageUrl;
+
+    // Store on parsed so analyzeAndPatch (which runs after) preserves it
+    parsed.storageUrl = storageUrl;
+
+    patchProps['ai_data'] = {
+      rich_text: [{ text: { content: JSON.stringify(currentAiData).slice(0, 2000) } }]
+    };
+
+    await fetch(`https://api.notion.com/v1/pages/${notionPageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ properties: patchProps })
+    });
+  } catch (e) {
+    console.warn('Storage channel forward error:', e.message);
+  }
+}
+
 // ─── Screenshot Capture ──────────────────────────────────────────────────────
 
 async function captureAndUploadScreenshot(url, chatId, env) {
@@ -679,6 +758,8 @@ async function transcribeAndPatch(parsed, notionPageId, env) {
     if (parsed.channelTitle) aiData.channelTitle = parsed.channelTitle;
     if (parsed.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
     if (parsed.audioDuration) aiData.audioDuration = parsed.audioDuration;
+    if (parsed.fileSize) aiData.fileSize = parsed.fileSize;
+    if (parsed.storageUrl) aiData.storageUrl = parsed.storageUrl;
     aiData.transcript = transcript.trim();
 
     const properties = {
@@ -904,6 +985,8 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   if (parsed.mediaGroupId) aiDataPayload.mediaGroupId = parsed.mediaGroupId;
   if (parsed.channelTitle) aiDataPayload.channelTitle = parsed.channelTitle;
   if (parsed.forwardFrom) aiDataPayload.forwardFrom = parsed.forwardFrom;
+  if (parsed.fileSize) aiDataPayload.fileSize = parsed.fileSize;
+  if (parsed.storageUrl) aiDataPayload.storageUrl = parsed.storageUrl;
   if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;

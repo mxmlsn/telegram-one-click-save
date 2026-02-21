@@ -1038,10 +1038,13 @@ function renderCard(item) {
     const cardUrl = isTgDirectVideo ? '' : url;
     const domainLabel = isTgDirectVideo ? 'Telegram video' : domain;
 
+    const hasStorageUrl = !!aiData.storageUrl;
     let videoBadge;
     if (isTgDirectVideo && isLargeFile) {
       const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
-      videoBadge = `<div class="video-badge video-badge-large">${sizeMB} MB</div>`;
+      videoBadge = hasStorageUrl
+        ? `<div class="video-badge video-badge-large">${sizeMB} MB · open in TG</div>`
+        : `<div class="video-badge video-badge-large">${sizeMB} MB</div>`;
     } else if (isTgDirectVideo) {
       videoBadge = '<div class="video-badge video-badge-inline">inline</div>';
     } else {
@@ -1873,12 +1876,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (fileUrl) {
             window.open(fileUrl, '_blank');
           } else {
-            // File too large for Bot API (>20MB)
+            // File too large for Bot API (>20MB) — try storageUrl or sourceUrl
             const card = actionEl.closest('.card[data-id]');
-            const srcUrl = card?.dataset?.sourceUrl;
-            if (srcUrl && /^https?:\/\//.test(srcUrl)) {
+            const item = card ? STATE.items.find(i => i.id === card.dataset.id) : null;
+            const fallbackUrl = item?.ai_data?.storageUrl || card?.dataset?.sourceUrl;
+            if (fallbackUrl && /^https?:\/\//.test(fallbackUrl)) {
               showToast('Файл &gt;20 МБ — открываю в Telegram');
-              window.open(srcUrl, '_blank');
+              window.open(fallbackUrl, '_blank');
             } else {
               showToast('Файл &gt;20 МБ — недоступен через Bot API');
             }
@@ -1902,12 +1906,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (videoUrl) {
         openLightbox(videoUrl, '', { video: true });
       } else {
-        // File too large for Bot API (>20MB) — try opening source in Telegram
+        // File too large for Bot API (>20MB) — try storageUrl or sourceUrl
         const card = actionEl.closest('.card[data-id]');
-        const srcUrl = card?.dataset?.sourceUrl;
-        if (srcUrl && /^https?:\/\//.test(srcUrl)) {
+        const item = card ? STATE.items.find(i => i.id === card.dataset.id) : null;
+        const fallbackUrl = item?.ai_data?.storageUrl || card?.dataset?.sourceUrl;
+        if (fallbackUrl && /^https?:\/\//.test(fallbackUrl)) {
           showToast('Видео &gt;20 МБ — открываю в Telegram');
-          window.open(srcUrl, '_blank');
+          window.open(fallbackUrl, '_blank');
         } else {
           showToast('Видео &gt;20 МБ — недоступно через Bot API');
         }
