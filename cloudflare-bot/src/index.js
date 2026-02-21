@@ -615,6 +615,56 @@ Rules:
 - color_palette, color_subject, color_top3: analyze the visual appearance of the document pages (cover design, diagrams, etc.). Null/empty if plain text.
 - All fields must be present. No markdown, no extra fields.`;
 
+const AI_PROMPT_TRANSCRIBE = `Transcribe this audio message word-for-word. Return ONLY the transcript text, nothing else. If the audio contains no speech or is unintelligible, return an empty string. Do not add any commentary, timestamps, or formatting — just the raw spoken words.`;
+
+async function transcribeAndPatch(parsed, notionPageId, env) {
+  try {
+    const fileRes = await fetch(
+      `https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${parsed.fileId}`
+    );
+    const fileData = await fileRes.json();
+    if (!fileData.ok) return;
+
+    const filePath = fileData.result.file_path;
+    const audioUrl = `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`;
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    const mimeMap = { oga: 'audio/ogg', ogg: 'audio/ogg', mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4' };
+    const mime = mimeMap[ext] || 'audio/ogg';
+
+    const base64 = await fetchBase64(audioUrl);
+    const transcript = await callGemini(AI_PROMPT_TRANSCRIBE, base64, env, mime);
+    if (!transcript || !transcript.trim()) return;
+
+    // Build ai_data preserving existing fields
+    const aiData = {};
+    if (parsed.mediaType) aiData.mediaType = parsed.mediaType;
+    if (parsed.thumbnailFileId) aiData.thumbnailFileId = parsed.thumbnailFileId;
+    if (parsed.channelTitle) aiData.channelTitle = parsed.channelTitle;
+    if (parsed.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
+    if (parsed.audioDuration) aiData.audioDuration = parsed.audioDuration;
+    aiData.transcript = transcript.trim();
+
+    const properties = {
+      'ai_analyzed': { checkbox: true },
+      'ai_data': {
+        rich_text: [{ text: { content: JSON.stringify(aiData).slice(0, 2000) } }]
+      }
+    };
+
+    await fetch(`https://api.notion.com/v1/pages/${notionPageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ properties })
+    });
+  } catch (e) {
+    console.warn('Transcription failed:', e.message);
+  }
+}
+
 async function fetchBase64(url) {
   const res = await fetch(url);
   const buffer = await res.arrayBuffer();
@@ -667,10 +717,17 @@ async function callAnthropic(messages, env) {
 
 async function analyzeAndPatch(parsed, notionPageId, env) {
   const provider = env.AI_PROVIDER || 'google';
-  // Skip AI analysis for audio-only types (nothing visual to analyze)
-  const isAudioOnly = ['voice', 'audio', 'video_note'].includes(parsed.type)
-    || ['voice', 'audio', 'video_note'].includes(parsed.mediaType);
-  if (isAudioOnly) return;
+
+  // Voice / video_note → transcribe audio via Gemini
+  const isVoice = ['voice', 'video_note'].includes(parsed.type)
+    || ['voice', 'video_note'].includes(parsed.mediaType);
+  if (isVoice && parsed.fileId && provider === 'google') {
+    await transcribeAndPatch(parsed, notionPageId, env);
+    return;
+  }
+  // Skip music files (nothing to transcribe)
+  const isAudioFile = parsed.type === 'audio' || parsed.mediaType === 'audio';
+  if (isAudioFile) return;
 
   const isPdf = parsed.type === 'pdf' || parsed.mediaType === 'pdf';
   const isVideo = parsed.type === 'video' || parsed.mediaType === 'video';

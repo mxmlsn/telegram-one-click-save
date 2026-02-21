@@ -883,6 +883,48 @@
     }
     a.voice-author:hover { color: rgba(255,255,255,0.6); }
 
+    /* ── Transcript button & text ── */
+    .transcript-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6);
+      font-size: 11px;
+      font-weight: 700;
+      font-family: Georgia, serif;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .transcript-btn:hover { background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.85); }
+    .transcript-btn.active { background: rgba(91,104,224,0.3); color: #8B9AFF; }
+    .card-tgpost .transcript-btn {
+      background: rgba(0,0,0,0.08);
+      color: rgba(0,0,0,0.4);
+    }
+    .card-tgpost .transcript-btn:hover { background: rgba(0,0,0,0.14); color: rgba(0,0,0,0.6); }
+    .card-tgpost .transcript-btn.active { background: rgba(91,104,224,0.15); color: #5B68E0; }
+    .transcript-text {
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(255,255,255,0.7);
+      padding: 8px 14px 10px;
+      white-space: pre-wrap;
+    }
+    .transcript-text.hidden { display: none; }
+    .card-tgpost .transcript-text {
+      color: rgba(0,0,0,0.65);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
     /* ── Audio file card ── */
     .card-audio {
       background: #1a1a1a;

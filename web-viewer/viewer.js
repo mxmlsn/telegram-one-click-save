@@ -1119,13 +1119,22 @@ function renderCard(item) {
       : '';
     const duration = aiData.audioDuration || 0;
     const thumbUrl = imgUrl || '';
+    const vnTranscript = aiData.transcript || '';
+    const vnTranscriptBtn = vnTranscript
+      ? `<button class="transcript-btn" data-action="toggle-transcript">Aa</button>`
+      : '';
+    const vnTranscriptHtml = vnTranscript
+      ? `<div class="transcript-text hidden">${escapeHtml(vnTranscript)}</div>`
+      : '';
     return `<div class="card card-videonote" data-id="${item.id}">
       ${pendingDot}
+      ${vnTranscriptBtn}
       <div class="videonote-circle" data-action="videonote-play" data-file-id="${escapeHtml(vnFileId)}">
         <video class="videonote-video" muted loop playsinline preload="none"></video>
         <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>
       ${authorHtml}
+      ${vnTranscriptHtml}
     </div>`;
   }
 
@@ -1141,14 +1150,23 @@ function renderCard(item) {
           ? `<a class="voice-author" data-action="open" data-url="${escapeHtml(voiceSourceUrl)}">${escapeHtml(authorLabel)}</a>`
           : `<div class="voice-author">${escapeHtml(authorLabel)}</div>`)
       : '';
+    const voiceTranscript = aiData.transcript || '';
+    const voiceTranscriptBtn = voiceTranscript
+      ? `<button class="transcript-btn" data-action="toggle-transcript">Aa</button>`
+      : '';
+    const voiceTranscriptHtml = voiceTranscript
+      ? `<div class="transcript-text hidden">${escapeHtml(voiceTranscript)}</div>`
+      : '';
     return `<div class="card card-voice" data-id="${item.id}">
       ${pendingDot}
+      ${voiceTranscriptBtn}
       <div class="voice-player" data-action="voice-play" data-file-id="${escapeHtml(voiceFileId)}">
         <button class="voice-play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></button>
         <div class="voice-waveform"><div class="voice-progress"></div></div>
         <span class="voice-duration">${durationStr}</span>
       </div>
       ${authorHtml}
+      ${voiceTranscriptHtml}
     </div>`;
   }
 
@@ -1353,12 +1371,21 @@ function renderCard(item) {
           </div>`;
     }
 
+    const tgTranscript = aiData.transcript || '';
+    const tgTranscriptBtn = (tgTranscript && ['voice', 'video_note'].includes(aiData.mediaType))
+      ? `<button class="transcript-btn" data-action="toggle-transcript">Aa</button>`
+      : '';
+    const tgTranscriptHtml = (tgTranscript && ['voice', 'video_note'].includes(aiData.mediaType))
+      ? `<div class="transcript-text hidden" style="padding:0 16px 8px">${escapeHtml(tgTranscript)}</div>`
+      : '';
     return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
+      ${tgTranscriptBtn}
       ${mediaHtml}
       <div class="tgpost-body">
         <div class="quote-text${truncatedClass}">${displayHtml}</div>
       </div>
+      ${tgTranscriptHtml}
       <div class="quote-footer">
         ${domainHtml}
       </div>
@@ -1962,6 +1989,19 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         audio.pause();
         playerEl.classList.remove('is-playing');
+      }
+      return;
+    }
+
+    // "toggle-transcript" — show/hide transcript text
+    if (action === 'toggle-transcript') {
+      e.stopPropagation();
+      const card = actionEl.closest('.card[data-id]');
+      if (!card) return;
+      const transcriptEl = card.querySelector('.transcript-text');
+      if (transcriptEl) {
+        transcriptEl.classList.toggle('hidden');
+        actionEl.classList.toggle('active');
       }
       return;
     }
