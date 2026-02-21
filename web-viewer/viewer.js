@@ -1536,14 +1536,19 @@ function renderCard(item) {
       : '';
     // For audio albums: show all captions from grouped items
     const allCaptions = item._allCaptions || [];
-    const fullText = allCaptions.length > 1 ? allCaptions.join('\n') : textContent;
-    const fullDisplayText = fullText.length > 600 ? fullText.slice(0, 600) : fullText;
-    const fullTruncClass = fullText.length > 600 ? ' truncated' : truncatedClass;
-    const fullDisplayHtml = isHtml ? sanitizeHtml(fullDisplayText) : escapeHtml(fullDisplayText).replace(/\n/g, '<br>');
-    const bodyHtml = fullText
-      ? `<div class="tgpost-body"><div class="quote-text${fullTruncClass}">${fullDisplayHtml}</div></div>`
-      : '';
-    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(fullText)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
+    let bodyHtml = '';
+    if (allCaptions.length > 1) {
+      // Render each caption as a separate paragraph
+      const parts = allCaptions.map(cap => {
+        const capIsHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(cap);
+        return capIsHtml ? sanitizeHtml(cap) : escapeHtml(cap);
+      });
+      bodyHtml = `<div class="tgpost-body"><div class="quote-text">${parts.join('<br>')}</div></div>`;
+    } else if (textContent) {
+      bodyHtml = `<div class="tgpost-body"><div class="quote-text${truncatedClass}">${displayHtml}</div></div>`;
+    }
+    const quoteText = allCaptions.length > 1 ? allCaptions.join('\n') : textContent;
+    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteText)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
       ${tgTranscriptBtn}
       ${mediaHtml}
