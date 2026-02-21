@@ -966,9 +966,10 @@ function showToast(msg, duration = 4000) {
 
 function sanitizeHtml(html) {
   if (!html) return '';
-  // Strip all tags except safe ones
+  // Strip all tags except safe ones (a, code, pre kept; b/i/u/s stripped but content preserved)
   return html
-    .replace(/<(?!\/?(?:a|b|i|u|s|code|pre)\b)[^>]*>/gi, '')
+    .replace(/<\/?(?:b|i|u|s)\b[^>]*>/gi, '')
+    .replace(/<(?!\/?(?:a|code|pre)\b)[^>]*>/gi, '')
     .replace(/<a\s/gi, '<a target="_blank" rel="noopener" ');
 }
 
@@ -1320,8 +1321,8 @@ function renderCard(item) {
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTitle = toTitleCase(aiData.title || item.content || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
-    // Only use imgUrl as preview if it's from a thumbnail (not the raw PDF binary)
-    const hasPdfThumb = item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId;
+    // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
+    const hasPdfThumb = hasTgFile ? (item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId) : !!imgUrl;
     const previewHtml = (hasPdfThumb && imgUrl)
       ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
