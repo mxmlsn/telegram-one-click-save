@@ -304,6 +304,7 @@
     .tgpost-album {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
+      grid-auto-rows: 1fr;
       gap: 2px;
     }
     .tgpost-album.album-3col {
@@ -313,13 +314,14 @@
       position: relative;
       overflow: hidden;
       cursor: zoom-in;
+      aspect-ratio: 1;
     }
     .tgpost-album-item.is-video {
       cursor: pointer;
     }
     .tgpost-album-img {
       width: 100%;
-      aspect-ratio: 1;
+      height: 100%;
       object-fit: cover;
       display: block;
     }
@@ -334,12 +336,16 @@
     .tgpost-album:has(> :only-child) {
       grid-template-columns: 1fr;
     }
-    .tgpost-album > :only-child .tgpost-album-img {
+    .tgpost-album > :only-child {
       aspect-ratio: auto;
     }
-    /* Spanned last item: aspect ratio matches row height to avoid white gaps */
-    .album-span-2 .tgpost-album-img { aspect-ratio: 2 / 1; }
-    .album-span-3 .tgpost-album-img { aspect-ratio: 3 / 1; }
+    .tgpost-album > :only-child .tgpost-album-img {
+      aspect-ratio: auto;
+      height: auto;
+    }
+    /* Spanned items: match row height by using correct aspect ratio for span width */
+    .album-span-2 { aspect-ratio: 2 / 1; }
+    .album-span-3 { aspect-ratio: 3 / 1; }
     .tgpost-video-preview {
       position: relative;
       cursor: pointer;

@@ -809,7 +809,7 @@ function applyFilters() {
       if (dualMatch) return true;
       // Otherwise check pure base/AI filters
       const baseMatch = pureBase.length === 0 || pureBase.includes(itemBaseType) || pureBase.includes(mediaType);
-      const aiMatch = pureAI.length === 0 || pureAI.includes(item.ai_type) || pureAI.includes(item.ai_type_secondary);
+      const aiMatch = pureAI.length === 0 || pureAI.includes(item.ai_type) || pureAI.includes(item.ai_type_secondary) || pureAI.includes(mediaType);
       return baseMatch && aiMatch;
     });
   }
@@ -924,7 +924,7 @@ function renderCard(item) {
     : (isInstagramReel ? 'video' : (aiType || item.type));
 
   const NO_AI_TYPES = ['quote', 'video_note', 'voice', 'audio'];
-  const pendingDot = (!item.ai_analyzed && !NO_AI_TYPES.includes(item.type)) ? '<div class="badge-pending"></div>' : '';
+  const pendingDot = (!item.ai_analyzed && !NO_AI_TYPES.includes(item.type) && !NO_AI_TYPES.includes(aiData.mediaType || '')) ? '<div class="badge-pending"></div>' : '';
 
   // ── Video card ──
   if (effectiveType === 'video') {
@@ -1276,7 +1276,7 @@ function renderCard(item) {
         }
         return resolvedUrl
           ? `<div class="tgpost-album-item" data-action="lightbox" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
-          : (m.fileId ? `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>` : '');
+          : `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
       }).filter(Boolean);
       if (albumItems.length > 0) {
         // Calculate if last item needs to span remaining columns
