@@ -796,6 +796,9 @@ function applyFilters() {
     items = items.filter(item => {
       // Notion still stores old 'text' records — treat as 'quote'
       const itemBaseType = item.type === 'text' ? 'quote' : item.type;
+      // For tgpost items with mediaType, also match the media type filter
+      // (e.g. forwarded voice → type:'tgpost', mediaType:'voice' should match "voice" filter)
+      const mediaType = item.ai_data?.mediaType || '';
       // Dual type match: item's base type OR ai_type matches a dual type
       const dualMatch = dualTypes.length > 0 && (dualTypes.includes(itemBaseType) || dualTypes.includes(item.ai_type) || dualTypes.includes(item.ai_type_secondary));
       // If only dual types are selected (no pure base/AI), just use dual match
@@ -805,7 +808,7 @@ function applyFilters() {
       // If dual matches, always include
       if (dualMatch) return true;
       // Otherwise check pure base/AI filters
-      const baseMatch = pureBase.length === 0 || pureBase.includes(itemBaseType);
+      const baseMatch = pureBase.length === 0 || pureBase.includes(itemBaseType) || pureBase.includes(mediaType);
       const aiMatch = pureAI.length === 0 || pureAI.includes(item.ai_type) || pureAI.includes(item.ai_type_secondary);
       return baseMatch && aiMatch;
     });
@@ -907,7 +910,8 @@ function renderCard(item) {
   const aiType = item.ai_type; // article | video | product | xpost | null
   const aiTypeSec = item.ai_type_secondary; // secondary AI type for hybrid cards
   const aiData = item.ai_data || {};
-  const domain = getDomain(item.sourceUrl || item.url);
+  const rawDomain = getDomain(item.sourceUrl || item.url);
+  const domain = (rawDomain === 'stash.mxml.sn') ? '' : rawDomain;
   const url = item.sourceUrl || item.url || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
   // image/gif/tgpost/video_note/voice/audio from TG keeps its base type — AI type cannot override it
@@ -1224,7 +1228,7 @@ function renderCard(item) {
   // ── Telegram Post card (media + text) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || item.url || '';
-    const tgLabel = aiData.channelTitle || aiData.forwardFrom || getDomain(sourceUrl);
+    const tgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
     const textContent = item.content || item.ai_description || '';
     // Detect HTML content: explicit flag OR auto-detect <a href=, <b>, <i> tags in content
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
