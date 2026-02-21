@@ -912,11 +912,16 @@ function renderCard(item) {
   const aiData = item.ai_data || {};
   const rawDomain = getDomain(item.sourceUrl || item.url);
   const domain = (rawDomain === 'stash.mxml.sn') ? '' : rawDomain;
-  const url = item.sourceUrl || item.url || '';
+  const itemUrlAsLink = /^https?:\/\//i.test(item.url) ? item.url : '';
+  const url = item.sourceUrl || itemUrlAsLink || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
   // image/gif/tgpost/video_note/voice/audio from TG keeps its base type — AI type cannot override it
   const KEEP_BASE_TYPES = ['image', 'gif', 'tgpost', 'video_note', 'voice', 'audio'];
-  const effectiveType = KEEP_BASE_TYPES.includes(item.type) ? item.type : (isInstagramReel ? 'video' : (aiType || item.type));
+  // Video notes always render as standalone circles (no tgpost card wrapper)
+  const isVideoNoteTgpost = item.type === 'tgpost' && aiData.mediaType === 'video_note';
+  const effectiveType = isVideoNoteTgpost ? 'video_note'
+    : KEEP_BASE_TYPES.includes(item.type) ? item.type
+    : (isInstagramReel ? 'video' : (aiType || item.type));
 
   const NO_AI_TYPES = ['quote', 'video_note', 'voice', 'audio'];
   const pendingDot = (!item.ai_analyzed && !NO_AI_TYPES.includes(item.type)) ? '<div class="badge-pending"></div>' : '';
@@ -1227,7 +1232,7 @@ function renderCard(item) {
 
   // ── Telegram Post card (media + text) ──
   if (item.type === 'tgpost') {
-    const sourceUrl = item.sourceUrl || item.url || '';
+    const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const tgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
     const textContent = item.content || item.ai_description || '';
     // Detect HTML content: explicit flag OR auto-detect <a href=, <b>, <i> tags in content
@@ -1398,7 +1403,7 @@ function renderCard(item) {
 
   // ── GIF card ──
   if (item.type === 'gif' && imgUrl) {
-    const sourceUrl = item.sourceUrl || item.url || '';
+    const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const gifDomain = getDomain(sourceUrl);
     const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
     const domainBtn = (sourceUrl && gifDomain)
@@ -1414,7 +1419,7 @@ function renderCard(item) {
 
   // ── Has image (pure image — no AI type override) ──
   if (imgUrl) {
-    const sourceUrl = item.sourceUrl || item.url || '';
+    const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const imgDomain = getDomain(sourceUrl);
     const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
     const domainBtn = (sourceUrl && imgDomain)
@@ -1434,7 +1439,7 @@ function renderCard(item) {
   const quoteTextDisplay = isTruncated ? quoteTextRaw.slice(0, 460) : quoteTextRaw;
   const quoteText = escapeHtml(quoteTextDisplay);
   const truncatedClass = isTruncated ? ' truncated' : '';
-  const quoteSourceUrl = item.sourceUrl || item.url || '';
+  const quoteSourceUrl = item.sourceUrl || itemUrlAsLink || '';
   const quoteDomain = (domain && domain !== 'telegram') ? domain : '';
   const quoteDomainHtml = quoteDomain
     ? (quoteSourceUrl

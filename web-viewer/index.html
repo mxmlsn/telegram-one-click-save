@@ -747,17 +747,20 @@
 
     /* ── Video Note card (circle video) ── */
     .card-videonote {
-      background: transparent;
-      border: none;
-      box-shadow: none;
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      overflow: visible !important;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 8px 0;
+      cursor: default;
     }
     .videonote-circle {
-      width: 300px;
-      height: 300px;
+      width: min(300px, 100%);
+      aspect-ratio: 1;
       border-radius: 50%;
       overflow: hidden;
       position: relative;
