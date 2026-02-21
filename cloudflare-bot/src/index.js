@@ -341,6 +341,7 @@ function parseMessage(message, env) {
   // Audio file (mp3, wav, etc.)
   if (message.audio) {
     result.fileId = message.audio.file_id;
+    result.mediaType = 'audio';
     if (message.audio.thumbnail?.file_id) {
       result.thumbnailFileId = message.audio.thumbnail.file_id;
     }
@@ -349,7 +350,6 @@ function parseMessage(message, env) {
     result.audioDuration = message.audio.duration || 0;
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
-      result.mediaType = 'audio';
       const captionEntities = message.caption_entities || [];
       result.content += captionEntities.length
         ? formatTextWithEntities(caption, captionEntities)
