@@ -318,9 +318,12 @@ function mergeMediaGroups(items) {
   for (const item of items) {
     const gid = item.ai_data?.mediaGroupId;
     if (gid) {
+      // Determine media type: ai_data.mediaType is authoritative, fall back to item.type
+      const mType = item.ai_data?.mediaType
+        || (['video', 'image', 'gif', 'pdf', 'audio', 'voice', 'video_note'].includes(item.type) ? item.type : 'image');
       const mediaEntry = {
         fileId: item.fileId,
-        mediaType: item.ai_data?.mediaType || 'image',
+        mediaType: mType,
         videoFileId: item.videoFileId || '',
         pdfFileId: item.pdfFileId || '',
       };
@@ -981,8 +984,8 @@ function renderCard(item) {
   const itemUrlAsLink = /^https?:\/\//i.test(item.url) ? item.url : '';
   const url = item.sourceUrl || itemUrlAsLink || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
-  // image/gif/tgpost/video_note/voice/audio from TG keeps its base type — AI type cannot override it
-  const KEEP_BASE_TYPES = ['image', 'gif', 'tgpost', 'video_note', 'voice', 'audio'];
+  // image/gif/video/tgpost/video_note/voice/audio from TG keeps its base type — AI type cannot override it
+  const KEEP_BASE_TYPES = ['image', 'gif', 'video', 'tgpost', 'video_note', 'voice', 'audio'];
   // Video notes always render as standalone circles (no tgpost card wrapper)
   const isVideoNoteTgpost = item.type === 'tgpost' && aiData.mediaType === 'video_note';
   const effectiveType = isVideoNoteTgpost ? 'video_note'
@@ -1463,7 +1466,7 @@ function renderCard(item) {
         <img class="card-img" id="${vimeoImgId}" src="" loading="lazy" alt="">
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
-    } else if (aiData.mediaType === 'video' && item.fileId) {
+    } else if ((aiData.mediaType === 'video' || item.videoFileId) && item.fileId) {
       // Direct TG video in tgpost — show thumbnail or play icon
       const thumbUrl = imgUrl || '';
       mediaHtml = thumbUrl

@@ -199,9 +199,9 @@ function parseMessage(message, env) {
   // Photo (array of sizes, take largest)
   if (message.photo && message.photo.length > 0) {
     result.fileId = message.photo[message.photo.length - 1].file_id;
+    result.mediaType = 'image';
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
-      result.mediaType = 'image';
       const captionEntities = message.caption_entities || [];
       result.content += captionEntities.length
         ? formatTextWithEntities(caption, captionEntities)
@@ -217,9 +217,9 @@ function parseMessage(message, env) {
   // Animation (GIF)
   if (message.animation) {
     result.fileId = message.animation.file_id;
+    result.mediaType = 'gif';
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
-      result.mediaType = 'gif';
       const captionEntities = message.caption_entities || [];
       result.content += captionEntities.length
         ? formatTextWithEntities(caption, captionEntities)
@@ -235,13 +235,13 @@ function parseMessage(message, env) {
   // Video
   if (message.video) {
     result.fileId = message.video.file_id;
+    result.mediaType = 'video';
     if (message.video.file_size) result.fileSize = message.video.file_size;
     if (message.video.thumbnail?.file_id) {
       result.thumbnailFileId = message.video.thumbnail.file_id;
     }
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
-      result.mediaType = 'video';
       const captionEntities = message.caption_entities || [];
       result.content += captionEntities.length
         ? formatTextWithEntities(caption, captionEntities)

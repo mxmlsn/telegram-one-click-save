@@ -483,7 +483,7 @@ async function analyzeWithAI(item, settings) {
     const provider = settings.aiProvider || 'google';
     let responseText = null;
 
-    const isDirectImage = item.type === 'image' || item.type === 'gif';
+    const isDirectImage = item.type === 'image' || item.type === 'gif' || item.type === 'video';
 
     // For GIFs: use original image URL directly (Telegram thumbnail is tiny/inaccurate)
     if (item.originalImageUrl) {
