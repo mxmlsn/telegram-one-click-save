@@ -258,8 +258,10 @@ function parseItem(page) {
   const isAudioType = type === 'audio' || aiData.mediaType === 'audio';
   const hasThumb = !!aiData.thumbnailFileId;
 
-  // For video/PDF/video_note: use thumbnail for display, keep original for playback/download
-  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType) && hasThumb;
+  // For video/PDF/video_note/large images/documents: use thumbnail for display
+  const isDocType = type === 'document';
+  const isLargeImage = (type === 'image' || aiData.mediaType === 'image') && hasThumb && (aiData.fileSize || 0) > 20 * 1024 * 1024;
+  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType || isLargeImage || isDocType) && hasThumb;
   const displayFileId = needsThumbSwap ? aiData.thumbnailFileId : rawFileId;
   const videoFileId = ((isVideoType || isVideoNoteType) && hasThumb) ? rawFileId : ((isVideoType || isVideoNoteType) ? rawFileId : '');
   const pdfFileId = (isPdfType && hasThumb) ? rawFileId : (isPdfType ? rawFileId : '');
@@ -925,10 +927,11 @@ function renderCard(item) {
   // Video notes always render as standalone circles (no tgpost card wrapper)
   const isVideoNoteTgpost = item.type === 'tgpost' && aiData.mediaType === 'video_note';
   const effectiveType = isVideoNoteTgpost ? 'video_note'
+    : (item.type === 'document') ? 'image'
     : KEEP_BASE_TYPES.includes(item.type) ? item.type
     : (isInstagramReel ? 'video' : (aiType || item.type));
 
-  const NO_AI_TYPES = ['quote', 'video_note', 'voice', 'audio'];
+  const NO_AI_TYPES = ['quote', 'video_note', 'voice', 'audio', 'document'];
   const pendingDot = (!item.ai_analyzed && !NO_AI_TYPES.includes(item.type) && !NO_AI_TYPES.includes(aiData.mediaType || '')) ? '<div class="badge-pending"></div>' : '';
 
   // ── Video card ──
@@ -970,15 +973,23 @@ function renderCard(item) {
 
     // Direct TG video (no YouTube/Vimeo) — play inline via lightbox
     const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
+    const isLargeFile = (aiData.fileSize || 0) > 20 * 1024 * 1024;
     const playbackFileId = item.videoFileId || item.fileId;
     const cardAction = isTgDirectVideo ? 'video-play' : 'open';
     const cardUrl = isTgDirectVideo ? '' : url;
     const domainLabel = isTgDirectVideo ? 'Telegram video' : domain;
 
-    const videoBadge = isTgDirectVideo
-      ? '<div class="video-badge video-badge-inline">inline</div>'
-      : '<div class="video-badge video-badge-external">external</div>';
-    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(playbackFileId)}"` : ''}>
+    let videoBadge;
+    if (isTgDirectVideo && isLargeFile) {
+      const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+      videoBadge = `<div class="video-badge video-badge-large">${sizeMB} MB</div>`;
+    } else if (isTgDirectVideo) {
+      videoBadge = '<div class="video-badge video-badge-inline">inline</div>';
+    } else {
+      videoBadge = '<div class="video-badge video-badge-external">external</div>';
+    }
+    const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
+    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(playbackFileId)}"` : ''}${sourceUrlAttr}>
       ${pendingDot}
       ${videoBadge}
       <div class="video-header">
@@ -1233,7 +1244,8 @@ function renderCard(item) {
       : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
     const cardAction = hasTgFile ? 'open-file' : 'open';
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
-    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}>
+    const pdfSourceAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
+    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}${pdfSourceAttr}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
@@ -1799,7 +1811,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
           // Fallback: resolve and open directly (will likely download)
           const fileUrl = await resolveFileId(STATE.botToken, fileId);
-          if (fileUrl) window.open(fileUrl, '_blank');
+          if (fileUrl) {
+            window.open(fileUrl, '_blank');
+          } else {
+            // File too large for Bot API (>20MB)
+            const card = actionEl.closest('.card[data-id]');
+            const srcUrl = card?.dataset?.sourceUrl;
+            if (srcUrl && /^https?:\/\//.test(srcUrl)) {
+              window.open(srcUrl, '_blank');
+            } else {
+              alert('Файл слишком большой (>20MB). Откройте в Telegram.');
+            }
+          }
         }
       }
       return;
@@ -1816,7 +1839,18 @@ document.addEventListener('DOMContentLoaded', () => {
           videoUrl = await resolveFileId(STATE.botToken, fileId);
         }
       }
-      if (videoUrl) openLightbox(videoUrl, '', { video: true });
+      if (videoUrl) {
+        openLightbox(videoUrl, '', { video: true });
+      } else {
+        // File too large for Bot API (>20MB) — try opening source in Telegram
+        const card = actionEl.closest('.card[data-id]');
+        const srcUrl = card?.dataset?.sourceUrl;
+        if (srcUrl && /^https?:\/\//.test(srcUrl)) {
+          window.open(srcUrl, '_blank');
+        } else {
+          alert('Файл слишком большой для воспроизведения (>20MB). Откройте в Telegram.');
+        }
+      }
       return;
     }
 

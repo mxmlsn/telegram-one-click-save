@@ -230,6 +230,7 @@ function parseMessage(message, env) {
   // Video
   if (message.video) {
     result.fileId = message.video.file_id;
+    if (message.video.file_size) result.fileSize = message.video.file_size;
     if (message.video.thumbnail?.file_id) {
       result.thumbnailFileId = message.video.thumbnail.file_id;
     }
@@ -248,16 +249,33 @@ function parseMessage(message, env) {
     return result;
   }
 
-  // Document (PDF or other)
+  // Document (PDF, image-as-file, or other)
   if (message.document) {
     const mime = message.document.mime_type || '';
-    const docType = mime === 'application/pdf' ? 'pdf' : 'document';
+    const isImageDoc = mime.startsWith('image/');
+    const docType = mime === 'application/pdf' ? 'pdf' : (isImageDoc ? 'image' : 'document');
     result.fileId = message.document.file_id;
+    if (message.document.file_size) result.fileSize = message.document.file_size;
     if (message.document.thumbnail?.file_id) {
       result.thumbnailFileId = message.document.thumbnail.file_id;
     } else if (message.document.thumb?.file_id) {
-      // Fallback for older Bot API versions
       result.thumbnailFileId = message.document.thumb.file_id;
+    }
+    if (isImageDoc) {
+      // Image sent as document — treat like a photo
+      if (isForward || hasSubstantialCaption) {
+        result.type = 'tgpost';
+        result.mediaType = 'image';
+        const captionEntities = message.caption_entities || [];
+        result.content += captionEntities.length
+          ? formatTextWithEntities(caption, captionEntities)
+          : caption;
+        result.contentHasHtml = captionEntities.length > 0;
+      } else {
+        result.type = 'image';
+        result.content += caption;
+      }
+      return result;
     }
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
@@ -411,6 +429,7 @@ async function saveToNotion(parsed, env) {
   if (parsed.audioTitle) aiDataInit.audioTitle = parsed.audioTitle;
   if (parsed.audioPerformer) aiDataInit.audioPerformer = parsed.audioPerformer;
   if (parsed.audioDuration) aiDataInit.audioDuration = parsed.audioDuration;
+  if (parsed.fileSize) aiDataInit.fileSize = parsed.fileSize;
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
