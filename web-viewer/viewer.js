@@ -1779,6 +1779,9 @@ function downloadImage(url) {
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
+// Gallery state for lightbox navigation
+const _gallery = { items: [], index: 0 };
+
 function openLightbox(imgUrl, sourceUrl, opts) {
   const lb = document.getElementById('lightbox');
   const img = document.getElementById('lightbox-img');
@@ -1786,29 +1789,78 @@ function openLightbox(imgUrl, sourceUrl, opts) {
   const link = document.getElementById('lightbox-link');
   const dlBtn = document.getElementById('lightbox-download');
 
-  const isVideo = opts && opts.video;
-  img.classList.toggle('hidden', isVideo);
+  // Gallery: if opts.gallery provided, store it; otherwise single item
+  if (opts && opts.gallery && opts.gallery.length > 1) {
+    _gallery.items = opts.gallery;
+    _gallery.index = opts.galleryIndex || 0;
+  } else {
+    _gallery.items = [{ url: imgUrl, sourceUrl }];
+    _gallery.index = 0;
+  }
+
+  _showLightboxItem();
+  lb.classList.remove('hidden');
+}
+
+function _showLightboxItem() {
+  const lb = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img');
+  const video = document.getElementById('lightbox-video');
+  const link = document.getElementById('lightbox-link');
+  const dlBtn = document.getElementById('lightbox-download');
+
+  const item = _gallery.items[_gallery.index];
+  if (!item) return;
+
+  const isVideo = item.video;
+  img.classList.toggle('hidden', !!isVideo);
   video.classList.toggle('hidden', !isVideo);
 
   if (isVideo) {
-    video.src = imgUrl;
+    video.src = item.url;
     video.play().catch(() => {});
     img.src = '';
   } else {
-    img.src = imgUrl;
+    img.src = item.url;
     video.pause();
     video.src = '';
   }
 
-  dlBtn.onclick = (e) => { e.stopPropagation(); downloadImage(imgUrl); };
-  if (sourceUrl && /^https?:\/\//i.test(sourceUrl)) {
-    link.href = sourceUrl;
-    link.textContent = getDomain(sourceUrl);
+  dlBtn.onclick = (e) => { e.stopPropagation(); downloadImage(item.url); };
+  if (item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl)) {
+    link.href = item.sourceUrl;
+    link.textContent = getDomain(item.sourceUrl);
     link.classList.remove('hidden');
   } else {
     link.classList.add('hidden');
   }
-  lb.classList.remove('hidden');
+
+  // Show/hide arrows
+  const prevBtn = document.getElementById('lightbox-prev');
+  const nextBtn = document.getElementById('lightbox-next');
+  const counter = document.getElementById('lightbox-counter');
+  if (prevBtn) prevBtn.classList.toggle('hidden', _gallery.items.length <= 1);
+  if (nextBtn) nextBtn.classList.toggle('hidden', _gallery.items.length <= 1);
+  if (counter) {
+    if (_gallery.items.length > 1) {
+      counter.textContent = `${_gallery.index + 1} / ${_gallery.items.length}`;
+      counter.classList.remove('hidden');
+    } else {
+      counter.classList.add('hidden');
+    }
+  }
+}
+
+function lightboxPrev() {
+  if (_gallery.items.length <= 1) return;
+  _gallery.index = (_gallery.index - 1 + _gallery.items.length) % _gallery.items.length;
+  _showLightboxItem();
+}
+
+function lightboxNext() {
+  if (_gallery.items.length <= 1) return;
+  _gallery.index = (_gallery.index + 1) % _gallery.items.length;
+  _showLightboxItem();
 }
 
 function closeLightbox() {
@@ -1818,6 +1870,8 @@ function closeLightbox() {
   document.getElementById('lightbox-img').src = '';
   video.pause();
   video.src = '';
+  _gallery.items = [];
+  _gallery.index = 0;
 }
 
 // ─── Content overlay (shared) ────────────────────────────────────────────────
@@ -1862,10 +1916,26 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "lightbox" — open image lightbox
+    // "lightbox" — open image lightbox (with gallery support for albums)
     if (action === 'lightbox') {
       const imgSrc = actionEl.dataset.img || '';
-      if (imgSrc) openLightbox(imgSrc, url);
+      if (!imgSrc) return;
+      // Check if inside an album — collect all lightbox siblings for gallery
+      const album = actionEl.closest('.tgpost-album');
+      if (album) {
+        const siblings = album.querySelectorAll('[data-action="lightbox"][data-img]');
+        if (siblings.length > 1) {
+          const gallery = [];
+          let idx = 0;
+          siblings.forEach((el, i) => {
+            gallery.push({ url: el.dataset.img, sourceUrl: '' });
+            if (el === actionEl) idx = i;
+          });
+          openLightbox(imgSrc, '', { gallery, galleryIndex: idx });
+          return;
+        }
+      }
+      openLightbox(imgSrc, url);
       return;
     }
 
@@ -2222,13 +2292,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ── Lightbox close ──
+  // ── Lightbox close + gallery navigation ──
   const lb = document.getElementById('lightbox');
   lb.addEventListener('click', e => {
     if (e.target === lb || e.target === document.getElementById('lightbox-img') || e.target === document.getElementById('lightbox-video')) {
       closeLightbox();
     }
   });
+  document.getElementById('lightbox-prev')?.addEventListener('click', e => { e.stopPropagation(); lightboxPrev(); });
+  document.getElementById('lightbox-next')?.addEventListener('click', e => { e.stopPropagation(); lightboxNext(); });
 
   // ── Content overlay close ──
   const co = document.getElementById('content-overlay');
@@ -2297,12 +2369,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ── Escape key closes any overlay ──
+  // ── Keyboard: Escape closes overlays, arrows navigate gallery ──
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeLightbox();
       closeContentOverlay();
       closeCtxMenu();
+    } else if (e.key === 'ArrowLeft') {
+      const lb = document.getElementById('lightbox');
+      if (!lb.classList.contains('hidden')) { e.preventDefault(); lightboxPrev(); }
+    } else if (e.key === 'ArrowRight') {
+      const lb = document.getElementById('lightbox');
+      if (!lb.classList.contains('hidden')) { e.preventDefault(); lightboxNext(); }
     }
   });
 });

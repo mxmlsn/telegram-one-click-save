@@ -1468,6 +1468,24 @@
     }
     #lightbox-download:hover { border-color: rgba(255,255,255,0.3); color: #bbb; }
     #lightbox-download svg { width: 14px; height: 14px; }
+    .lightbox-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      z-index: 10; background: rgba(255,255,255,0.08); border: none;
+      border-radius: 50%; width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; color: rgba(255,255,255,0.6);
+      transition: background 0.15s, color 0.15s;
+    }
+    .lightbox-arrow:hover { background: rgba(255,255,255,0.18); color: #fff; }
+    .lightbox-arrow svg { width: 22px; height: 22px; }
+    .lightbox-arrow-left { left: 20px; }
+    .lightbox-arrow-right { right: 20px; }
+    .lightbox-arrow.hidden { display: none; }
+    #lightbox-counter {
+      color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+    #lightbox-counter.hidden { display: none; }
 
     /* ── Fullscreen content overlay (tweets, quotes) ── */
     #content-overlay {
@@ -2048,9 +2066,12 @@
 
 <!-- Lightbox -->
 <div id="lightbox" class="hidden">
+  <button id="lightbox-prev" class="lightbox-arrow lightbox-arrow-left hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+  <button id="lightbox-next" class="lightbox-arrow lightbox-arrow-right hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
   <img id="lightbox-img" src="" alt="">
   <video id="lightbox-video" class="hidden" controls playsinline></video>
   <div id="lightbox-bottom">
+    <span id="lightbox-counter" class="hidden"></span>
     <a id="lightbox-link" href="#" target="_blank"></a>
     <button id="lightbox-download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
   </div>
