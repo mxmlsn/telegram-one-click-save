@@ -1426,7 +1426,18 @@ function renderCard(item) {
         </div>
       </div>`;
     } else if (imgUrl) {
-      mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
+      const tgImgLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
+      const tgImgStorage = aiData.storageUrl || '';
+      if (tgImgLarge && tgImgStorage) {
+        const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+        const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+        mediaHtml = `<div class="largefile-inline" data-action="open" data-url="${escapeHtml(tgImgStorage)}">
+          <div class="largefile-preview"><img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
+          <div class="largefile-footer"><span class="largefile-size">${sizeMB} MB</span><span class="largefile-arrow">${arrowSvg}</span></div>
+        </div>`;
+      } else {
+        mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
+      }
     } else if (tgYtMatch) {
       const ytId = tgYtMatch[1];
       const ytThumb = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
@@ -1506,6 +1517,23 @@ function renderCard(item) {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const imgDomain = getDomain(sourceUrl);
     const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    // Large images (>20MB): show thumbnail in smaller gray container, click opens TG
+    const imgIsLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
+    const imgStorageUrl = aiData.storageUrl || '';
+    if (imgIsLarge && imgStorageUrl) {
+      const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+      const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+      return `<div class="card card-largefile" data-id="${item.id}" data-action="open" data-url="${escapeHtml(imgStorageUrl)}">
+        ${pendingDot}
+        <div class="largefile-preview">
+          <img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+        </div>
+        <div class="largefile-footer">
+          <span class="largefile-size">${sizeMB} MB</span>
+          <span class="largefile-arrow">${arrowSvg}</span>
+        </div>
+      </div>`;
+    }
     const domainBtn = (sourceUrl && imgDomain)
       ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
       : '';

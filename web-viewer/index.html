@@ -543,6 +543,50 @@
       background: rgba(220, 120, 30, 0.85);
       color: #fff;
     }
+
+    /* Large file card (>20MB images) */
+    .card-largefile {
+      background: #1a1a1a;
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .card-largefile:hover { opacity: 0.85; }
+    .largefile-preview, .largefile-inline .largefile-preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: #222;
+    }
+    .largefile-inline .largefile-preview {
+      border-radius: 12px;
+      margin: 12px 14px 0;
+    }
+    .largefile-thumb {
+      max-width: 50%;
+      max-height: 160px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+    .largefile-footer, .largefile-inline .largefile-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      color: rgba(255,255,255,0.5);
+      font-size: 12px;
+    }
+    .largefile-inline .largefile-footer {
+      padding: 8px 14px;
+    }
+    .largefile-size { font-weight: 500; }
+    .largefile-arrow { display: flex; align-items: center; }
+    .largefile-inline {
+      cursor: pointer;
+    }
+    .largefile-inline:hover { opacity: 0.85; }
+
     .card.card-video {
       border-radius: 20px;
       overflow: hidden;
