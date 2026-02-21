@@ -857,7 +857,7 @@ const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'v
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 
-function applyFilters({ animate = false } = {}) {
+function applyFilters() {
   let items = STATE.items;
 
   if (STATE.activeTypes.size > 0) {
@@ -948,7 +948,7 @@ function applyFilters({ animate = false } = {}) {
     });
   }
 
-  renderAll(items, { animate });
+  renderAll(items);
 }
 
 // ─── Card rendering ───────────────────────────────────────────────────────────
@@ -1677,44 +1677,7 @@ function getColumnCount() {
   return 5;
 }
 
-// Snapshot card positions for FLIP animation (only cards visible in viewport ± margin)
-function _snapshotCardPositions(masonry) {
-  const map = new Map();
-  const vpTop = window.scrollY - 300;
-  const vpBot = window.scrollY + window.innerHeight + 300;
-  masonry.querySelectorAll('.card[data-id]').forEach(card => {
-    const rect = card.getBoundingClientRect();
-    const absTop = rect.top + window.scrollY;
-    if (absTop + rect.height >= vpTop && absTop <= vpBot) {
-      map.set(card.dataset.id, { top: rect.top, left: rect.left });
-    }
-  });
-  return map;
-}
-
-// Apply FLIP animation: cards slide from old position to new
-function _flipAnimate(masonry, oldPositions) {
-  if (!oldPositions.size) return;
-  masonry.querySelectorAll('.card[data-id]').forEach(card => {
-    const id = card.dataset.id;
-    const old = oldPositions.get(id);
-    if (!old) return;
-    const rect = card.getBoundingClientRect();
-    const dx = old.left - rect.left;
-    const dy = old.top - rect.top;
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return; // didn't move
-    card.style.transform = `translate(${dx}px, ${dy}px)`;
-    // Force layout so the inverse transform is applied before transition
-    card.getBoundingClientRect();
-    card.classList.add('card-flip-move');
-    card.style.transform = '';
-    card.addEventListener('transitionend', () => {
-      card.classList.remove('card-flip-move');
-    }, { once: true });
-  });
-}
-
-function renderAll(items, { animate = false } = {}) {
+function renderAll(items) {
   const masonry = document.getElementById('masonry');
   const empty = document.getElementById('empty-state');
   if (!masonry) return;
@@ -1724,21 +1687,9 @@ function renderAll(items, { animate = false } = {}) {
     return;
   }
   empty.classList.add('hidden');
-
-  // FLIP: snapshot old positions before re-render
-  const oldPositions = animate ? _snapshotCardPositions(masonry) : null;
-
   const cards = items.map(renderCard);
 
   if (STATE.align === 'masonry') {
-    // Build explicit column divs — distribute cards round-robin
-    // so row reading order (left-to-right, top-to-bottom) is chronological.
-    // Items come newest-first from Notion, so visual order:
-    //   row 0 (top): items 0,1,2,3  (newest)
-    //   row 1:       items 4,5,6,7
-    //   ...
-    //   last row (bottom): oldest items
-    // Round-robin: item i goes to column (i % cols)
     const cols = getColumnCount();
     const columns = Array.from({ length: cols }, () => []);
     for (let i = 0; i < cards.length; i++) {
@@ -1748,13 +1699,9 @@ function renderAll(items, { animate = false } = {}) {
       `<div class="masonry-col">${col.join('')}</div>`
     ).join('');
   } else {
-    // Center mode — flat cards directly in masonry container
     masonry.innerHTML = cards.join('');
   }
   applyGridMode();
-
-  // FLIP: animate cards from old position to new
-  if (oldPositions) _flipAnimate(masonry, oldPositions);
 
   // Mark truncated xpost cards for zoom-in cursor + collapsed fade
   masonry.querySelectorAll('.card-xpost').forEach(card => {
@@ -1868,10 +1815,10 @@ async function deleteItem(pageId) {
     cardEl.classList.add('card-dissolving');
     cardEl.addEventListener('animationend', () => {
       cardEl.remove();
-      applyFilters({ animate: true }); // reflow with FLIP animation
+      applyFilters();
     }, { once: true });
   } else {
-    applyFilters({ animate: true });
+    applyFilters();
   }
 
   // ── Background: archive in Notion (fire-and-forget) ──
