@@ -793,12 +793,17 @@ function applyFilters() {
     const dualTypes = activeBase.filter(t => activeAI.includes(t));
     const pureBase = activeBase.filter(t => !dualTypes.includes(t));
     const pureAI = activeAI.filter(t => !dualTypes.includes(t));
+    const videoLinkRe = /(?:youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/|vimeo\.com\/)/;
     items = items.filter(item => {
       // Notion still stores old 'text' records — treat as 'quote'
       const itemBaseType = item.type === 'text' ? 'quote' : item.type;
       // For tgpost items with mediaType, also match the media type filter
       // (e.g. forwarded voice → type:'tgpost', mediaType:'voice' should match "voice" filter)
-      const mediaType = item.ai_data?.mediaType || '';
+      let mediaType = item.ai_data?.mediaType || '';
+      // Detect YouTube/Vimeo links as 'video' for filter matching
+      if (!mediaType && videoLinkRe.test((item.sourceUrl || '') + ' ' + (item.content || ''))) {
+        mediaType = 'video';
+      }
       // Dual type match: item's base type OR ai_type matches a dual type
       const dualMatch = dualTypes.length > 0 && (dualTypes.includes(itemBaseType) || dualTypes.includes(item.ai_type) || dualTypes.includes(item.ai_type_secondary));
       // If only dual types are selected (no pure base/AI), just use dual match
@@ -931,10 +936,10 @@ function renderCard(item) {
     const ytMatch = url.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
     const vimeoMatch = !ytMatch && url.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
 
-    // YouTube: maxresdefault (no black bars), fallback to sddefault via onerror
+    // YouTube: hqdefault always exists; try maxresdefault and fall back
     const ytId = ytMatch ? ytMatch[1] : null;
     const ytSrc = ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null;
-    const ytFallback = ytId ? `https://img.youtube.com/vi/${ytId}/sddefault.jpg` : null;
+    const ytFallback = ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null;
     const videoImgUrl = ytSrc || imgUrl;
 
     const faviconUrl = domain
@@ -959,8 +964,9 @@ function renderCard(item) {
     }
 
     const thumbSrc = vimeoId ? (imgUrl || '') : (videoImgUrl || '');
-    const thumbGlowAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
-    const thumbImgAttr = ytSrc ? `onerror="this.src='${ytFallback}'"` : '';
+    const ytOnload = ytSrc ? `onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'"` : '';
+    const thumbGlowAttr = ytOnload;
+    const thumbImgAttr = ytOnload;
 
     // Direct TG video (no YouTube/Vimeo) — play inline via lightbox
     const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
@@ -1346,10 +1352,10 @@ function renderCard(item) {
     } else if (tgYtMatch) {
       const ytId = tgYtMatch[1];
       const ytThumb = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
-      const ytFallback = `https://img.youtube.com/vi/${ytId}/sddefault.jpg`;
+      const ytFallback = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
       const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
       mediaHtml = `<div class="tgpost-video-preview" data-action="open" data-url="${escapeHtml(ytUrl)}">
-        <img class="card-img" src="${escapeHtml(ytThumb)}" loading="lazy" alt="" onerror="this.src='${ytFallback}'">
+        <img class="card-img" src="${escapeHtml(ytThumb)}" loading="lazy" alt="" onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'">
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
     } else if (tgVimeoMatch) {
