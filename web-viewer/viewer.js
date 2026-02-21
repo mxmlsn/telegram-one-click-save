@@ -1657,7 +1657,9 @@ function renderAll(items) {
     return;
   }
   empty.classList.add('hidden');
-  const cards = items.map(renderCard);
+  const cards = items.map(item => {
+    try { return renderCard(item); } catch (e) { console.error('[renderCard] crash', item.id, e); return ''; }
+  }).filter(Boolean);
 
   if (STATE.align === 'masonry') {
     // Build explicit column divs — distribute cards round-robin
