@@ -2434,7 +2434,8 @@ async function runAiBackgroundProcessing() {
           fileId: item.fileId,
           sourceUrl: item.sourceUrl,
           content: item.content,
-          tagName: item.tag
+          tagName: item.tag,
+          existingAiData: item.ai_data || {}
         },
         notionPageId: item.id
       }, response => {
@@ -2444,16 +2445,16 @@ async function runAiBackgroundProcessing() {
           item.ai_type_secondary = response.result.content_type_secondary || item.ai_type_secondary;
           item.ai_description = response.result.description || item.ai_description;
           const r = response.result;
-          const aiDataPayload = {};
-          if (r.materials?.length) aiDataPayload.materials = r.materials;
-          if (r.color_palette) aiDataPayload.color_palette = r.color_palette;
-          if (r.color_subject) aiDataPayload.color_subject = r.color_subject;
-          if (r.color_top3?.length) aiDataPayload.color_top3 = r.color_top3;
-          if (r.text_on_image) aiDataPayload.text_on_image = r.text_on_image;
-          if (r.price) aiDataPayload.price = r.price;
-          if (r.author) aiDataPayload.author = r.author;
-          if (r.tweet_text) aiDataPayload.tweet_text = r.tweet_text;
-          item.ai_data = aiDataPayload;
+          // Merge AI results into existing ai_data (preserve mediaType, thumbnailFileId, etc.)
+          if (r.materials?.length) item.ai_data.materials = r.materials;
+          if (r.color_palette) item.ai_data.color_palette = r.color_palette;
+          if (r.color_subject) item.ai_data.color_subject = r.color_subject;
+          if (r.color_top3?.length) item.ai_data.color_top3 = r.color_top3;
+          if (r.text_on_image) item.ai_data.text_on_image = r.text_on_image;
+          if (r.price) item.ai_data.price = r.price;
+          if (r.author) item.ai_data.author = r.author;
+          if (r.tweet_text) item.ai_data.tweet_text = r.tweet_text;
+          if (r.title) item.ai_data.title = r.title;
           item.ai_analyzed = true;
           // Re-query fresh (applyFilters may have replaced innerHTML while batch was in-flight)
           const freshCard = document.querySelector(`.card[data-id="${item.id}"]`);

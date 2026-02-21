@@ -575,7 +575,7 @@ async function analyzeWithAI(item, settings) {
   }
 }
 
-async function patchNotionWithAI(pageId, aiResult, settings) {
+async function patchNotionWithAI(pageId, aiResult, settings, existingAiData) {
   if (!pageId || !aiResult) return;
 
   const properties = {
@@ -595,7 +595,8 @@ async function patchNotionWithAI(pageId, aiResult, settings) {
       rich_text: [{ text: { content: aiResult.description.slice(0, 2000) } }]
     };
   }
-  const aiDataPayload = {};
+  // Start from existing ai_data to preserve mediaType, thumbnailFileId, mediaGroupId, etc.
+  const aiDataPayload = { ...(existingAiData || {}) };
   if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
   if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;
@@ -1752,7 +1753,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const merged = { ...DEFAULT_SETTINGS, ...settings };
       const result = await analyzeWithAI(msg.item, merged);
       if (result && msg.notionPageId) {
-        await patchNotionWithAI(msg.notionPageId, result, merged);
+        await patchNotionWithAI(msg.notionPageId, result, merged, msg.item.existingAiData);
       }
       sendResponse({ ok: !!result, result });
     });
