@@ -778,7 +778,7 @@ function applyGridMode() {
 // Filtering: if base type selected → match item.type
 //            if AI type selected → match item.ai_type
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
-const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'video_note', 'voice', 'audio']);
+const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'video', 'video_note', 'voice', 'audio']);
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 
@@ -804,8 +804,8 @@ function applyFilters() {
       if (!mediaType && videoLinkRe.test((item.sourceUrl || '') + ' ' + (item.content || ''))) {
         mediaType = 'video';
       }
-      // Dual type match: item's base type OR ai_type matches a dual type
-      const dualMatch = dualTypes.length > 0 && (dualTypes.includes(itemBaseType) || dualTypes.includes(item.ai_type) || dualTypes.includes(item.ai_type_secondary));
+      // Dual type match: item's base type, ai_type, or mediaType matches a dual type
+      const dualMatch = dualTypes.length > 0 && (dualTypes.includes(itemBaseType) || dualTypes.includes(item.ai_type) || dualTypes.includes(item.ai_type_secondary) || dualTypes.includes(mediaType));
       // If only dual types are selected (no pure base/AI), just use dual match
       if (pureBase.length === 0 && pureAI.length === 0) {
         return dualMatch;
@@ -975,8 +975,12 @@ function renderCard(item) {
     const cardUrl = isTgDirectVideo ? '' : url;
     const domainLabel = isTgDirectVideo ? 'Telegram video' : domain;
 
+    const videoBadge = isTgDirectVideo
+      ? '<div class="video-badge video-badge-inline">inline</div>'
+      : '<div class="video-badge video-badge-external">external</div>';
     return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(playbackFileId)}"` : ''}>
       ${pendingDot}
+      ${videoBadge}
       <div class="video-header">
         ${faviconUrl && !isTgDirectVideo ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
         <span class="video-domain">${escapeHtml(domainLabel)}</span>

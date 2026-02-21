@@ -94,41 +94,59 @@ function escapeHtmlBot(str) {
 
 function formatTextWithEntities(text, entities) {
   if (!entities || entities.length === 0) return text;
-  const sorted = [...entities].sort((a, b) => a.offset - b.offset);
-  let result = '';
-  let lastIdx = 0;
-  for (const entity of sorted) {
-    result += escapeHtmlBot(text.substring(lastIdx, entity.offset));
-    const entityText = text.substring(entity.offset, entity.offset + entity.length);
-    const escaped = escapeHtmlBot(entityText);
-    switch (entity.type) {
-      case 'text_link':
-        result += `<a href="${escapeHtmlBot(entity.url)}">${escaped}</a>`;
-        break;
-      case 'url':
-        result += `<a href="${entityText}">${escaped}</a>`;
-        break;
-      case 'bold':
-        result += `<b>${escaped}</b>`;
-        break;
-      case 'italic':
-        result += `<i>${escaped}</i>`;
-        break;
-      case 'code':
-        result += `<code>${escaped}</code>`;
-        break;
-      case 'underline':
-        result += `<u>${escaped}</u>`;
-        break;
-      case 'strikethrough':
-        result += `<s>${escaped}</s>`;
-        break;
-      default:
-        result += escaped;
-    }
-    lastIdx = entity.offset + entity.length;
+  // Only keep entities we render as HTML tags; skip hashtag, mention, etc.
+  const tagMap = {
+    bold: 'b', italic: 'i', underline: 'u', strikethrough: 's',
+    code: 'code', pre: 'pre',
+  };
+  const htmlEntities = entities.filter(e =>
+    tagMap[e.type] || e.type === 'text_link' || e.type === 'url'
+  );
+  // Collect boundary points where entities open/close
+  const events = []; // { pos, type: 'open'|'close', entity }
+  for (const e of htmlEntities) {
+    events.push({ pos: e.offset, type: 'open', entity: e });
+    events.push({ pos: e.offset + e.length, type: 'close', entity: e });
   }
-  result += escapeHtmlBot(text.substring(lastIdx));
+  // Sort: by position, then close before open at same position
+  events.sort((a, b) => a.pos - b.pos || (a.type === 'close' ? -1 : 1));
+
+  let result = '';
+  let cursor = 0;
+  const activeStack = []; // entities currently open
+
+  for (const ev of events) {
+    // Emit text from cursor to this event position
+    if (ev.pos > cursor) {
+      result += escapeHtmlBot(text.substring(cursor, ev.pos));
+      cursor = ev.pos;
+    }
+    if (ev.type === 'open') {
+      const e = ev.entity;
+      if (e.type === 'text_link') {
+        result += `<a href="${escapeHtmlBot(e.url)}">`;
+      } else if (e.type === 'url') {
+        const urlText = text.substring(e.offset, e.offset + e.length);
+        result += `<a href="${escapeHtmlBot(urlText)}">`;
+      } else {
+        result += `<${tagMap[e.type]}>`;
+      }
+      activeStack.push(e);
+    } else {
+      const e = ev.entity;
+      if (e.type === 'text_link' || e.type === 'url') {
+        result += '</a>';
+      } else {
+        result += `</${tagMap[e.type]}>`;
+      }
+      const idx = activeStack.lastIndexOf(e);
+      if (idx !== -1) activeStack.splice(idx, 1);
+    }
+  }
+  // Emit remaining text
+  if (cursor < text.length) {
+    result += escapeHtmlBot(text.substring(cursor));
+  }
   return result;
 }
 
