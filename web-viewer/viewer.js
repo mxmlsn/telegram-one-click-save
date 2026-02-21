@@ -1815,24 +1815,33 @@ async function deleteItem(pageId) {
   const idsToDelete = item?._groupPageIds?.length ? item._groupPageIds : [pageId];
   const idsSet = new Set(idsToDelete);
 
-  try {
-    const results = await Promise.all(idsToDelete.map(id =>
-      bgFetch(`https://api.notion.com/v1/pages/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${STATE.notionToken}`,
-          'Notion-Version': NOTION_VERSION,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ archived: true })
-      })
-    ));
-    const failed = results.filter(r => !r.ok);
-    if (failed.length) { console.error('[Viewer] Delete failed for', failed.length, 'pages'); }
-    if (failed.length === idsToDelete.length) return; // all failed — bail
-  } catch (e) { console.error('[Viewer] Delete error:', e); return; }
+  // ── Optimistic: dissolve animation + remove from state immediately ──
+  const cardEl = document.querySelector(`.card[data-id="${pageId}"]`);
+  // Remove from state right away so any concurrent applyFilters won't re-add it
   STATE.items = STATE.items.filter(item => !idsSet.has(item.id));
-  applyFilters();
+
+  if (cardEl) {
+    cardEl.classList.add('card-dissolving');
+    cardEl.addEventListener('animationend', () => {
+      cardEl.remove();
+      applyFilters(); // reflow remaining cards
+    }, { once: true });
+  } else {
+    applyFilters();
+  }
+
+  // ── Background: archive in Notion (fire-and-forget) ──
+  Promise.all(idsToDelete.map(id =>
+    bgFetch(`https://api.notion.com/v1/pages/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ archived: true })
+    })
+  )).catch(e => console.error('[Viewer] Delete error:', e));
 }
 
 async function changeItemType(pageId, newAiType, newSecondary) {

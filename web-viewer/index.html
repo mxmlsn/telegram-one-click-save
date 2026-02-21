@@ -184,6 +184,17 @@
       min-width: 0;
     }
 
+    /* ── Card dissolve-delete animation ── */
+    @keyframes card-dissolve {
+      0%   { opacity: 1; filter: blur(0px) brightness(1); transform: scale(1); }
+      40%  { opacity: 0.6; filter: blur(4px) brightness(1.2); transform: scale(0.97); }
+      100% { opacity: 0; filter: blur(16px) brightness(1.5); transform: scale(0.92); }
+    }
+    .card-dissolving {
+      animation: card-dissolve 0.35s cubic-bezier(0.4, 0, 1, 1) forwards;
+      pointer-events: none;
+    }
+
     /* ── Cards ── */
     .card {
       border-radius: var(--radius);
