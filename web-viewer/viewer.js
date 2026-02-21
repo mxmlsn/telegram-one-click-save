@@ -1318,7 +1318,7 @@ function renderCard(item) {
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const tgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
-    const textContent = item.content || item.ai_description || '';
+    const textContent = item.content || '';
     // Detect HTML content: explicit flag OR auto-detect <a href=, <b>, <i> tags in content
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
     const isTruncated = textContent.length > 300;
@@ -1483,13 +1483,14 @@ function renderCard(item) {
     const tgTranscriptHtml = (tgTranscript && ['voice', 'video_note'].includes(aiData.mediaType))
       ? `<div class="transcript-text hidden" style="padding:0 16px 8px">${escapeHtml(tgTranscript)}</div>`
       : '';
+    const bodyHtml = textContent
+      ? `<div class="tgpost-body"><div class="quote-text${truncatedClass}">${displayHtml}</div></div>`
+      : '';
     return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
       ${tgTranscriptBtn}
       ${mediaHtml}
-      <div class="tgpost-body">
-        <div class="quote-text${truncatedClass}">${displayHtml}</div>
-      </div>
+      ${bodyHtml}
       ${tgTranscriptHtml}
       <div class="quote-footer">
         ${domainHtml}
@@ -1795,7 +1796,9 @@ function openLightbox(imgUrl, sourceUrl, opts) {
     _gallery.items = opts.gallery;
     _gallery.index = opts.galleryIndex || 0;
   } else {
-    _gallery.items = [{ url: imgUrl, sourceUrl }];
+    const single = { url: imgUrl, sourceUrl };
+    if (opts && opts.video) single.video = true;
+    _gallery.items = [single];
     _gallery.index = 0;
   }
 
@@ -1826,6 +1829,11 @@ async function _showLightboxItem() {
     video.src = item.url;
     video.play().catch(() => {});
     img.src = '';
+  } else if (item.video && !item.url && item.thumb) {
+    // Video couldn't be resolved (>20MB) — show thumbnail
+    img.src = item.thumb;
+    video.pause();
+    video.src = '';
   } else {
     img.src = item.url || '';
     video.pause();
@@ -1940,7 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
       siblings.forEach((el, i) => {
         const gType = el.dataset.galleryType || 'image';
         if (gType === 'video') {
-          gallery.push({ url: '', fileId: el.dataset.fileId || '', video: true, sourceUrl: '' });
+          gallery.push({ url: '', fileId: el.dataset.fileId || '', video: true, thumb: el.dataset.thumb || '', sourceUrl: '' });
         } else {
           gallery.push({ url: el.dataset.img || '', sourceUrl: '' });
         }
