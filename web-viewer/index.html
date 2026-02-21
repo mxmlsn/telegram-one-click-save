@@ -194,10 +194,15 @@
       animation: card-dissolve 0.4s cubic-bezier(0.4, 0, 1, 1) forwards;
       pointer-events: none;
     }
-
-    /* ── Card FLIP rearrange animation ── */
-    .card-flip-move {
-      transition: transform 0.9s cubic-bezier(0.25, 0.1, 0.25, 1);
+    .card-collapsing {
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                  padding 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                  margin 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin: 0 !important;
+      overflow: hidden;
     }
 
     /* ── Cards ── */
