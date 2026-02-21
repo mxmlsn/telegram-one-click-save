@@ -368,13 +368,12 @@ function mergeMediaGroups(items) {
   }
   // Finalize merged groups
   for (const item of result) {
-    if (item.albumMedia?.length > 1) {
-      if (item.type !== 'tgpost') item.type = 'tgpost';
-      // Join all collected content parts
-      if (item._contentParts?.length) {
-        item.content = item._contentParts.join('\n');
-      }
-      delete item._contentParts;
+    if (item._contentParts?.length) {
+      item.content = item._contentParts.join('\n');
+    }
+    delete item._contentParts;
+    if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
+      item.type = 'tgpost';
     }
   }
   return result;
