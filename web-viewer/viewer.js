@@ -1716,9 +1716,9 @@ function renderAll(items) {
   });
 
   // Auto-load and play ALL video notes immediately on page open (muted loop)
+  // Uses concurrency limit to avoid Telegram API throttling
   const videoCircles = masonry.querySelectorAll('.videonote-circle');
   if (videoCircles.length && STATE.botToken) {
-    // Resolve all video note URLs in parallel first, then set src and play
     const vnEntries = [...videoCircles].map(circle => ({
       circle,
       fileId: circle.dataset.fileId,
@@ -1726,32 +1726,44 @@ function renderAll(items) {
       playIcon: circle.querySelector('.videonote-play-icon'),
     })).filter(e => e.fileId && e.video);
 
-    // Resolve all file IDs in parallel
-    const urlPromises = vnEntries.map(e => resolveFileId(STATE.botToken, e.fileId).catch(() => null));
-    Promise.all(urlPromises).then(urls => {
-      vnEntries.forEach((entry, i) => {
-        const videoUrl = urls[i];
-        if (!videoUrl) return;
-        const { video, playIcon } = entry;
-        video.preload = 'auto';
-        video.src = videoUrl;
-        video.muted = true;
-        video.play().then(() => {
-          if (playIcon) playIcon.style.display = 'none';
-        }).catch(() => {
-          // Autoplay blocked by browser — retry on first user interaction
-          const retry = () => {
-            video.play().then(() => {
-              if (playIcon) playIcon.style.display = 'none';
-            }).catch(() => {});
-            document.removeEventListener('click', retry);
-            document.removeEventListener('scroll', retry);
-          };
-          document.addEventListener('click', retry, { once: true });
-          document.addEventListener('scroll', retry, { once: true });
-        });
-      });
-    });
+    const CONCURRENCY = 3;
+    let idx = 0;
+    const loadOne = async () => {
+      while (idx < vnEntries.length) {
+        const entry = vnEntries[idx++];
+        const { video, playIcon, fileId } = entry;
+        // Try up to 2 times (retry once on failure)
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const videoUrl = await resolveFileId(STATE.botToken, fileId);
+            if (videoUrl) {
+              video.preload = 'auto';
+              video.src = videoUrl;
+              video.muted = true;
+              try {
+                await video.play();
+                if (playIcon) playIcon.style.display = 'none';
+              } catch {
+                // Autoplay blocked — retry on user interaction
+                const retry = () => {
+                  video.play().then(() => {
+                    if (playIcon) playIcon.style.display = 'none';
+                  }).catch(() => {});
+                  document.removeEventListener('click', retry);
+                  document.removeEventListener('scroll', retry);
+                };
+                document.addEventListener('click', retry, { once: true });
+                document.addEventListener('scroll', retry, { once: true });
+              }
+              break; // success, move to next entry
+            }
+          } catch { /* retry */ }
+          if (attempt === 0) await new Promise(r => setTimeout(r, 500)); // wait before retry
+        }
+      }
+    };
+    // Launch CONCURRENCY workers
+    for (let i = 0; i < Math.min(CONCURRENCY, vnEntries.length); i++) loadOne();
   }
 }
 
