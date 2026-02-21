@@ -1337,7 +1337,7 @@ function renderCard(item) {
     const mediaType = (item.ai_data || {}).mediaType;
     const isPlainImage = !albumMedia.length
       && !textContent.trim()
-      && (!mediaType || mediaType === 'photo');
+      && (!mediaType || mediaType === 'photo' || mediaType === 'image');
     if (isPlainImage) {
       const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
       const imgDomain = getDomain(sourceUrl);
@@ -1414,7 +1414,8 @@ function renderCard(item) {
           const pdfFid = m.pdfFileId || m.fileId;
           const hasThumbnail = m.fileId && m.pdfFileId && m.fileId !== m.pdfFileId;
           const previewUrl = hasThumbnail ? resolvedUrl : '';
-          const albumPdfArrow = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+          const albumPdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+          const albumPdfArrow = aiData.storageUrl ? albumPdfArrowSvg : '';
           return previewUrl
             ? `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><img class="tgpost-album-img blur-preview" src="${escapeHtml(previewUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${albumPdfArrow}</div></div>`
             : `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="pdf-badge" style="position:relative;top:auto;left:auto;transform:none"><span class="pdf-badge-text">pdf</span>${albumPdfArrow}</div></div></div>`;
@@ -1454,7 +1455,8 @@ function renderCard(item) {
       // Only use imgUrl as preview if it's from a thumbnail (not the raw PDF binary)
       const hasPdfThumb = item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId;
       const pdfThumbUrl = hasPdfThumb ? (imgUrl || '') : '';
-      const pdfArrow = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+      const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+      const pdfArrow = aiData.storageUrl ? pdfArrowSvg : '';
       mediaHtml = pdfThumbUrl
         ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div></div>`
         : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`;
@@ -1710,31 +1712,51 @@ function renderAll(items) {
     }
   });
 
-  // Auto-load and play video notes (muted loop) — sequential to avoid race conditions
-  const videoCircles = [...masonry.querySelectorAll('.videonote-circle')];
-  (async () => {
-    for (const circle of videoCircles) {
+  // Auto-load and play video notes (muted loop) — lazy via IntersectionObserver
+  const videoCircles = masonry.querySelectorAll('.videonote-circle');
+  if (videoCircles.length && STATE.botToken) {
+    const loadAndPlay = async (circle) => {
+      if (circle._vnLoading || circle._vnLoaded) return;
+      circle._vnLoading = true;
       const fileId = circle.dataset.fileId;
       const video = circle.querySelector('.videonote-video');
       const playIcon = circle.querySelector('.videonote-play-icon');
-      if (!fileId || !video || !STATE.botToken) continue;
+      if (!fileId || !video) return;
       try {
         const videoUrl = await resolveFileId(STATE.botToken, fileId);
         if (videoUrl) {
+          video.preload = 'auto';
           video.src = videoUrl;
           video.muted = true;
-          await new Promise((resolve) => {
-            video.onloadeddata = resolve;
-            video.onerror = resolve;
-            setTimeout(resolve, 8000); // timeout fallback
-          });
           video.play().then(() => {
+            circle._vnLoaded = true;
             if (playIcon) playIcon.style.display = 'none';
-          }).catch(() => {});
+          }).catch(() => {
+            // Autoplay blocked — retry when user interacts with page
+            const retry = () => {
+              video.play().then(() => {
+                circle._vnLoaded = true;
+                if (playIcon) playIcon.style.display = 'none';
+                document.removeEventListener('click', retry);
+                document.removeEventListener('scroll', retry);
+              }).catch(() => {});
+            };
+            document.addEventListener('click', retry, { once: true });
+            document.addEventListener('scroll', retry, { once: true });
+          });
         }
-      } catch (e) { /* skip failed circle, continue to next */ }
-    }
-  })();
+      } catch (e) { /* skip */ }
+    };
+    const vnObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          loadAndPlay(entry.target);
+          vnObserver.unobserve(entry.target);
+        }
+      }
+    }, { rootMargin: '200px' });
+    videoCircles.forEach(c => vnObserver.observe(c));
+  }
 }
 
 // ─── Notion mutation helpers ──────────────────────────────────────────────────
