@@ -352,6 +352,15 @@ function mergeMediaGroups(items) {
         if (!groups[gid].content && item.content) {
           groups[gid].content = item.content;
         }
+        // Collect all unique captions for audio albums (used in rendering)
+        if (item.content) {
+          if (!groups[gid]._allCaptions) {
+            groups[gid]._allCaptions = groups[gid].content ? [groups[gid].content] : [];
+          }
+          if (!groups[gid]._allCaptions.includes(item.content)) {
+            groups[gid]._allCaptions.push(item.content);
+          }
+        }
         // Merge HTML content flag
         if (item.ai_data?.htmlContent) {
           groups[gid].ai_data.htmlContent = true;
@@ -1525,10 +1534,16 @@ function renderCard(item) {
     const tgTranscriptHtml = (tgTranscript && ['voice', 'video_note'].includes(aiData.mediaType))
       ? `<div class="transcript-text hidden" style="padding:0 16px 8px">${escapeHtml(tgTranscript)}</div>`
       : '';
-    const bodyHtml = textContent
-      ? `<div class="tgpost-body"><div class="quote-text${truncatedClass}">${displayHtml}</div></div>`
+    // For audio albums: show all captions from grouped items
+    const allCaptions = item._allCaptions || [];
+    const fullText = allCaptions.length > 1 ? allCaptions.join('\n') : textContent;
+    const fullDisplayText = fullText.length > 600 ? fullText.slice(0, 600) : fullText;
+    const fullTruncClass = fullText.length > 600 ? ' truncated' : truncatedClass;
+    const fullDisplayHtml = isHtml ? sanitizeHtml(fullDisplayText) : escapeHtml(fullDisplayText).replace(/\n/g, '<br>');
+    const bodyHtml = fullText
+      ? `<div class="tgpost-body"><div class="quote-text${fullTruncClass}">${fullDisplayHtml}</div></div>`
       : '';
-    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(textContent)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
+    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(fullText)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
       ${tgTranscriptBtn}
       ${mediaHtml}
