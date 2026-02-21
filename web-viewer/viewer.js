@@ -1317,9 +1317,12 @@ function renderCard(item) {
     const pdfTitle = toTitleCase(aiData.title || item.content || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
     const hasPdfThumb = hasTgFile ? (item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId) : !!imgUrl;
+    const pdfHeavyArrow = aiData.storageUrl
+      ? `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`
+      : '';
     const previewHtml = (hasPdfThumb && imgUrl)
-      ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span></div></div>`
-      : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span></div></div>`;
+      ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfHeavyArrow}</div></div>`
+      : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfHeavyArrow}</div></div>`;
     const cardAction = hasTgFile ? 'open-file' : 'open';
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
     const pdfSourceAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
@@ -1712,50 +1715,43 @@ function renderAll(items) {
     }
   });
 
-  // Auto-load and play video notes (muted loop) — lazy via IntersectionObserver
+  // Auto-load and play ALL video notes immediately on page open (muted loop)
   const videoCircles = masonry.querySelectorAll('.videonote-circle');
   if (videoCircles.length && STATE.botToken) {
-    const loadAndPlay = async (circle) => {
-      if (circle._vnLoading || circle._vnLoaded) return;
-      circle._vnLoading = true;
-      const fileId = circle.dataset.fileId;
-      const video = circle.querySelector('.videonote-video');
-      const playIcon = circle.querySelector('.videonote-play-icon');
-      if (!fileId || !video) return;
-      try {
-        const videoUrl = await resolveFileId(STATE.botToken, fileId);
-        if (videoUrl) {
-          video.preload = 'auto';
-          video.src = videoUrl;
-          video.muted = true;
-          video.play().then(() => {
-            circle._vnLoaded = true;
-            if (playIcon) playIcon.style.display = 'none';
-          }).catch(() => {
-            // Autoplay blocked — retry when user interacts with page
-            const retry = () => {
-              video.play().then(() => {
-                circle._vnLoaded = true;
-                if (playIcon) playIcon.style.display = 'none';
-                document.removeEventListener('click', retry);
-                document.removeEventListener('scroll', retry);
-              }).catch(() => {});
-            };
-            document.addEventListener('click', retry, { once: true });
-            document.addEventListener('scroll', retry, { once: true });
-          });
-        }
-      } catch (e) { /* skip */ }
-    };
-    const vnObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          loadAndPlay(entry.target);
-          vnObserver.unobserve(entry.target);
-        }
-      }
-    }, { rootMargin: '200px' });
-    videoCircles.forEach(c => vnObserver.observe(c));
+    // Resolve all video note URLs in parallel first, then set src and play
+    const vnEntries = [...videoCircles].map(circle => ({
+      circle,
+      fileId: circle.dataset.fileId,
+      video: circle.querySelector('.videonote-video'),
+      playIcon: circle.querySelector('.videonote-play-icon'),
+    })).filter(e => e.fileId && e.video);
+
+    // Resolve all file IDs in parallel
+    const urlPromises = vnEntries.map(e => resolveFileId(STATE.botToken, e.fileId).catch(() => null));
+    Promise.all(urlPromises).then(urls => {
+      vnEntries.forEach((entry, i) => {
+        const videoUrl = urls[i];
+        if (!videoUrl) return;
+        const { video, playIcon } = entry;
+        video.preload = 'auto';
+        video.src = videoUrl;
+        video.muted = true;
+        video.play().then(() => {
+          if (playIcon) playIcon.style.display = 'none';
+        }).catch(() => {
+          // Autoplay blocked by browser — retry on first user interaction
+          const retry = () => {
+            video.play().then(() => {
+              if (playIcon) playIcon.style.display = 'none';
+            }).catch(() => {});
+            document.removeEventListener('click', retry);
+            document.removeEventListener('scroll', retry);
+          };
+          document.addEventListener('click', retry, { once: true });
+          document.addEventListener('scroll', retry, { once: true });
+        });
+      });
+    });
   }
 }
 
