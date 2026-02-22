@@ -296,6 +296,9 @@
     .card-tgpost .tgpost-body {
       padding: 14px 20px 10px;
     }
+    .card-tgpost .tgpost-body:last-child {
+      padding-bottom: 16px;
+    }
     .card-tgpost .quote-text {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 13px;
@@ -492,6 +495,26 @@
     .tgpost-yt-card { cursor: pointer; }
     .tgpost-yt-card .video-header { padding: 10px 14px 6px; }
     .tgpost-yt-card .video-preview { padding: 0 14px; }
+    .tgpost-yt-card .video-glow-wrap { position: relative; }
+    .tgpost-yt-card .video-glow {
+      position: absolute;
+      bottom: -1px; left: 50%;
+      transform: translateX(-50%) scaleX(0.85);
+      width: 100%;
+      border-radius: 11px;
+      filter: blur(30px) saturate(1.4);
+      opacity: 0.7;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .tgpost-yt-card .video-screenshot {
+      position: relative;
+      display: block;
+      width: 100%;
+      object-fit: cover;
+      z-index: 1;
+      border-radius: 11px;
+    }
     /* Document file cards */
     .card-document {
       display: flex;
@@ -590,6 +613,14 @@
       width: 22px;
       height: 22px;
       margin-left: 2px;
+    }
+    .tgpost-video-preview .tgpost-play-icon {
+      width: 80px;
+      height: 80px;
+    }
+    .tgpost-video-preview .tgpost-play-icon svg {
+      width: 36px;
+      height: 36px;
     }
     /* Full-width PDF preview in tgpost */
     /* PDF section inside tgpost — reuses pdf-blur-wrap and pdf-title from card-pdf */
@@ -1077,6 +1108,27 @@
       line-clamp: 4;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    /* PDF card with text + author (tgpost-like extension) */
+    .card-pdf-tgpost { background: linear-gradient(180deg, rgb(57,57,57) 0%, rgb(46,46,46) 100%); }
+    .card-pdf-tgpost .tgpost-body { padding: 10px 20px 8px; }
+    .card-pdf-tgpost .quote-text {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      color: rgba(255,255,255,0.6);
+      white-space: pre-wrap;
+    }
+    .card-pdf-tgpost .quote-footer {
+      display: flex;
+      align-items: center;
+      padding: 4px 20px 14px;
+    }
+    .card-pdf-tgpost .quote-source-link {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      text-decoration: none;
     }
 
     /* ── Video Note card (circle video) ── */

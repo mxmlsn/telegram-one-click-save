@@ -1339,7 +1339,10 @@ function renderCard(item) {
     const pdfUrl = item.sourceUrl || item.url || '';
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
-    const pdfTitle = toTitleCase(aiData.title || item.content || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
+    const pdfTextContent = item.content || '';
+    const pdfAuthorLabel = aiData.channelTitle || aiData.forwardFrom || '';
+    // Use content as title only if there's no separate text body (i.e. content IS the filename)
+    const pdfTitle = toTitleCase(aiData.title || (!pdfTextContent.includes(' ') ? pdfTextContent : '') || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
     const hasPdfThumb = hasTgFile ? (item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId) : !!imgUrl;
     const pdfHeavyArrow = aiData.storageUrl
@@ -1351,10 +1354,21 @@ function renderCard(item) {
     const cardAction = hasTgFile ? 'open-file' : 'open';
     const cardDataUrl = hasTgFile ? '' : pdfUrl;
     const pdfSourceAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
-    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}${pdfSourceAttr}>
+    // Text body (caption) — show if content looks like actual text (has spaces), not just a filename
+    const pdfBodyHtml = (pdfTextContent && pdfTextContent.includes(' '))
+      ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(pdfTextContent.length > 700 ? pdfTextContent.slice(0, 700) : pdfTextContent)}</div></div>`
+      : '';
+    // Author footer
+    const pdfFooterHtml = pdfAuthorLabel
+      ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(pdfAuthorLabel)}</span></div></div>`
+      : '';
+    const pdfHasExtras = pdfBodyHtml || pdfFooterHtml;
+    return `<div class="card card-pdf${pdfHasExtras ? ' card-pdf-tgpost' : ''}" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}${pdfSourceAttr}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
+      ${pdfBodyHtml}
+      ${pdfFooterHtml}
     </div>`;
   }
 
@@ -1363,8 +1377,10 @@ function renderCard(item) {
     const docFileName = aiData.fileName || item.content || 'file';
     const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
     const storageUrl = aiData.storageUrl || '';
-    const docAction = storageUrl ? 'open' : (item.fileId ? 'open-file' : '');
-    const docActionUrl = storageUrl || '';
+    const docSourceUrl = item.sourceUrl || '';
+    const docOpenUrl = storageUrl || docSourceUrl;
+    const docAction = docOpenUrl ? 'open' : (item.fileId ? 'open-file' : '');
+    const docActionUrl = docOpenUrl || '';
     const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
     const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
     return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
@@ -1576,7 +1592,8 @@ function renderCard(item) {
       const docFileName = aiData.fileName || item.content || 'file';
       const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
       const docStorageUrl = aiData.storageUrl || '';
-      const docAction = docStorageUrl ? `data-action="open" data-url="${escapeHtml(docStorageUrl)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
+      const docOpenUrl2 = docStorageUrl || sourceUrl;
+      const docAction = docOpenUrl2 ? `data-action="open" data-url="${escapeHtml(docOpenUrl2)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
       const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
       mediaHtml = `<div class="tgpost-document" ${docAction}>
         <div class="doc-file-icon">
@@ -1608,16 +1625,28 @@ function renderCard(item) {
       const vimeoId = tgVimeoMatch[1];
       const vimeoImgId = `tgpost-vimeo-${item.id}`;
       const vimeoUrl = `https://vimeo.com/${vimeoId}`;
+      const vimeoThumbSrc = imgUrl || '';
       fetch(`https://vimeo.com/api/v2/video/${vimeoId}.json`)
         .then(r => r.json())
         .then(data => {
           const src = data[0]?.thumbnail_large || data[0]?.thumbnail_medium || '';
+          if (!src) return;
           const el = document.getElementById(vimeoImgId);
-          if (el && src) el.src = src;
+          const glowEl = document.getElementById(vimeoImgId + '-glow');
+          if (el) el.src = src;
+          if (glowEl) glowEl.src = src;
         }).catch(() => {});
-      mediaHtml = `<div class="tgpost-video-preview" data-action="open" data-url="${escapeHtml(vimeoUrl)}">
-        <img class="card-img" id="${vimeoImgId}" src="" loading="lazy" alt="">
-        <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+      mediaHtml = `<div class="tgpost-yt-card" data-action="open" data-url="${escapeHtml(vimeoUrl)}">
+        <div class="video-header">
+          <img class="video-favicon" src="https://www.google.com/s2/favicons?domain=vimeo.com&sz=64" alt="" onerror="this.style.display='none'">
+          <span class="video-domain">vimeo.com</span>
+        </div>
+        <div class="video-preview">
+          <div class="video-glow-wrap">
+            <img class="video-glow" id="${vimeoImgId}-glow" src="${escapeHtml(vimeoThumbSrc)}" loading="lazy" alt="" aria-hidden="true">
+            <div class="screenshot-crop" style="border-radius:11px"><img class="video-screenshot" id="${vimeoImgId}" src="${escapeHtml(vimeoThumbSrc)}" loading="lazy" alt=""></div>
+          </div>
+        </div>
       </div>`;
     } else if ((aiData.mediaType === 'video' || item.videoFileId) && item.fileId) {
       // Inline TG video — full-width thumbnail with play icon
