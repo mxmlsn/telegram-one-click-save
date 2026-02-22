@@ -673,10 +673,11 @@
       height: 56px;
       pointer-events: none;
       z-index: 2;
-      clip-path: polygon(15% 0%, 100% 50%, 15% 100%);
+      clip-path: path('M10 4 C10 2, 12 1, 14 2 L48 23 C51 25, 51 31, 48 33 L14 54 C12 55, 10 54, 10 52 Z');
       background: rgba(255,255,255,0.35);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.25));
     }
     .tgpost-play-icon svg { display: none; }
     .tgpost-video-preview .tgpost-play-icon,
