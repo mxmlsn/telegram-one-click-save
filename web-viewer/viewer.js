@@ -2444,12 +2444,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
     if (action === 'open' && url) {
       e.stopPropagation();
-      // tg:// deep links need location.href (window.open may be blocked for custom protocols)
-      if (/^tg:\/\//i.test(url)) {
-        window.location.href = url;
-      } else {
-        window.open(url, '_blank');
-      }
+      window.open(url, '_blank');
       return;
     }
 
@@ -2913,11 +2908,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       e.stopPropagation();
       const href = link.getAttribute('href');
-      if (/^tg:\/\//i.test(href)) {
-        window.location.href = href;
-      } else if (href) {
-        window.open(href, '_blank');
-      }
+      if (href) window.open(href, '_blank');
     }
   });
 

@@ -189,11 +189,9 @@ function parseMessage(message, env) {
         const name = [origin.sender_user.first_name, origin.sender_user.last_name]
           .filter(Boolean).join(' ');
         if (name) result.forwardFrom = name;
-        // Build profile link: t.me/username if available, else tg://user?id=N deep link
+        // Profile link only possible if user has a public @username
         const username = origin.sender_user.username;
-        result.forwardUserUrl = username
-          ? `https://t.me/${username}`
-          : `tg://user?id=${origin.sender_user.id}`;
+        if (username) result.forwardUserUrl = `https://t.me/${username}`;
       }
     } else if (origin.type === 'hidden_user') {
       // User has forwarding privacy enabled — only display name available, no link possible
