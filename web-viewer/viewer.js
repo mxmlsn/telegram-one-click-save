@@ -1117,9 +1117,11 @@ function renderCard(item) {
           ${tgVideoBadge}
           ${tgThumbUrl
             ? `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}">
-                <div class="video-glow-wrap">
-                  <img class="video-glow" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="" aria-hidden="true">
-                  <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+                <div class="video-preview">
+                  <div class="video-glow-wrap">
+                    <img class="video-glow" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="" aria-hidden="true">
+                    <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+                  </div>
                 </div>
                 <div class="tgpost-play-icon">${playIconSvg}</div>
               </div>`
@@ -1135,9 +1137,11 @@ function renderCard(item) {
         ? `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
           ${pendingDot}
           ${tgVideoBadge}
-          <div class="video-glow-wrap">
-            <img class="video-glow" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="" aria-hidden="true">
-            <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+          <div class="video-preview">
+            <div class="video-glow-wrap">
+              <img class="video-glow" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="" aria-hidden="true">
+              <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+            </div>
           </div>
           <div class="tgpost-play-icon">${playIconSvg}</div>
         </div>`
