@@ -176,7 +176,6 @@ function parseMessage(message, env) {
   // Extract forward origin info
   if (message.forward_origin) {
     const origin = message.forward_origin;
-    console.log('[FWD_DEBUG] forward_origin:', JSON.stringify(origin));
     if (origin.type === 'channel' && origin.chat?.username) {
       result.sourceUrl = `https://t.me/${origin.chat.username}/${origin.message_id}`;
       if (origin.chat.title) result.channelTitle = origin.chat.title;
@@ -192,7 +191,6 @@ function parseMessage(message, env) {
         if (name) result.forwardFrom = name;
         // Profile link only possible if user has a public @username
         const username = origin.sender_user.username;
-        console.log('[FWD_DEBUG] sender_user:', JSON.stringify(origin.sender_user), 'username:', username);
         if (username) result.forwardUserUrl = `https://t.me/${username}`;
       }
     } else if (origin.type === 'hidden_user') {
@@ -461,9 +459,6 @@ async function saveToNotion(parsed, env) {
   if (parsed.audioFileName) aiDataInit.audioFileName = parsed.audioFileName;
   if (parsed.fileName) aiDataInit.fileName = parsed.fileName;
   if (parsed.fileSize) aiDataInit.fileSize = parsed.fileSize;
-  if (parsed.forwardFrom || parsed.forwardUserUrl) {
-    console.log('[FWD_DEBUG] saving ai_data — forwardFrom:', parsed.forwardFrom, 'forwardUserUrl:', parsed.forwardUserUrl);
-  }
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
