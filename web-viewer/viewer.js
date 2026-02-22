@@ -311,10 +311,11 @@ async function resolveRemainingImages(items, fileCache) {
       // Convert standalone HEIC
       const fname = it.ai_data?.fileName || it.content || '';
       if (/\.heic$/i.test(fname) && it._resolvedImg) {
-        const converted = await maybeConvertHeic(it._resolvedImg, fname);
-        if (converted !== it._resolvedImg) {
-          it._resolvedImg = converted;
-          STATE.imageMap[it.fileId] = converted;
+        const { url: convUrl, width, height } = await maybeConvertHeic(it._resolvedImg, fname);
+        if (convUrl !== it._resolvedImg) {
+          it._resolvedImg = convUrl;
+          STATE.imageMap[it.fileId] = convUrl;
+          if (width && height) { it.ai_data = it.ai_data || {}; it.ai_data.imageWidth = width; it.ai_data.imageHeight = height; }
         }
       }
       // Convert HEIC entries inside albumMedia
@@ -322,15 +323,16 @@ async function resolveRemainingImages(items, fileCache) {
         for (const m of it.albumMedia) {
           const mfname = m.fileName || '';
           if (/\.heic$/i.test(mfname) && STATE.imageMap[m.fileId]) {
-            const conv = await maybeConvertHeic(STATE.imageMap[m.fileId], mfname);
-            if (conv !== STATE.imageMap[m.fileId]) {
-              STATE.imageMap[m.fileId] = conv;
+            const { url: convUrl, width, height } = await maybeConvertHeic(STATE.imageMap[m.fileId], mfname);
+            if (convUrl !== STATE.imageMap[m.fileId]) {
+              STATE.imageMap[m.fileId] = convUrl;
+              if (width && height) { m.imageWidth = width; m.imageHeight = height; }
             }
           }
         }
       }
       return it;
-    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg || it.albumMedia?.length)));
+    })).then(converted => patchCardImages(converted));
   }
 }
 
@@ -525,17 +527,16 @@ async function resolveFileId(tgToken, fileId) {
 }
 
 async function maybeConvertHeic(url, fileName) {
-  if (!url) return url;
+  if (!url) return { url };
   const isHeic = /\.heic$/i.test(fileName || '') || /\.heic($|\?)/i.test(url);
-  if (!isHeic) { console.log('[HEIC] skip — not heic:', fileName, url); return url; }
-  if (typeof heic2any === 'undefined') { console.warn('[HEIC] heic2any not loaded'); return url; }
+  if (!isHeic) { return { url }; }
+  if (typeof heic2any === 'undefined') { console.warn('[HEIC] heic2any not loaded'); return { url }; }
   console.log('[HEIC] converting:', fileName, url.slice(0, 80));
   try {
     const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
     const filePathMatch = url.match(/\/file\/bot[^/]+\/(.+)$/);
     let blob;
     if (filePathMatch) {
-      console.log('[HEIC] fetching via proxy, path:', filePathMatch[1]);
       const res = await fetch(proxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -548,20 +549,25 @@ async function maybeConvertHeic(url, fileName) {
           contentType: 'application/octet-stream'
         })
       });
-      console.log('[HEIC] proxy response status:', res.status, res.headers.get('content-type'));
       blob = await res.blob();
     } else {
       const res = await fetch(url);
       blob = await res.blob();
     }
-    console.log('[HEIC] blob size:', blob.size, 'type:', blob.type);
     const pngBlob = await heic2any({ blob, toType: 'image/png', quality: 0.85 });
-    const result = URL.createObjectURL(Array.isArray(pngBlob) ? pngBlob[0] : pngBlob);
-    console.log('[HEIC] converted OK, blob URL:', result.slice(0, 40));
-    return result;
+    const blobUrl = URL.createObjectURL(Array.isArray(pngBlob) ? pngBlob[0] : pngBlob);
+    // Read real dimensions from converted image
+    const dims = await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => resolve({});
+      img.src = blobUrl;
+    });
+    console.log('[HEIC] converted OK:', dims.width, 'x', dims.height);
+    return { url: blobUrl, width: dims.width, height: dims.height };
   } catch(e) {
     console.error('[HEIC] conversion failed:', e);
-    return url;
+    return { url };
   }
 }
 
@@ -655,11 +661,12 @@ async function resolveImagesBatch(items, tgToken, cache) {
       // Convert standalone HEIC
       const fname = it.ai_data?.fileName || '';
       if (/\.heic$/i.test(fname) && it._resolvedImg) {
-        const converted = await maybeConvertHeic(it._resolvedImg, fname);
-        if (converted !== it._resolvedImg) {
-          it._resolvedImg = converted;
-          map[it.fileId] = converted;
-          STATE.imageMap[it.fileId] = converted;
+        const { url: convUrl, width, height } = await maybeConvertHeic(it._resolvedImg, fname);
+        if (convUrl !== it._resolvedImg) {
+          it._resolvedImg = convUrl;
+          map[it.fileId] = convUrl;
+          STATE.imageMap[it.fileId] = convUrl;
+          if (width && height) { it.ai_data = it.ai_data || {}; it.ai_data.imageWidth = width; it.ai_data.imageHeight = height; }
         }
       }
       // Convert HEIC entries inside albumMedia
@@ -667,16 +674,17 @@ async function resolveImagesBatch(items, tgToken, cache) {
         for (const m of it.albumMedia) {
           const mfname = m.fileName || '';
           if (/\.heic$/i.test(mfname) && STATE.imageMap[m.fileId]) {
-            const conv = await maybeConvertHeic(STATE.imageMap[m.fileId], mfname);
-            if (conv !== STATE.imageMap[m.fileId]) {
-              map[m.fileId] = conv;
-              STATE.imageMap[m.fileId] = conv;
+            const { url: convUrl, width, height } = await maybeConvertHeic(STATE.imageMap[m.fileId], mfname);
+            if (convUrl !== STATE.imageMap[m.fileId]) {
+              map[m.fileId] = convUrl;
+              STATE.imageMap[m.fileId] = convUrl;
+              if (width && height) { m.imageWidth = width; m.imageHeight = height; }
             }
           }
         }
       }
       return it;
-    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg || it.albumMedia?.length)));
+    })).then(converted => patchCardImages(converted));
   }
 
   return map;
