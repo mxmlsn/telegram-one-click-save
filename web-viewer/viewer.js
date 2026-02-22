@@ -1428,6 +1428,11 @@ function renderCard(item) {
     const truncatedClass = isTruncated ? ' truncated' : '';
     const displayHtml = isHtml ? sanitizeHtml(displayText) : escapeHtml(displayText);
 
+    // Detect YouTube/Vimeo links
+    const allText = sourceUrl + ' ' + textContent;
+    const tgYtMatch = allText.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+    const tgVimeoMatch = !tgYtMatch && allText.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+
     // Background class by media type
     const mt = aiData.mediaType;
     const hasPrice = !!aiData.price;
@@ -1438,11 +1443,6 @@ function renderCard(item) {
       : (mt === 'video' || mt === 'video_note' || hasYtOrVimeo) ? ' tgpost-bg-video'
       : mt === 'pdf' ? ' tgpost-bg-pdf'
       : '';
-
-    // Detect YouTube/Vimeo links
-    const allText = sourceUrl + ' ' + textContent;
-    const tgYtMatch = allText.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
-    const tgVimeoMatch = !tgYtMatch && allText.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
 
     // Link header (external URL, not t.me)
     const externalDomain = getDomain(sourceUrl);
