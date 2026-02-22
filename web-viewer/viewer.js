@@ -295,26 +295,24 @@ async function resolveRemainingImages(items, fileCache) {
     if (thumbPatched.length) patchCardImages(thumbPatched);
   }
 
-  // HEIC conversion: find items with resolved HEIC images and convert to PNG blob URLs
+  saveFileCache(fileCache);
+
+  // HEIC conversion: run in background after page is rendered
   const heicItems = items.filter(it => {
     const fname = it.ai_data?.fileName || it.content || '';
     return /\.heic$/i.test(fname) && it._resolvedImg;
   });
   if (heicItems.length > 0 && typeof heic2any !== 'undefined') {
-    await Promise.all(heicItems.map(async it => {
+    Promise.all(heicItems.map(async it => {
       const fname = it.ai_data?.fileName || it.content || '';
       const converted = await maybeConvertHeic(it._resolvedImg, fname);
       if (converted !== it._resolvedImg) {
         it._resolvedImg = converted;
         STATE.imageMap[it.fileId] = converted;
-        // Don't cache blob URLs — they're session-only
-        delete fileCache[it.fileId];
       }
-    }));
-    patchCardImages(heicItems);
+      return it;
+    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg)));
   }
-
-  saveFileCache(fileCache);
 }
 
 // ─── Notion fetch ─────────────────────────────────────────────────────────────
@@ -622,22 +620,22 @@ async function resolveImagesBatch(items, tgToken, cache) {
     }
   }
 
-  // HEIC conversion for this batch
+  // HEIC conversion: fire-and-forget, patches cards after page renders
   const heicBatchItems = items.filter(it => {
     const fname = it.ai_data?.fileName || '';
     return /\.heic$/i.test(fname) && it._resolvedImg;
   });
   if (heicBatchItems.length > 0 && typeof heic2any !== 'undefined') {
-    await Promise.all(heicBatchItems.map(async it => {
+    Promise.all(heicBatchItems.map(async it => {
       const fname = it.ai_data?.fileName || '';
       const converted = await maybeConvertHeic(it._resolvedImg, fname);
       if (converted !== it._resolvedImg) {
         it._resolvedImg = converted;
         map[it.fileId] = converted;
         STATE.imageMap[it.fileId] = converted;
-        delete cache[it.fileId];
       }
-    }));
+      return it;
+    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg)));
   }
 
   return map;
