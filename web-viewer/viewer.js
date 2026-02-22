@@ -295,6 +295,25 @@ async function resolveRemainingImages(items, fileCache) {
     if (thumbPatched.length) patchCardImages(thumbPatched);
   }
 
+  // HEIC conversion: find items with resolved HEIC images and convert to PNG blob URLs
+  const heicItems = items.filter(it => {
+    const fname = it.ai_data?.fileName || it.content || '';
+    return /\.heic$/i.test(fname) && it._resolvedImg;
+  });
+  if (heicItems.length > 0 && typeof heic2any !== 'undefined') {
+    await Promise.all(heicItems.map(async it => {
+      const fname = it.ai_data?.fileName || it.content || '';
+      const converted = await maybeConvertHeic(it._resolvedImg, fname);
+      if (converted !== it._resolvedImg) {
+        it._resolvedImg = converted;
+        STATE.imageMap[it.fileId] = converted;
+        // Don't cache blob URLs — they're session-only
+        delete fileCache[it.fileId];
+      }
+    }));
+    patchCardImages(heicItems);
+  }
+
   saveFileCache(fileCache);
 }
 
@@ -486,6 +505,18 @@ async function resolveFileId(tgToken, fileId) {
     if (!data.ok || !data.result?.file_path) return null;
     return `https://api.telegram.org/file/bot${tgToken}/${data.result.file_path}`;
   } catch { return null; }
+}
+
+async function maybeConvertHeic(url, fileName) {
+  if (!url) return url;
+  const isHeic = /\.heic$/i.test(fileName || '') || /\.heic($|\?)/i.test(url);
+  if (!isHeic || typeof heic2any === 'undefined') return url;
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    const pngBlob = await heic2any({ blob, toType: 'image/png', quality: 0.85 });
+    return URL.createObjectURL(Array.isArray(pngBlob) ? pngBlob[0] : pngBlob);
+  } catch { return url; }
 }
 
 // Resolve a batch of items, using cache where possible
@@ -1492,7 +1523,9 @@ function renderCard(item) {
     const thumbHtml = imgUrl
       ? `<div class="doc-thumb-wrap"><img class="doc-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>`
       : '';
-    return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
+    // Tinted dark background based on icon color
+    const bgStyle = imgUrl ? '' : ` style="background:color-mix(in srgb, ${iconColor} 18%, #0d1a24)"`;
+    return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}${bgStyle}>
       ${pendingDot}
       ${thumbHtml}
       <div class="doc-file-icon${imgUrl ? ' doc-file-icon-small' : ''}">
