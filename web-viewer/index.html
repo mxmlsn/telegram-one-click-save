@@ -1978,7 +1978,7 @@
       z-index: 500; cursor: zoom-out;
     }
     #lightbox.hidden { display: none; }
-    #lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 0; object-fit: contain; }
+    #lightbox img:not(#lightbox-video-glow) { max-width: 90vw; max-height: 88vh; border-radius: 0; object-fit: contain; }
     #lightbox video { max-width: 90vw; max-height: 88vh; border-radius: 8px; outline: none; position: relative; z-index: 1; }
     #lightbox-video-wrap {
       position: relative;
@@ -1996,7 +1996,7 @@
       object-fit: cover;
       border-radius: 8px;
       filter: blur(40px) saturate(1.4);
-      opacity: 0;
+      opacity: 0.7;
       pointer-events: none;
       z-index: 0;
       transition: filter 0.3s ease, opacity 0.3s ease;
