@@ -642,6 +642,10 @@
       height: 101px;
       flex-shrink: 0;
     }
+    .card-document .doc-file-icon {
+      width: 160px;
+      height: 202px;
+    }
     .doc-file-icon .doc-file-body {
       width: 100%;
       height: 100%;
@@ -656,6 +660,26 @@
       color: white;
       line-height: 1;
     }
+    .card-document .doc-file-ext {
+      top: 20px;
+      left: 20px;
+      font-size: 30px;
+    }
+    .doc-file-title {
+      position: absolute;
+      bottom: 16px;
+      left: 20px;
+      right: 20px;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: left;
+    }
     .doc-file-name {
       margin-top: 12px;
       font-family: Arial, sans-serif;
@@ -666,6 +690,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .card-document .doc-file-name {
+      display: none;
     }
     .tgpost-document {
       display: flex;

@@ -1672,6 +1672,7 @@ function renderCard(item) {
     const docFileName = aiData.fileName || item.content || 'file';
     const docExt = docFileName.includes('.') ? docFileName.split('.').pop() : '';
     const docExtUpper = docExt.toUpperCase();
+    const docBaseName = docExt ? docFileName.slice(0, -(docExt.length + 1)) : docFileName;
     const iconColor = getFileIconColor(docExt);
     const storageUrl = aiData.storageUrl || '';
     const docSourceUrl = item.sourceUrl || '';
@@ -1685,12 +1686,14 @@ function renderCard(item) {
       : '';
     // Tinted dark background based on icon color
     const bgStyle = imgUrl ? '' : ` style="background:color-mix(in srgb, ${iconColor} 18%, #0d1a24)"`;
+    const titleHtml = !imgUrl && docBaseName ? `<span class="doc-file-title">${escapeHtml(docBaseName)}</span>` : '';
     return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}${bgStyle}>
       ${pendingDot}
       ${thumbHtml}
       <div class="doc-file-icon${imgUrl ? ' doc-file-icon-small' : ''}">
         ${docFileIconSvg}
         ${docExtUpper ? `<span class="doc-file-ext">.${escapeHtml(docExtUpper)}</span>` : ''}
+        ${titleHtml}
       </div>
       <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
     </div>`;
