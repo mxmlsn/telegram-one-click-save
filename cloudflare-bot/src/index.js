@@ -391,8 +391,18 @@ function parseMessage(message, env) {
       // Content = text without the URL itself
       result.content += message.text.replace(url, '').trim();
     } else {
-      result.type = 'quote';
-      result.content += message.text;
+      // Telegram doesn't create url entities for bare domains (e.g. "google.com")
+      // Detect them manually: word with dot + TLD, no spaces
+      const bareUrlMatch = message.text.match(/^([\w-]+(?:\.[\w-]+)+(?:\/\S*)?)(?:\s|$)/);
+      if (bareUrlMatch) {
+        const bareUrl = bareUrlMatch[1];
+        result.type = 'link';
+        result.sourceUrl = normalizeUrl(bareUrl);
+        result.content += message.text.replace(bareUrl, '').trim();
+      } else {
+        result.type = 'quote';
+        result.content += message.text;
+      }
     }
     return result;
   }
@@ -555,41 +565,66 @@ async function forwardToStorageChannel(message, chatId, notionPageId, parsed, en
 // ─── Screenshot Capture ──────────────────────────────────────────────────────
 
 async function captureAndUploadScreenshot(url, chatId, env) {
-  try {
-    // Fetch screenshot from thum.io
-    const normalizedUrl = normalizeUrl(url);
-    const screenshotUrl = `https://image.thum.io/get/width/1280/crop/960/noanimate/${normalizedUrl}`;
-    const imgRes = await fetch(screenshotUrl, { redirect: 'follow' });
-    if (!imgRes.ok) {
-      console.warn('Screenshot fetch failed:', imgRes.status);
-      return null;
+  const normalizedUrl = normalizeUrl(url);
+  const screenshotUrl = `https://image.thum.io/get/width/1280/crop/960/noanimate/${normalizedUrl}`;
+  const MAX_RETRIES = 3;
+  const RETRY_DELAYS = [2000, 5000, 10000]; // 2s, 5s, 10s
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`Screenshot retry ${attempt}/${MAX_RETRIES - 1} for: ${normalizedUrl}`);
+        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt - 1]));
+      }
+
+      const imgRes = await fetch(screenshotUrl, { redirect: 'follow' });
+      if (!imgRes.ok) {
+        console.warn(`Screenshot fetch failed (attempt ${attempt + 1}):`, imgRes.status);
+        continue;
+      }
+
+      // thum.io sometimes returns HTML (error page, queue page) instead of image
+      const contentType = imgRes.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) {
+        console.warn(`Screenshot not an image (${contentType}), retrying...`);
+        continue;
+      }
+
+      const imgBlob = await imgRes.arrayBuffer();
+      if (!imgBlob || imgBlob.byteLength < 1024) {
+        console.warn(`Screenshot too small (${imgBlob?.byteLength || 0}b), retrying...`);
+        continue;
+      }
+
+      // Send to Telegram silently to get file_id
+      const formData = new FormData();
+      formData.append('chat_id', chatId);
+      formData.append('photo', new Blob([imgBlob], { type: 'image/png' }), 'screenshot.png');
+      formData.append('disable_notification', 'true');
+
+      const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendPhoto`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!tgRes.ok) {
+        console.warn(`TG screenshot upload failed (attempt ${attempt + 1}):`, tgRes.status);
+        continue;
+      }
+
+      const tgResult = await tgRes.json();
+      const photos = tgResult.result?.photo;
+      const fileId = photos && photos.length > 0 ? photos[photos.length - 1].file_id : null;
+      if (fileId) return fileId;
+
+      console.warn('TG returned no file_id, retrying...');
+    } catch (e) {
+      console.warn(`Screenshot capture error (attempt ${attempt + 1}):`, e.message);
     }
-
-    const imgBlob = await imgRes.arrayBuffer();
-
-    // Send to Telegram silently to get file_id
-    const formData = new FormData();
-    formData.append('chat_id', chatId);
-    formData.append('photo', new Blob([imgBlob], { type: 'image/png' }), 'screenshot.png');
-    formData.append('disable_notification', 'true');
-
-    const tgRes = await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendPhoto`, {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!tgRes.ok) {
-      console.warn('TG screenshot upload failed:', tgRes.status);
-      return null;
-    }
-
-    const tgResult = await tgRes.json();
-    const photos = tgResult.result?.photo;
-    return photos && photos.length > 0 ? photos[photos.length - 1].file_id : null;
-  } catch (e) {
-    console.warn('Screenshot capture error:', e);
-    return null;
   }
+
+  console.warn('Screenshot failed after all retries:', normalizedUrl);
+  return null;
 }
 
 // ─── AI Analysis ─────────────────────────────────────────────────────────────
