@@ -510,13 +510,15 @@ async function resolveFileId(tgToken, fileId) {
 async function maybeConvertHeic(url, fileName) {
   if (!url) return url;
   const isHeic = /\.heic$/i.test(fileName || '') || /\.heic($|\?)/i.test(url);
-  if (!isHeic || typeof heic2any === 'undefined') return url;
+  if (!isHeic) { console.log('[HEIC] skip — not heic:', fileName, url); return url; }
+  if (typeof heic2any === 'undefined') { console.warn('[HEIC] heic2any not loaded'); return url; }
+  console.log('[HEIC] converting:', fileName, url.slice(0, 80));
   try {
-    // TG file URLs need CORS proxy: extract file path from URL
     const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
     const filePathMatch = url.match(/\/file\/bot[^/]+\/(.+)$/);
     let blob;
     if (filePathMatch) {
+      console.log('[HEIC] fetching via proxy, path:', filePathMatch[1]);
       const res = await fetch(proxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -529,14 +531,21 @@ async function maybeConvertHeic(url, fileName) {
           contentType: 'application/octet-stream'
         })
       });
+      console.log('[HEIC] proxy response status:', res.status, res.headers.get('content-type'));
       blob = await res.blob();
     } else {
       const res = await fetch(url);
       blob = await res.blob();
     }
+    console.log('[HEIC] blob size:', blob.size, 'type:', blob.type);
     const pngBlob = await heic2any({ blob, toType: 'image/png', quality: 0.85 });
-    return URL.createObjectURL(Array.isArray(pngBlob) ? pngBlob[0] : pngBlob);
-  } catch { return url; }
+    const result = URL.createObjectURL(Array.isArray(pngBlob) ? pngBlob[0] : pngBlob);
+    console.log('[HEIC] converted OK, blob URL:', result.slice(0, 40));
+    return result;
+  } catch(e) {
+    console.error('[HEIC] conversion failed:', e);
+    return url;
+  }
 }
 
 // Resolve a batch of items, using cache where possible
@@ -611,6 +620,24 @@ async function resolveImagesBatch(items, tgToken, cache) {
         STATE.imageMap[item.fileId] = map[thumbFid];
       }
     }
+  }
+
+  // HEIC conversion for this batch
+  const heicBatchItems = items.filter(it => {
+    const fname = it.ai_data?.fileName || '';
+    return /\.heic$/i.test(fname) && it._resolvedImg;
+  });
+  if (heicBatchItems.length > 0 && typeof heic2any !== 'undefined') {
+    await Promise.all(heicBatchItems.map(async it => {
+      const fname = it.ai_data?.fileName || '';
+      const converted = await maybeConvertHeic(it._resolvedImg, fname);
+      if (converted !== it._resolvedImg) {
+        it._resolvedImg = converted;
+        map[it.fileId] = converted;
+        STATE.imageMap[it.fileId] = converted;
+        delete cache[it.fileId];
+      }
+    }));
   }
 
   return map;
