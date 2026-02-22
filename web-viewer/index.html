@@ -489,6 +489,69 @@
       display: block;
       width: 100%;
     }
+    .tgpost-yt-card { cursor: pointer; }
+    .tgpost-yt-card .video-header { padding: 10px 14px 6px; }
+    .tgpost-yt-card .video-preview { padding: 0 14px; }
+    /* Document file cards */
+    .card-document {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px 20px;
+      min-height: 140px;
+    }
+    .doc-file-icon {
+      position: relative;
+      width: 62px;
+      height: 78px;
+      flex-shrink: 0;
+    }
+    .doc-file-icon .doc-file-body {
+      width: 100%;
+      height: 100%;
+    }
+    .doc-file-ext {
+      position: absolute;
+      top: 40px;
+      left: 8px;
+      font-family: 'Anybody', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      line-height: 1;
+    }
+    .doc-file-name {
+      margin-top: 10px;
+      font-family: Arial, sans-serif;
+      font-size: 8.6px;
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tgpost-document {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 14px 8px;
+      cursor: pointer;
+    }
+    .tgpost-document .doc-file-icon {
+      width: 52px;
+      height: 66px;
+    }
+    .tgpost-document .doc-file-ext {
+      top: 33px;
+      left: 6px;
+      font-size: 11px;
+    }
+    .tgpost-document .doc-file-name {
+      margin-top: 8px;
+      font-size: 8.6px;
+    }
     .tgpost-play-icon {
       position: absolute;
       top: 50%;
@@ -972,9 +1035,9 @@
     /* ── Video Note card (circle video) ── */
     .card.card-videonote { border-radius: 20px; overflow: clip; }
     .card-videonote {
-      background: #354251;
-      border: 0.3px solid #515151;
-      box-shadow: 0px 13px 21.9px 0px rgba(0,0,0,0.08);
+      background: transparent;
+      border: none;
+      box-shadow: none;
       border-radius: 20px;
       overflow: clip;
       display: flex;
@@ -1017,8 +1080,8 @@
     .videonote-play-icon svg { width: 20px; height: 20px; }
     .videonote-author {
       margin-top: 6px;
-      font-size: 11px;
-      color: rgba(255,255,255,0.5);
+      font-size: 9px;
+      color: rgba(255,255,255,0.3);
       text-align: center;
       text-decoration: none;
       display: block;

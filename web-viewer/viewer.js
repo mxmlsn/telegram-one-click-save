@@ -32,7 +32,7 @@ function getAccentColor(colorKey, fallback) {
   if (!colorKey) return fallback || '#5B68E0';
   return PRODUCT_PALETTE[colorKey]?.accent || fallback || '#5B68E0';
 }
-const TG_ICON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="opacity:0.4;flex-shrink:0"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.97 9.291c-.145.658-.537.818-1.084.508l-3-2.211-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.932z"/></svg>`;
+const TG_ICON_SVG = `<svg width="12" height="10" viewBox="0 0 12.3848 10.2636" fill="none" style="flex-shrink:0"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.85139 4.41839L7.50196 1.55371C10.669 0.23644 11.327 0.00763 11.756 0.00008C11.8503-0.00158 12.0612 0.02179 12.1979 0.13266C12.3133 0.22627 12.345 0.35276 12.3602 0.44148C12.3754 0.53021 12.3943 0.73244 12.3793 0.89044C12.2076 2.69363 11.465 7.06966 11.0872 9.0893C10.9274 9.94392 10.6128 10.2305 10.3079 10.2585C9.64564 10.3194 9.14274 9.8208 8.50131 9.40036L5.95631 7.69083C4.83037 6.94889 5.56027 6.54108 6.20195 5.87463C6.36987 5.70015 9.28776 3.04613 9.34421 2.80537C9.35105 2.77526 9.35782 2.66305 9.29115 2.60375C9.22449 2.54445 9.12602 2.56497 9.05502 2.58087C8.95437 2.60372 7.35095 3.66352 4.24478 5.7603C3.78965 6.07284 3.37739 6.22512 3.00806 6.21714C2.60087 6.20834 1.81763 5.98692 1.23536 5.79763C0.521177 5.56549-0.0464449 5.44274 0.00300277 5.04849C0.0287301 4.84315 0.311526 4.63315 0.851367 4.41844Z" fill="white" fill-opacity="0.3"/></svg>`;
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const STATE = {
@@ -351,6 +351,7 @@ function mergeMediaGroups(items) {
         audioTitle: item.ai_data?.audioTitle || '',
         audioPerformer: item.ai_data?.audioPerformer || '',
         audioDuration: item.ai_data?.audioDuration || 0,
+        audioFileName: item.ai_data?.audioFileName || '',
         coverFileId: (mType === 'audio' && item.ai_data?.thumbnailFileId) ? item.ai_data.thumbnailFileId : '',
       };
       if (!groups[gid]) {
@@ -1037,7 +1038,8 @@ function renderCard(item) {
   // Video notes always render as standalone circles (no tgpost card wrapper)
   const isVideoNoteTgpost = item.type === 'tgpost' && aiData.mediaType === 'video_note';
   const effectiveType = isVideoNoteTgpost ? 'video_note'
-    : (item.type === 'document') ? 'image'
+    : (item.type === 'document' && imgUrl) ? 'image'
+    : (item.type === 'document') ? 'document'
     : KEEP_BASE_TYPES.includes(item.type) ? item.type
     : (isInstagramReel ? 'video' : (aiType || item.type));
 
@@ -1240,20 +1242,17 @@ function renderCard(item) {
     const vnFileId = item.videoFileId || item.audioFileId || item.fileId;
     const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const vnSourceUrl = item.sourceUrl || '';
-    const authorHtml = (authorLabel && vnSourceUrl)
-      ? `<a class="videonote-author" data-action="open" data-url="${escapeHtml(vnSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+    const authorHtml = authorLabel
+      ? (vnSourceUrl
+        ? `<a class="videonote-author" data-action="open" data-url="${escapeHtml(vnSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+        : `<span class="videonote-author">${escapeHtml(authorLabel)}</span>`)
       : '';
-    const duration = aiData.audioDuration || 0;
-    const thumbUrl = imgUrl || '';
     const vnTranscript = aiData.transcript || '';
     const vnTranscriptBtn = vnTranscript
       ? `<button class="transcript-btn" data-action="toggle-transcript">Aa</button>`
       : '';
     const vnTranscriptHtml = vnTranscript
       ? `<div class="transcript-text hidden">${escapeHtml(vnTranscript)}</div>`
-      : '';
-    const vnFooterHtml = authorLabel
-      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
       : '';
     return `<div class="card card-videonote" data-id="${item.id}">
       ${pendingDot}
@@ -1263,7 +1262,7 @@ function renderCard(item) {
         <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>
       ${vnTranscriptHtml}
-      ${vnFooterHtml}
+      ${authorHtml}
     </div>`;
   }
 
@@ -1303,7 +1302,7 @@ function renderCard(item) {
   // ── Audio file card (mp3, wav) ──
   if (effectiveType === 'audio') {
     const audioFileId = item.audioFileId || item.fileId;
-    const title = aiData.audioTitle || item.content || 'Audio';
+    const title = aiData.audioTitle || aiData.audioFileName || item.content || 'Audio';
     const performer = aiData.audioPerformer || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
@@ -1358,11 +1357,52 @@ function renderCard(item) {
     </div>`;
   }
 
+  // ── Document file card (.psd, .ai, .zip etc) ──
+  if (effectiveType === 'document') {
+    const docFileName = aiData.fileName || item.content || 'file';
+    const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
+    const storageUrl = aiData.storageUrl || '';
+    const docAction = storageUrl ? 'open' : (item.fileId ? 'open-file' : '');
+    const docActionUrl = storageUrl || '';
+    const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
+    const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
+    return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
+      ${pendingDot}
+      <div class="doc-file-icon">
+        ${docFileIconSvg}
+        ${docExt ? `<span class="doc-file-ext">.${escapeHtml(docExt)}</span>` : ''}
+      </div>
+      <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
+    </div>`;
+  }
+
   // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const tgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
     const textContent = item.content || '';
+
+    // Short-circuit: single image tgpost with no text → render as plain card-image
+    const albumMedia = item.albumMedia || [];
+    const isSingleImage = !albumMedia.length && imgUrl
+      && (!aiData.mediaType || aiData.mediaType === 'image')
+      && !textContent.trim();
+    const externalDomainCheck = getDomain(sourceUrl);
+    const hasExternalLink = externalDomainCheck && !/^(t\.me|telegram)/i.test(externalDomainCheck);
+    if (isSingleImage && !hasExternalLink) {
+      const imgDomain = getDomain(sourceUrl);
+      const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+      const domainBtn = (sourceUrl && imgDomain)
+        ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
+        : '';
+      const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
+      return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
+        ${pendingDot}
+        <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+        <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
+      </div>`;
+    }
+
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
     const isTruncated = textContent.length > 700;
     const displayText = isTruncated ? textContent.slice(0, 700) : textContent;
@@ -1395,7 +1435,7 @@ function renderCard(item) {
     </div>` : '';
 
     // Album (multiple media)
-    const albumMedia = item.albumMedia || [];
+    // albumMedia already declared above in short-circuit check
     const isAlbum = albumMedia.length > 1;
     let mediaHtml = '';
     if (isAlbum) {
@@ -1403,7 +1443,7 @@ function renderCard(item) {
       if (audioTracks.length > 1) {
         const miniPlayers = audioTracks.map(m => {
           const aFid = m.audioFileId || m.fileId;
-          const title = m.audioTitle || 'Audio';
+          const title = m.audioTitle || m.audioFileName || 'Audio';
           const performer = m.audioPerformer || '';
           const dur = m.audioDuration || 0;
           const durStr = dur > 0 ? `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` : '';
@@ -1469,9 +1509,10 @@ function renderCard(item) {
       const pdfThumbUrl = hasPdfThumb ? (imgUrl || '') : '';
       const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
       const pdfArrow = aiData.storageUrl ? pdfArrowSvg : '';
+      const pdfFileName = aiData.fileName || '';
       mediaHtml = pdfThumbUrl
         ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div></div>`
-        : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`;
+        : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div style="padding:16px 14px"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div>${pdfFileName ? `<div class="doc-file-name" style="margin-top:8px;text-align:left">${escapeHtml(pdfFileName)}</div>` : ''}</div></div>`;
     } else if (aiData.mediaType === 'video_note' && (item.videoFileId || item.fileId)) {
       const vnFid = item.videoFileId || item.fileId;
       mediaHtml = `<div class="tgpost-videonote">
@@ -1491,7 +1532,7 @@ function renderCard(item) {
       </div>`;
     } else if (aiData.mediaType === 'audio' && (item.audioFileId || item.fileId)) {
       const aFid = item.audioFileId || item.fileId;
-      const title = aiData.audioTitle || '';
+      const title = aiData.audioTitle || aiData.audioFileName || '';
       const performer = aiData.audioPerformer || '';
       const duration = aiData.audioDuration || 0;
       const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
@@ -1506,6 +1547,19 @@ function renderCard(item) {
           <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
           <span class="audio-time">${durationStr}</span>
         </div>
+      </div>`;
+    } else if (aiData.mediaType === 'document' && !imgUrl) {
+      const docFileName = aiData.fileName || item.content || 'file';
+      const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
+      const storageUrl = aiData.storageUrl || '';
+      const docAction = storageUrl ? `data-action="open" data-url="${escapeHtml(storageUrl)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
+      const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
+      mediaHtml = `<div class="tgpost-document" ${docAction}>
+        <div class="doc-file-icon">
+          ${docFileIconSvg}
+          ${docExt ? `<span class="doc-file-ext">.${escapeHtml(docExt)}</span>` : ''}
+        </div>
+        <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
       </div>`;
     } else if (imgUrl) {
       const tgImgLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
@@ -1525,9 +1579,18 @@ function renderCard(item) {
       const ytThumb = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
       const ytFallback = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
       const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
-      mediaHtml = `<div class="tgpost-video-preview" data-action="open" data-url="${escapeHtml(ytUrl)}">
-        <img class="card-img" src="${escapeHtml(ytThumb)}" loading="lazy" alt="" onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'">
-        <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+      const ytOnload = `onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'"`;
+      mediaHtml = `<div class="tgpost-yt-card" data-action="open" data-url="${escapeHtml(ytUrl)}">
+        <div class="video-header">
+          <img class="video-favicon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=64" alt="" onerror="this.style.display='none'">
+          <span class="video-domain">youtube.com</span>
+        </div>
+        <div class="video-preview">
+          <div class="video-glow-wrap">
+            <img class="video-glow" src="${escapeHtml(ytThumb)}" loading="lazy" alt="" aria-hidden="true" ${ytOnload}>
+            <div class="screenshot-crop" style="border-radius:11px"><img class="video-screenshot" src="${escapeHtml(ytThumb)}" loading="lazy" alt="" ${ytOnload}></div>
+          </div>
+        </div>
       </div>`;
     } else if (tgVimeoMatch) {
       const vimeoId = tgVimeoMatch[1];
@@ -1591,12 +1654,13 @@ function renderCard(item) {
     const hasFiles = !!mediaHtml;
     const hasText = !!(textContent || '').trim();
     const sectionCount = [hasLink, hasFiles, hasText].filter(Boolean).length;
-    const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    const hiderCircle = `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/></svg>`;
+    const hiderSlash = `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="11" x2="11" y2="3" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
     const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot" data-action="toggle-hider">
       <div class="tgpost-hider-popup">
-        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${eyeSvg}<span>link</span></div>` : ''}
-        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${eyeSvg}<span>files</span></div>` : ''}
-        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${eyeSvg}<span>text</span></div>` : ''}
+        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${hidden.link ? hiderSlash : hiderCircle}<span>link</span></div>` : ''}
+        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${hidden.files ? hiderSlash : hiderCircle}<span>files</span></div>` : ''}
+        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${hidden.text ? hiderSlash : hiderCircle}<span>text</span></div>` : ''}
       </div>
     </div>` : '';
 
@@ -1605,7 +1669,8 @@ function renderCard(item) {
     const showText = !hidden.text;
 
     const quoteText = allCaptions.length > 1 ? allCaptions.join('\n') : textContent;
-    return `<div class="card card-tgpost${bgClass}" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteText)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
+    const hasQuoteAction = !!(quoteText || '').trim();
+    return `<div class="card card-tgpost${bgClass}" data-id="${item.id}"${hasQuoteAction ? ` data-action="quote" data-quote-text="${escapeHtml(quoteText)}"` : ''} data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
       ${tgTranscriptBtn}
       ${showLink ? linkHeaderHtml : ''}

@@ -68,8 +68,10 @@ async function handleUpdate(update, env, ctx) {
           }
         }
 
-        // For large files (>20MB): forward to storage channel so they're accessible via link
-        if (parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024 && env.STORAGE_CHANNEL_ID) {
+        // For large files (>20MB) or unknown document types: forward to storage channel
+        const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
+        const isDocFile = parsed.type === 'document' || parsed.mediaType === 'document';
+        if ((isLargeFile || isDocFile) && env.STORAGE_CHANNEL_ID) {
           await forwardToStorageChannel(message, chatId, notionPageId, parsed, env);
         }
 
@@ -260,6 +262,7 @@ function parseMessage(message, env) {
     const isImageDoc = mime.startsWith('image/');
     const docType = mime === 'application/pdf' ? 'pdf' : (isImageDoc ? 'image' : 'document');
     result.fileId = message.document.file_id;
+    result.fileName = message.document.file_name || '';
     if (message.document.file_size) result.fileSize = message.document.file_size;
     if (message.document.thumbnail?.file_id) {
       result.thumbnailFileId = message.document.thumbnail.file_id;
@@ -348,6 +351,7 @@ function parseMessage(message, env) {
     result.audioTitle = message.audio.title || '';
     result.audioPerformer = message.audio.performer || '';
     result.audioDuration = message.audio.duration || 0;
+    result.audioFileName = message.audio.file_name || '';
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       const captionEntities = message.caption_entities || [];
@@ -444,6 +448,8 @@ async function saveToNotion(parsed, env) {
   if (parsed.audioTitle) aiDataInit.audioTitle = parsed.audioTitle;
   if (parsed.audioPerformer) aiDataInit.audioPerformer = parsed.audioPerformer;
   if (parsed.audioDuration) aiDataInit.audioDuration = parsed.audioDuration;
+  if (parsed.audioFileName) aiDataInit.audioFileName = parsed.audioFileName;
+  if (parsed.fileName) aiDataInit.fileName = parsed.fileName;
   if (parsed.fileSize) aiDataInit.fileSize = parsed.fileSize;
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
@@ -538,6 +544,8 @@ async function forwardToStorageChannel(message, chatId, notionPageId, parsed, en
     if (parsed.audioTitle) currentAiData.audioTitle = parsed.audioTitle;
     if (parsed.audioPerformer) currentAiData.audioPerformer = parsed.audioPerformer;
     if (parsed.audioDuration) currentAiData.audioDuration = parsed.audioDuration;
+    if (parsed.audioFileName) currentAiData.audioFileName = parsed.audioFileName;
+    if (parsed.fileName) currentAiData.fileName = parsed.fileName;
     if (parsed.fileSize) currentAiData.fileSize = parsed.fileSize;
     currentAiData.storageUrl = storageUrl;
 
@@ -837,17 +845,34 @@ async function transcribeAndPatch(parsed, notionPageId, env) {
 }
 
 async function analyzeAudioCover(parsed, notionPageId, env, provider) {
-  // Build ai_data preserving existing fields
-  const aiData = {};
-  if (parsed.mediaType) aiData.mediaType = parsed.mediaType;
-  if (parsed.thumbnailFileId) aiData.thumbnailFileId = parsed.thumbnailFileId;
-  if (parsed.channelTitle) aiData.channelTitle = parsed.channelTitle;
-  if (parsed.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
-  if (parsed.audioTitle) aiData.audioTitle = parsed.audioTitle;
-  if (parsed.audioPerformer) aiData.audioPerformer = parsed.audioPerformer;
-  if (parsed.audioDuration) aiData.audioDuration = parsed.audioDuration;
-  if (parsed.fileSize) aiData.fileSize = parsed.fileSize;
-  if (parsed.storageUrl) aiData.storageUrl = parsed.storageUrl;
+  // Read existing ai_data from Notion to avoid overwriting fields set by other steps
+  let aiData = {};
+  try {
+    const pageRes = await fetch(`https://api.notion.com/v1/pages/${notionPageId}`, {
+      headers: {
+        'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+        'Notion-Version': '2022-06-28'
+      }
+    });
+    if (pageRes.ok) {
+      const pageData = await pageRes.json();
+      const existingStr = pageData.properties?.['ai_data']?.rich_text?.[0]?.text?.content || '{}';
+      try { aiData = JSON.parse(existingStr); } catch {}
+    }
+  } catch (e) {
+    console.warn('Failed to read existing ai_data:', e.message);
+  }
+  // Ensure key fields from parsed are present
+  if (parsed.mediaType && !aiData.mediaType) aiData.mediaType = parsed.mediaType;
+  if (parsed.thumbnailFileId && !aiData.thumbnailFileId) aiData.thumbnailFileId = parsed.thumbnailFileId;
+  if (parsed.channelTitle && !aiData.channelTitle) aiData.channelTitle = parsed.channelTitle;
+  if (parsed.forwardFrom && !aiData.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
+  if (parsed.audioTitle && !aiData.audioTitle) aiData.audioTitle = parsed.audioTitle;
+  if (parsed.audioPerformer && !aiData.audioPerformer) aiData.audioPerformer = parsed.audioPerformer;
+  if (parsed.audioDuration && !aiData.audioDuration) aiData.audioDuration = parsed.audioDuration;
+  if (parsed.audioFileName && !aiData.audioFileName) aiData.audioFileName = parsed.audioFileName;
+  if (parsed.fileSize && !aiData.fileSize) aiData.fileSize = parsed.fileSize;
+  if (parsed.storageUrl && !aiData.storageUrl) aiData.storageUrl = parsed.storageUrl;
 
   // If cover art exists, analyze it for color
   if (parsed.thumbnailFileId) {
@@ -1126,6 +1151,8 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   if (parsed.channelTitle) aiDataPayload.channelTitle = parsed.channelTitle;
   if (parsed.forwardFrom) aiDataPayload.forwardFrom = parsed.forwardFrom;
   if (parsed.fileSize) aiDataPayload.fileSize = parsed.fileSize;
+  if (parsed.audioFileName) aiDataPayload.audioFileName = parsed.audioFileName;
+  if (parsed.fileName) aiDataPayload.fileName = parsed.fileName;
   if (parsed.storageUrl) aiDataPayload.storageUrl = parsed.storageUrl;
   if (aiResult.title) aiDataPayload.title = aiResult.title;
   if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
