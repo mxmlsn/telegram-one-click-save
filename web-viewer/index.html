@@ -642,14 +642,14 @@
       height: 101px;
       flex-shrink: 0;
     }
-    .card-document .doc-file-icon {
-      width: 72%;
-      height: auto;
-      aspect-ratio: 80 / 101;
-    }
     .doc-file-icon .doc-file-body {
       width: 100%;
       height: 100%;
+    }
+    /* card-document full (no thumb): SVG contains all text, fills card */
+    .card-document .doc-file-icon {
+      width: 57%;
+      height: auto;
     }
     .doc-file-ext {
       position: absolute;
@@ -661,30 +661,6 @@
       color: white;
       line-height: 1;
     }
-    .card-document .doc-file-ext {
-      top: 13%;
-      left: 13%;
-      font-size: clamp(14px, 5.5cqi, 28px);
-      font-weight: 600;
-      text-transform: lowercase;
-    }
-    .doc-file-title {
-      position: absolute;
-      bottom: 12%;
-      left: 13%;
-      right: 13%;
-      font-family: Arial, sans-serif;
-      font-size: clamp(10px, 4cqi, 22px);
-      font-weight: 400;
-      color: rgba(255, 255, 255, 0.75);
-      line-height: 1.35;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
-      -webkit-box-orient: vertical;
-      text-align: left;
-    }
     .doc-file-name {
       margin-top: 12px;
       font-family: Arial, sans-serif;
@@ -695,9 +671,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    .card-document .doc-file-name {
-      display: none;
     }
     .tgpost-document {
       display: flex;
