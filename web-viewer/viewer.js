@@ -512,8 +512,28 @@ async function maybeConvertHeic(url, fileName) {
   const isHeic = /\.heic$/i.test(fileName || '') || /\.heic($|\?)/i.test(url);
   if (!isHeic || typeof heic2any === 'undefined') return url;
   try {
-    const resp = await fetch(url);
-    const blob = await resp.blob();
+    // TG file URLs need CORS proxy: extract file path from URL
+    const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
+    const filePathMatch = url.match(/\/file\/bot[^/]+\/(.+)$/);
+    let blob;
+    if (filePathMatch) {
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service: 'telegram',
+          token: STATE.botToken,
+          path: `/file/${filePathMatch[1]}`,
+          method: 'GET',
+          binary: true,
+          contentType: 'application/octet-stream'
+        })
+      });
+      blob = await res.blob();
+    } else {
+      const res = await fetch(url);
+      blob = await res.blob();
+    }
     const pngBlob = await heic2any({ blob, toType: 'image/png', quality: 0.85 });
     return URL.createObjectURL(Array.isArray(pngBlob) ? pngBlob[0] : pngBlob);
   } catch { return url; }
