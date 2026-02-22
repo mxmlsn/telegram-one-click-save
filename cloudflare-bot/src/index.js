@@ -185,17 +185,20 @@ function parseMessage(message, env) {
     } else if (origin.type === 'user') {
       // Skip author for messages forwarded from the bot owner (self)
       const isSelf = env?.ALLOWED_CHAT_ID && String(origin.sender_user?.id) === env.ALLOWED_CHAT_ID;
-      if (!isSelf) {
-        const username = origin.sender_user?.username;
-        if (username) {
-          // User has public username — build clickable t.me link
-          const name = [origin.sender_user.first_name, origin.sender_user.last_name]
-            .filter(Boolean).join(' ');
-          if (name) result.forwardFrom = name;
-          result.sourceUrl = `https://t.me/${username}`;
-        }
-        // No username → privacy settings hide it; skip label entirely
+      if (!isSelf && origin.sender_user) {
+        const name = [origin.sender_user.first_name, origin.sender_user.last_name]
+          .filter(Boolean).join(' ');
+        if (name) result.forwardFrom = name;
+        // Build profile link: t.me/username if available, else tg://user?id=N deep link
+        const username = origin.sender_user.username;
+        result.forwardUserUrl = username
+          ? `https://t.me/${username}`
+          : `tg://user?id=${origin.sender_user.id}`;
       }
+    } else if (origin.type === 'hidden_user') {
+      // User has forwarding privacy enabled — only display name available, no link possible
+      const name = origin.sender_user_name;
+      if (name) result.forwardFrom = name;
     }
   }
 
@@ -451,6 +454,7 @@ async function saveToNotion(parsed, env) {
   if (parsed.mediaGroupId) aiDataInit.mediaGroupId = parsed.mediaGroupId;
   if (parsed.channelTitle) aiDataInit.channelTitle = parsed.channelTitle;
   if (parsed.forwardFrom) aiDataInit.forwardFrom = parsed.forwardFrom;
+  if (parsed.forwardUserUrl) aiDataInit.forwardUserUrl = parsed.forwardUserUrl;
   if (parsed.audioTitle) aiDataInit.audioTitle = parsed.audioTitle;
   if (parsed.audioPerformer) aiDataInit.audioPerformer = parsed.audioPerformer;
   if (parsed.audioDuration) aiDataInit.audioDuration = parsed.audioDuration;

@@ -397,6 +397,9 @@ function mergeMediaGroups(items) {
         if (!groups[gid].ai_data.forwardFrom && item.ai_data?.forwardFrom) {
           groups[gid].ai_data.forwardFrom = item.ai_data.forwardFrom;
         }
+        if (!groups[gid].ai_data.forwardUserUrl && item.ai_data?.forwardUserUrl) {
+          groups[gid].ai_data.forwardUserUrl = item.ai_data.forwardUserUrl;
+        }
       }
     } else {
       result.push(item);
@@ -1103,9 +1106,9 @@ function renderCard(item) {
       // Text + author from ai_data
       const tgVideoText = item.content || '';
       // forwardFrom only shown if sourceUrl exists (user has public username)
-      // forwardFrom only shown if bot saved a t.me/username link
-      const tgVideoUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(item.sourceUrl) ? item.sourceUrl : '';
-      const tgVideoAuthor = aiData.channelTitle || (tgVideoUserUrl ? aiData.forwardFrom : '') || '';
+      // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
+      const tgVideoUserUrl = aiData.forwardUserUrl || '';
+      const tgVideoAuthor = aiData.channelTitle || (aiData.forwardFrom && tgVideoUserUrl ? aiData.forwardFrom : '') || '';
       const tgVideoBodyHtml = tgVideoText.trim()
         ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(tgVideoText.length > 700 ? tgVideoText.slice(0, 700) : tgVideoText)}</div></div>`
         : '';
@@ -1292,9 +1295,9 @@ function renderCard(item) {
   if (effectiveType === 'video_note') {
     const vnFileId = item.videoFileId || item.audioFileId || item.fileId;
     const vnSourceUrl = item.sourceUrl || '';
-    // forwardFrom only shown if bot saved a t.me/username link
-    const vnUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(vnSourceUrl) ? vnSourceUrl : '';
-    const authorLabel = (vnUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
+    const vnUserUrl = aiData.forwardUserUrl || '';
+    const authorLabel = (aiData.forwardFrom && vnUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const authorLinkUrl = vnUserUrl || vnSourceUrl;
     const authorHtml = authorLabel
       ? (authorLinkUrl
@@ -1324,9 +1327,9 @@ function renderCard(item) {
   if (effectiveType === 'voice') {
     const voiceFileId = item.audioFileId || item.fileId;
     const voiceSourceUrl = item.sourceUrl || '';
-    // forwardFrom only shown if bot saved a t.me/username link
-    const voiceUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(voiceSourceUrl) ? voiceSourceUrl : '';
-    const authorLabel = (voiceUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
+    const voiceUserUrl = aiData.forwardUserUrl || '';
+    const authorLabel = (aiData.forwardFrom && voiceUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const authorLinkUrl = voiceUserUrl || voiceSourceUrl;
@@ -1365,9 +1368,9 @@ function renderCard(item) {
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const coverUrl = imgUrl || '';
     const audioSourceUrl = item.sourceUrl || '';
-    // forwardFrom only shown if bot saved a t.me/username link
-    const audioUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(audioSourceUrl) ? audioSourceUrl : '';
-    const authorLabel = (audioUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
+    const audioUserUrl = aiData.forwardUserUrl || '';
+    const authorLabel = (aiData.forwardFrom && audioUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const authorLinkUrl = audioUserUrl || audioSourceUrl;
     const authorHtml = (authorLabel && authorLinkUrl)
       ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(authorLinkUrl)}">${escapeHtml(authorLabel)}</a>`
@@ -1399,8 +1402,8 @@ function renderCard(item) {
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTextContent = item.content || '';
-    // forwardFrom only shown if bot saved a t.me/username link
-    const pdfAuthorLabel = aiData.channelTitle || (aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(item.sourceUrl) ? aiData.forwardFrom : '') || '';
+    // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
+    const pdfAuthorLabel = aiData.channelTitle || (aiData.forwardFrom && aiData.forwardUserUrl ? aiData.forwardFrom : '') || '';
     // Use content as title only if there's no separate text body (i.e. content IS the filename)
     const pdfTitle = toTitleCase(aiData.title || (!pdfTextContent.includes(' ') ? pdfTextContent : '') || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
@@ -1455,9 +1458,10 @@ function renderCard(item) {
   // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
-    // forwardFrom (user) only shown if bot saved a t.me/username link
-    const userSourceUrl = aiData.forwardFrom && item.sourceUrl && /^https?:\/\/t\.me\/[^\/]+$/i.test(item.sourceUrl) ? item.sourceUrl : '';
-    const forwardLabel = userSourceUrl ? aiData.forwardFrom : '';
+    // forwardUserUrl = t.me/username or tg://user?id=N (stored in ai_data by bot)
+    const forwardUserUrl = aiData.forwardUserUrl || '';
+    // forwardFrom shown only if we have a profile link (hidden_user with no link → no label)
+    const forwardLabel = (aiData.forwardFrom && forwardUserUrl) ? aiData.forwardFrom : '';
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
@@ -1806,8 +1810,8 @@ function renderCard(item) {
     }
 
     // Footer with TG icon + author + multi-hider
-    // For user forwards, link to user profile; for channels, link to source post
-    const labelUrl = userSourceUrl || (aiData.channelTitle ? sourceUrl : '') || sourceUrl;
+    // For user forwards → forwardUserUrl (profile link); for channels → sourceUrl (post link)
+    const labelUrl = forwardUserUrl || sourceUrl;
     const domainHtml = tgLabel
       ? (labelUrl
         ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(labelUrl)}">${escapeHtml(tgLabel)}</a>`
