@@ -500,6 +500,7 @@
       justify-content: center;
       padding: 28px 20px 20px;
       min-height: 140px;
+      cursor: pointer;
     }
     .doc-file-icon {
       position: relative;
@@ -591,39 +592,31 @@
       margin-left: 2px;
     }
     /* Full-width PDF preview in tgpost */
-    .tgpost-pdf-full {
+    /* PDF section inside tgpost — reuses pdf-blur-wrap and pdf-title from card-pdf */
+    .tgpost-pdf-section {
       cursor: pointer;
       position: relative;
     }
-    .tgpost-pdf-full .tgpost-pdf-blur-bg {
+    .tgpost-pdf-section .pdf-blur-wrap {
+      border-radius: 0;
       position: relative;
       overflow: hidden;
-      max-height: 180px;
+      max-height: 100cqi;
     }
-    .tgpost-pdf-full .tgpost-pdf-blur-img {
+    .tgpost-pdf-section .pdf-blur-img {
       display: block;
-      width: calc(100% + 20px);
-      margin: -10px;
-      max-height: 200px;
+      width: calc(100% + 40px);
+      margin: -20px -20px 0;
+      max-height: calc(100cqi + 20px);
       object-fit: cover;
       object-position: top;
-      filter: blur(7px);
+      filter: blur(6px);
       transition: filter 0.25s ease;
+      mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
+      -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
     }
-    .tgpost-pdf-full:hover .tgpost-pdf-blur-img {
+    .tgpost-pdf-section:hover .pdf-blur-img {
       filter: blur(0px);
-    }
-    .tgpost-pdf-full .pdf-badge {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-    }
-    .tgpost-pdf-title {
-      font-family: 'Times New Roman', Times, serif;
-      font-size: 24px;
-      line-height: 27px;
-      color: white;
-      padding: 14px 20px 0;
     }
     .tgpost-pdf-preview {
       cursor: pointer;

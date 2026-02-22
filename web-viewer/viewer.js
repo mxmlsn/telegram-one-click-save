@@ -1380,7 +1380,8 @@ function renderCard(item) {
   // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
-    const tgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
+    const rawTgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
+    const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
 
     // Short-circuit: single image tgpost with no text → render as plain card-image
@@ -1444,11 +1445,12 @@ function renderCard(item) {
       : mt === 'pdf' ? ' tgpost-bg-pdf'
       : '';
 
-    // Link header (external URL, not t.me)
+    // Link header (external URL, not t.me) — suppress for YouTube/Vimeo (rendered in media section)
     const externalDomain = getDomain(sourceUrl);
     const isExternalLink = externalDomain && !/^(t\.me|telegram)/i.test(externalDomain);
     const arrowIcon = `<svg viewBox="0 0 36.738 36.7375" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.9528 14.1284C18.5149 12.5663 21.047 12.5663 22.6091 14.1284C24.1712 15.6905 24.1712 18.2226 22.6091 19.7847L6.82782 35.5659C5.26573 37.128 2.73367 37.128 1.17157 35.5659C-0.390524 34.0038 -0.390524 31.4718 1.17157 29.9097L16.9528 14.1284Z" fill="white"/><path d="M28.738 29.9131V9C28.738 8.44788 28.29 8.00026 27.738 8H6.82489C4.61575 8 2.82489 6.20914 2.82489 4C2.82489 1.79086 4.61575 0 6.82489 0H27.738C32.7083 0.00026285 36.738 4.0296 36.738 9V29.9131C36.7377 32.1218 34.9467 33.9128 32.738 33.9131C30.529 33.9131 28.7382 32.122 28.738 29.9131Z" fill="white"/></svg>`;
-    const linkHeaderHtml = isExternalLink ? `<div class="tgpost-link-header">
+    const showLinkHeader = isExternalLink && !tgYtMatch && !tgVimeoMatch;
+    const linkHeaderHtml = showLinkHeader ? `<div class="tgpost-link-header">
       <img class="tgpost-link-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(externalDomain)}&sz=64" alt="" onerror="this.style.display='none'">
       <span class="tgpost-link-domain">${escapeHtml(externalDomain)}</span>
       <button class="tgpost-share-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${arrowIcon}</button>
@@ -1524,15 +1526,17 @@ function renderCard(item) {
       }
       }
     } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
+      // Reuse same structure as standalone card-pdf
       const pdfFid = item.pdfFileId || item.fileId;
       const hasPdfThumb = item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId;
       const pdfThumbUrl = hasPdfThumb ? (imgUrl || '') : '';
       const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
       const pdfArrow = aiData.storageUrl ? pdfArrowSvg : '';
-      const pdfTitle = aiData.title || aiData.fileName || '';
-      mediaHtml = pdfThumbUrl
-        ? `<div class="tgpost-pdf-full" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="tgpost-pdf-blur-bg"><img class="tgpost-pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""></div><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div>${pdfTitle ? `<div class="tgpost-pdf-title">${escapeHtml(pdfTitle)}</div>` : ''}</div>`
-        : `<div class="tgpost-pdf-full" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div style="padding:16px 14px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>${pdfTitle ? `<div class="tgpost-pdf-title">${escapeHtml(pdfTitle)}</div>` : ''}</div>`;
+      const pdfTitle = toTitleCase(aiData.title || aiData.fileName || item.content || '');
+      const previewHtml = pdfThumbUrl
+        ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`
+        : `<div style="padding:16px 14px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`;
+      mediaHtml = `<div class="tgpost-pdf-section" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}">${previewHtml}${pdfTitle ? `<div class="pdf-title" style="padding:10px 16px 0">${escapeHtml(pdfTitle)}</div>` : ''}</div>`;
     } else if (aiData.mediaType === 'video_note' && (item.videoFileId || item.fileId)) {
       const vnFid = item.videoFileId || item.fileId;
       mediaHtml = `<div class="tgpost-videonote">
