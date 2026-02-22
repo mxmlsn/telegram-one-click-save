@@ -196,6 +196,7 @@ async function startApp() {
     // 4. Render immediately — first 16 with images, rest without
     applyFilters();
     document.getElementById('ai-status').textContent = '';
+    patchHeicPlaceholderSizes();
 
     // 5. Resolve remaining images in background, patch cards as they come
     const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId || i.fileIds?.length > 1);
@@ -714,6 +715,38 @@ function patchCardImages(items) {
   }
   // Re-autoload video notes if any were re-rendered
   if (hasVideoNotes) autoloadVideoNotes();
+  // Fix sizes for any newly rendered HEIC placeholders
+  patchHeicPlaceholderSizes();
+}
+
+// Fix aspect-ratio of HEIC placeholders by loading their thumbnail
+async function patchHeicPlaceholderSizes() {
+  const placeholders = document.querySelectorAll('.card-heic-placeholder[data-thumb-fid]');
+  if (!placeholders.length) return;
+  for (const card of placeholders) {
+    const thumbFid = card.dataset.thumbFid;
+    if (!thumbFid || card.dataset.thumbSized) continue;
+    card.dataset.thumbSized = '1';
+    // Resolve thumbnail URL (may already be cached)
+    let thumbUrl = STATE.imageMap[thumbFid];
+    if (!thumbUrl) {
+      thumbUrl = await resolveFileId(STATE.botToken, thumbFid);
+      if (thumbUrl) STATE.imageMap[thumbFid] = thumbUrl;
+    }
+    if (!thumbUrl) continue;
+    // Load thumbnail to get natural dimensions
+    await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          card.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+        }
+        resolve();
+      };
+      img.onerror = resolve;
+      img.src = thumbUrl;
+    });
+  }
 }
 
 
@@ -2099,9 +2132,11 @@ function renderCard(item) {
     const isHeicFile = /\.heic$/i.test(aiData.fileName || '');
     const isConverted = imgUrl.startsWith('blob:');
     if (isHeicFile && !isConverted) {
-      const heicW = aiData.imageWidth || 4;
-      const heicH = aiData.imageHeight || 3;
-      return `<div class="card card-heic-placeholder" data-id="${item.id}" style="aspect-ratio:${heicW}/${heicH}">
+      const heicW = aiData.imageWidth || 0;
+      const heicH = aiData.imageHeight || 0;
+      const heicRatioStyle = (heicW && heicH) ? ` style="aspect-ratio:${heicW}/${heicH}"` : '';
+      const thumbFid = aiData.thumbnailFileId ? ` data-thumb-fid="${escapeHtml(aiData.thumbnailFileId)}"` : '';
+      return `<div class="card card-heic-placeholder" data-id="${item.id}"${heicRatioStyle}${thumbFid}>
         ${pendingDot}
         <div class="heic-icon"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg></div>
         <div class="heic-label">HEIC</div>
