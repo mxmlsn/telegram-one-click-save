@@ -768,6 +768,24 @@ Rules:
 
 const AI_PROMPT_TRANSCRIBE = `Transcribe this audio message word-for-word. Return ONLY the transcript text, nothing else. If the audio contains no speech or is unintelligible, return an empty string. Do not add any commentary, timestamps, or formatting — just the raw spoken words.`;
 
+const AI_PROMPT_AUDIO = `Analyze this audio track cover art image and return ONLY valid JSON, no other text:
+{
+  "color_subject": null,
+  "color_palette": null,
+  "color_top3": [],
+  "title": "",
+  "description": ""
+}
+
+Rules:
+- COLOR TAGS — allowed values: "red", "violet", "pink", "yellow", "green", "blue", "brown", "white", "black", "bw", "orange", "purple".
+- color_subject: the single dominant color of the MAIN SUBJECT on the cover art. This color will be used as the accent for the audio player UI. Pick the most visually prominent color. Null only if genuinely unclear.
+- color_palette: the overall dominant color of the entire cover by area. Null if unclear.
+- color_top3: top 1-3 most prominent colors ordered by area coverage (largest first). Do NOT pad — if mostly one color, return just that one.
+- title: if there is text visible on the cover art that looks like a track/album title, extract it. Empty string if none.
+- description: brief 1-2 sentence description of what the cover art depicts. Empty string if nothing notable.
+- All fields must be present. No markdown, no extra fields.`;
+
 async function transcribeAndPatch(parsed, notionPageId, env) {
   try {
     const fileRes = await fetch(
@@ -816,6 +834,89 @@ async function transcribeAndPatch(parsed, notionPageId, env) {
   } catch (e) {
     console.warn('Transcription failed:', e.message);
   }
+}
+
+async function analyzeAudioCover(parsed, notionPageId, env, provider) {
+  // Build ai_data preserving existing fields
+  const aiData = {};
+  if (parsed.mediaType) aiData.mediaType = parsed.mediaType;
+  if (parsed.thumbnailFileId) aiData.thumbnailFileId = parsed.thumbnailFileId;
+  if (parsed.channelTitle) aiData.channelTitle = parsed.channelTitle;
+  if (parsed.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
+  if (parsed.audioTitle) aiData.audioTitle = parsed.audioTitle;
+  if (parsed.audioPerformer) aiData.audioPerformer = parsed.audioPerformer;
+  if (parsed.audioDuration) aiData.audioDuration = parsed.audioDuration;
+  if (parsed.fileSize) aiData.fileSize = parsed.fileSize;
+  if (parsed.storageUrl) aiData.storageUrl = parsed.storageUrl;
+
+  // If cover art exists, analyze it for color
+  if (parsed.thumbnailFileId) {
+    try {
+      const fileRes = await fetch(
+        `https://api.telegram.org/bot${env.BOT_TOKEN}/getFile?file_id=${parsed.thumbnailFileId}`
+      );
+      const fileData = await fileRes.json();
+      if (fileData.ok) {
+        const filePath = fileData.result.file_path;
+        const imgUrl = `https://api.telegram.org/file/bot${env.BOT_TOKEN}/${filePath}`;
+
+        const context = [
+          parsed.audioTitle ? `Track: ${parsed.audioTitle}` : '',
+          parsed.audioPerformer ? `Artist: ${parsed.audioPerformer}` : '',
+          parsed.content ? `Caption: ${parsed.content.slice(0, 200)}` : ''
+        ].filter(Boolean).join('\n');
+        const prompt = context
+          ? `${AI_PROMPT_AUDIO}\n\nAdditional context:\n${context}`
+          : AI_PROMPT_AUDIO;
+
+        let responseText = null;
+        if (provider === 'google') {
+          const base64 = await fetchBase64(imgUrl);
+          responseText = await callGemini(prompt, base64, env, 'image/jpeg');
+        } else {
+          responseText = await callAnthropic([{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'url', url: imgUrl } },
+              { type: 'text', text: prompt }
+            ]
+          }], env);
+        }
+
+        if (responseText) {
+          const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+          try {
+            const result = JSON.parse(cleaned);
+            if (result.color_subject) aiData.color_subject = result.color_subject;
+            if (result.color_palette) aiData.color_palette = result.color_palette;
+            if (result.color_top3?.length) aiData.color_top3 = result.color_top3;
+          } catch {
+            console.warn('Audio cover AI parse error:', cleaned.slice(0, 100));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Audio cover analysis failed:', e.message);
+    }
+  }
+
+  // Patch Notion
+  const properties = {
+    'ai_analyzed': { checkbox: true },
+    'ai_data': {
+      rich_text: [{ text: { content: JSON.stringify(aiData).slice(0, 2000) } }]
+    }
+  };
+
+  await fetch(`https://api.notion.com/v1/pages/${notionPageId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${env.NOTION_TOKEN}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ properties })
+  });
 }
 
 async function fetchBase64(url) {
@@ -878,9 +979,12 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
     await transcribeAndPatch(parsed, notionPageId, env);
     return;
   }
-  // Skip music files (nothing to transcribe)
+  // Audio files → analyze cover art if available
   const isAudioFile = parsed.type === 'audio' || parsed.mediaType === 'audio';
-  if (isAudioFile) return;
+  if (isAudioFile) {
+    await analyzeAudioCover(parsed, notionPageId, env, provider);
+    return;
+  }
 
   const isPdf = parsed.type === 'pdf' || parsed.mediaType === 'pdf';
   const isVideo = parsed.type === 'video' || parsed.mediaType === 'video';

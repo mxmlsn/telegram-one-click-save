@@ -13,6 +13,27 @@ const AI_MODELS = {
 };
 const AI_DEFAULT_MODEL = { google: 'gemini-2.0-flash', anthropic: 'claude-haiku-4-5-20251001' };
 
+// ─── Shared Palettes & SVGs ──────────────────────────────────────────────────
+const PRODUCT_PALETTE = {
+  red:    { bg: '#3D1A1A', border: 'rgba(140,50,50,0.5)',   accent: '#C97A7A' },
+  violet: { bg: '#313367', border: 'rgba(69,57,131,0.5)',   accent: '#9392CA' },
+  pink:   { bg: '#3D1A2E', border: 'rgba(140,50,100,0.5)',  accent: '#CA7AAF' },
+  yellow: { bg: '#3A3210', border: 'rgba(140,125,30,0.5)',  accent: '#C9B860' },
+  green:  { bg: '#1A2E15', border: 'rgba(50,110,45,0.5)',   accent: '#7ABF72' },
+  blue:   { bg: '#13213D', border: 'rgba(45,85,160,0.5)',   accent: '#7A9FCA' },
+  brown:  { bg: '#2E1F10', border: 'rgba(110,72,30,0.5)',   accent: '#C4986A' },
+  white:  { bg: '#2A2A2A', border: 'rgba(120,120,120,0.5)', accent: '#C0C0C0' },
+  black:  { bg: '#111111', border: 'rgba(70,70,70,0.5)',    accent: '#909090' },
+  bw:     { bg: '#1A1A1A', border: 'rgba(90,90,90,0.5)',    accent: '#ABABAB' },
+  orange: { bg: '#3A2410', border: 'rgba(140,85,30,0.5)',   accent: '#C99060' },
+  purple: { bg: '#313367', border: 'rgba(69,57,131,0.5)',   accent: '#9392CA' },
+};
+function getAccentColor(colorKey, fallback) {
+  if (!colorKey) return fallback || '#5B68E0';
+  return PRODUCT_PALETTE[colorKey]?.accent || fallback || '#5B68E0';
+}
+const TG_ICON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" style="opacity:0.4;flex-shrink:0"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161l-1.97 9.291c-.145.658-.537.818-1.084.508l-3-2.211-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.121l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.932z"/></svg>`;
+
 // ─── State ────────────────────────────────────────────────────────────────────
 const STATE = {
   items: [],
@@ -1115,21 +1136,6 @@ function renderCard(item) {
       if (!sym) { const m = rawPrice.match(/^([^\d\s]+)/); sym = m ? m[1] : '$'; }
       formattedPrice = sym + num;
     }
-    const PRODUCT_PALETTE = {
-      red:    { bg: '#3D1A1A', border: 'rgba(140,50,50,0.5)',   price: '#C97A7A' },
-      violet: { bg: '#313367', border: 'rgba(69,57,131,0.5)',   price: '#9392CA' },
-      pink:   { bg: '#3D1A2E', border: 'rgba(140,50,100,0.5)',  price: '#CA7AAF' },
-      yellow: { bg: '#3A3210', border: 'rgba(140,125,30,0.5)',  price: '#C9B860' },
-      green:  { bg: '#1A2E15', border: 'rgba(50,110,45,0.5)',   price: '#7ABF72' },
-      blue:   { bg: '#13213D', border: 'rgba(45,85,160,0.5)',   price: '#7A9FCA' },
-      brown:  { bg: '#2E1F10', border: 'rgba(110,72,30,0.5)',   price: '#C4986A' },
-      white:  { bg: '#2A2A2A', border: 'rgba(120,120,120,0.5)', price: '#C0C0C0' },
-      black:  { bg: '#111111', border: 'rgba(70,70,70,0.5)',    price: '#909090' },
-      bw:     { bg: '#1A1A1A', border: 'rgba(90,90,90,0.5)',    price: '#ABABAB' },
-      // Legacy aliases
-      orange: { bg: '#3A2410', border: 'rgba(140,85,30,0.5)',   price: '#C99060' },
-      purple: { bg: '#313367', border: 'rgba(69,57,131,0.5)',   price: '#9392CA' },
-    };
     const colorKey = aiData.color_subject || aiData.color_top3?.[0] || aiData.color_palette || 'violet';
     const theme = PRODUCT_PALETTE[colorKey] || PRODUCT_PALETTE.purple;
     const notchSvg = `<svg viewBox="-3 -3 101.0078 43.6777" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1139,7 +1145,7 @@ function renderCard(item) {
       ${pendingDot}
       <div class="product-new-notch">${notchSvg}</div>
       <div class="product-new-header">
-        ${rawPrice ? `<div class="product-new-price" style="color:${theme.price}">${escapeHtml(formattedPrice)}</div>` : (domain ? `<div class="product-new-domain" style="color:${theme.price}">${escapeHtml(domain)}</div>` : '')}
+        ${rawPrice ? `<div class="product-new-price" style="color:${theme.accent}">${escapeHtml(formattedPrice)}</div>` : (domain ? `<div class="product-new-domain" style="color:${theme.accent}">${escapeHtml(domain)}</div>` : '')}
       </div>
       <div class="product-new-preview">
         <div class="screenshot-crop"><img class="product-new-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
@@ -1246,6 +1252,9 @@ function renderCard(item) {
     const vnTranscriptHtml = vnTranscript
       ? `<div class="transcript-text hidden">${escapeHtml(vnTranscript)}</div>`
       : '';
+    const vnFooterHtml = authorLabel
+      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
+      : '';
     return `<div class="card card-videonote" data-id="${item.id}">
       ${pendingDot}
       ${vnTranscriptBtn}
@@ -1253,8 +1262,8 @@ function renderCard(item) {
         <video class="videonote-video" muted loop playsinline preload="none"></video>
         <div class="videonote-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>
-      ${authorHtml}
       ${vnTranscriptHtml}
+      ${vnFooterHtml}
     </div>`;
   }
 
@@ -1275,6 +1284,9 @@ function renderCard(item) {
     const voiceTranscriptHtml = voiceTranscript
       ? `<div class="transcript-text hidden">${escapeHtml(voiceTranscript)}</div>`
       : '';
+    const voiceFooterHtml = authorLabel
+      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
+      : '';
     return `<div class="card card-voice" data-id="${item.id}">
       ${pendingDot}
       ${voiceTranscriptBtn}
@@ -1283,8 +1295,8 @@ function renderCard(item) {
         <div class="voice-waveform"><div class="voice-progress"></div></div>
         <span class="voice-duration">${durationStr}</span>
       </div>
-      ${authorHtml}
       ${voiceTranscriptHtml}
+      ${voiceFooterHtml}
     </div>`;
   }
 
@@ -1301,7 +1313,12 @@ function renderCard(item) {
     const authorHtml = (authorLabel && audioSourceUrl)
       ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(audioSourceUrl)}">${escapeHtml(authorLabel)}</a>`
       : '';
-    return `<div class="card card-audio" data-id="${item.id}">
+    const audioAccent = getAccentColor(aiData.color_subject, '#18bb3e');
+    const hasCoverClass = coverUrl ? ' audio-has-cover' : '';
+    const audioFooterHtml = authorLabel
+      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
+      : '';
+    return `<div class="card card-audio${hasCoverClass}" data-id="${item.id}" style="--audio-accent:${audioAccent}">
       ${pendingDot}
       ${coverUrl ? `<div class="audio-cover"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt="" onerror="this.parentElement.remove()"></div>` : ''}
       <div class="audio-info">
@@ -1313,7 +1330,7 @@ function renderCard(item) {
         <div class="audio-progress-wrap"><div class="audio-progress"></div></div>
         <span class="audio-time">${durationStr}</span>
       </div>
-      ${authorHtml}
+      ${audioFooterHtml}
     </div>`;
   }
 
@@ -1341,56 +1358,47 @@ function renderCard(item) {
     </div>`;
   }
 
-  // ── Single-image tgpost → render as plain image ──
-  if (item.type === 'tgpost' && imgUrl) {
-    const albumMedia = item.albumMedia || [];
-    const textContent = item.content || '';
-    const mediaType = (item.ai_data || {}).mediaType;
-    const isPlainImage = !albumMedia.length
-      && !textContent.trim()
-      && (!mediaType || mediaType === 'photo' || mediaType === 'image');
-    if (isPlainImage) {
-      const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
-      const imgDomain = getDomain(sourceUrl);
-      const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-      const domainBtn = (sourceUrl && imgDomain)
-        ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
-        : '';
-      const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
-      return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
-        ${pendingDot}
-        <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
-        <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
-      </div>`;
-    }
-  }
-
-  // ── Telegram Post card (media + text) ──
+  // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const tgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
     const textContent = item.content || '';
-    // Detect HTML content: explicit flag OR auto-detect <a href=, <b>, <i> tags in content
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
-    const isTruncated = textContent.length > 300;
-    const displayText = isTruncated ? textContent.slice(0, 300) : textContent;
+    const isTruncated = textContent.length > 700;
+    const displayText = isTruncated ? textContent.slice(0, 700) : textContent;
     const truncatedClass = isTruncated ? ' truncated' : '';
     const displayHtml = isHtml ? sanitizeHtml(displayText) : escapeHtml(displayText);
-    const domainHtml = (tgLabel && sourceUrl)
-      ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>`
+
+    // Background class by media type
+    const mt = aiData.mediaType;
+    const hasPrice = !!aiData.price;
+    const bgClass = hasPrice ? ' tgpost-paid'
+      : mt === 'voice' ? ' tgpost-bg-voice'
+      : mt === 'audio' ? (imgUrl ? ' tgpost-bg-audio-cover' : ' tgpost-bg-audio')
+      : (mt === 'video' || mt === 'video_note') ? ' tgpost-bg-video'
+      : mt === 'pdf' ? ' tgpost-bg-pdf'
       : '';
 
-    // Detect YouTube/Vimeo links in sourceUrl or text content for video preview
+    // Detect YouTube/Vimeo links
     const allText = sourceUrl + ' ' + textContent;
     const tgYtMatch = allText.match(/(?:youtube\.com\/watch\?.*v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
     const tgVimeoMatch = !tgYtMatch && allText.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+
+    // Link header (external URL, not t.me)
+    const externalDomain = getDomain(sourceUrl);
+    const isExternalLink = externalDomain && !/^(t\.me|telegram)/i.test(externalDomain);
+    const arrowIcon = `<svg viewBox="0 0 36.738 36.7375" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.9528 14.1284C18.5149 12.5663 21.047 12.5663 22.6091 14.1284C24.1712 15.6905 24.1712 18.2226 22.6091 19.7847L6.82782 35.5659C5.26573 37.128 2.73367 37.128 1.17157 35.5659C-0.390524 34.0038 -0.390524 31.4718 1.17157 29.9097L16.9528 14.1284Z" fill="white"/><path d="M28.738 29.9131V9C28.738 8.44788 28.29 8.00026 27.738 8H6.82489C4.61575 8 2.82489 6.20914 2.82489 4C2.82489 1.79086 4.61575 0 6.82489 0H27.738C32.7083 0.00026285 36.738 4.0296 36.738 9V29.9131C36.7377 32.1218 34.9467 33.9128 32.738 33.9131C30.529 33.9131 28.7382 32.122 28.738 29.9131Z" fill="white"/></svg>`;
+    const linkHeaderHtml = isExternalLink ? `<div class="tgpost-link-header">
+      <img class="tgpost-link-favicon" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(externalDomain)}&sz=64" alt="" onerror="this.style.display='none'">
+      <span class="tgpost-link-domain">${escapeHtml(externalDomain)}</span>
+      <button class="tgpost-share-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${arrowIcon}</button>
+    </div>` : '';
 
     // Album (multiple media)
     const albumMedia = item.albumMedia || [];
     const isAlbum = albumMedia.length > 1;
     let mediaHtml = '';
     if (isAlbum) {
-      // ── Audio album: stacked mini-players ──
       const audioTracks = albumMedia.filter(m => m.mediaType === 'audio');
       if (audioTracks.length > 1) {
         const miniPlayers = audioTracks.map(m => {
@@ -1418,7 +1426,6 @@ function renderCard(item) {
         }).join('');
         mediaHtml = `<div class="audio-album-list">${miniPlayers}</div>`;
       } else {
-      // ── Non-audio album: image/video/pdf grid ──
       const albumItems = albumMedia.map(m => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
         if (m.mediaType === 'pdf') {
@@ -1433,23 +1440,19 @@ function renderCard(item) {
         }
         if (m.mediaType === 'video') {
           const playFileId = m.videoFileId || m.fileId;
-          // Album gallery item: video with thumbnail
           return resolvedUrl
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
             : `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
         }
-        // Album gallery item: image
         return resolvedUrl
           ? `<div class="tgpost-album-item" data-action="album-gallery" data-gallery-type="image" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
           : `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
       }).filter(Boolean);
       if (albumItems.length > 0) {
-        // Calculate if last item needs to span remaining columns
         const cols = albumItems.length > 4 ? 3 : 2;
         const remainder = albumItems.length % cols;
         if (remainder !== 0) {
           const spanCols = cols - remainder + 1;
-          // Replace last item's opening div to add grid-column span
           const lastIdx = albumItems.length - 1;
           albumItems[lastIdx] = albumItems[lastIdx].replace(
             /^<div class="tgpost-album-item/,
@@ -1459,11 +1462,9 @@ function renderCard(item) {
         const colClass = albumItems.length > 4 ? ' album-3col' : '';
         mediaHtml = `<div class="tgpost-album${colClass}">${albumItems.join('')}</div>`;
       }
-      } // end else (non-audio album grid)
+      }
     } else if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
-      // PDF preview — must come before generic imgUrl check
       const pdfFid = item.pdfFileId || item.fileId;
-      // Only use imgUrl as preview if it's from a thumbnail (not the raw PDF binary)
       const hasPdfThumb = item.fileId && item.pdfFileId && item.fileId !== item.pdfFileId;
       const pdfThumbUrl = hasPdfThumb ? (imgUrl || '') : '';
       const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
@@ -1472,9 +1473,7 @@ function renderCard(item) {
         ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div></div>`
         : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`;
     } else if (aiData.mediaType === 'video_note' && (item.videoFileId || item.fileId)) {
-      // Video note (circle) embedded in tgpost
       const vnFid = item.videoFileId || item.fileId;
-      const thumbUrl = imgUrl || '';
       mediaHtml = `<div class="tgpost-videonote">
         <div class="videonote-circle" data-action="videonote-play" data-file-id="${escapeHtml(vnFid)}">
           <video class="videonote-video" muted loop playsinline preload="none"></video>
@@ -1482,25 +1481,24 @@ function renderCard(item) {
         </div>
       </div>`;
     } else if (aiData.mediaType === 'voice' && (item.audioFileId || item.fileId)) {
-      // Voice message embedded in tgpost
       const vFid = item.audioFileId || item.fileId;
       const duration = aiData.audioDuration || 0;
       const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
-      mediaHtml = `<div class="voice-player" data-action="voice-play" data-file-id="${escapeHtml(vFid)}" style="margin:12px 14px 0">
+      mediaHtml = `<div class="voice-player" data-action="voice-play" data-file-id="${escapeHtml(vFid)}" style="margin:14px 14px 0">
         <button class="voice-play-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></button>
         <div class="voice-waveform"><div class="voice-progress"></div></div>
         <span class="voice-duration">${durationStr}</span>
       </div>`;
     } else if (aiData.mediaType === 'audio' && (item.audioFileId || item.fileId)) {
-      // Audio file embedded in tgpost
       const aFid = item.audioFileId || item.fileId;
       const title = aiData.audioTitle || '';
       const performer = aiData.audioPerformer || '';
       const duration = aiData.audioDuration || 0;
       const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
       const coverUrl = imgUrl || '';
-      mediaHtml = `<div style="padding:12px 14px 0">
-        ${coverUrl ? `<div class="audio-cover" style="margin-bottom:8px"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt="" onerror="this.parentElement.remove()"></div>` : ''}
+      const audioAccent = getAccentColor(aiData.color_subject, '#18bb3e');
+      mediaHtml = `<div style="padding:12px 14px 0;--audio-accent:${audioAccent}">
+        ${coverUrl ? `<div class="audio-cover" style="margin-bottom:8px;border-radius:8px"><img src="${escapeHtml(coverUrl)}" loading="lazy" alt="" onerror="this.parentElement.remove()"></div>` : ''}
         ${title ? `<div class="audio-title">${escapeHtml(title)}</div>` : ''}
         ${performer ? `<div class="audio-performer">${escapeHtml(performer)}</div>` : ''}
         <div class="audio-player" data-action="audio-play" data-file-id="${escapeHtml(aFid)}">
@@ -1547,7 +1545,6 @@ function renderCard(item) {
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
     } else if ((aiData.mediaType === 'video' || item.videoFileId) && item.fileId) {
-      // Direct TG video in tgpost — show thumbnail or play icon
       const thumbUrl = imgUrl || '';
       mediaHtml = thumbUrl
         ? `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(item.videoFileId || item.fileId)}">
@@ -1559,6 +1556,7 @@ function renderCard(item) {
           </div>`;
     }
 
+    // Transcript
     const tgTranscript = aiData.transcript || '';
     const tgTranscriptBtn = (tgTranscript && ['voice', 'video_note'].includes(aiData.mediaType))
       ? `<button class="transcript-btn" data-action="toggle-transcript">Aa</button>`
@@ -1566,11 +1564,11 @@ function renderCard(item) {
     const tgTranscriptHtml = (tgTranscript && ['voice', 'video_note'].includes(aiData.mediaType))
       ? `<div class="transcript-text hidden" style="padding:0 16px 8px">${escapeHtml(tgTranscript)}</div>`
       : '';
-    // For audio albums: show all captions from grouped items
+
+    // Body text
     const allCaptions = item._allCaptions || [];
     let bodyHtml = '';
     if (allCaptions.length > 1) {
-      // Render each caption as a separate paragraph
       const parts = allCaptions.map(cap => {
         const capIsHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(cap);
         return capIsHtml ? sanitizeHtml(cap) : escapeHtml(cap);
@@ -1579,15 +1577,47 @@ function renderCard(item) {
     } else if (textContent) {
       bodyHtml = `<div class="tgpost-body"><div class="quote-text${truncatedClass}">${displayHtml}</div></div>`;
     }
+
+    // Footer with TG icon + author + multi-hider
+    const domainHtml = tgLabel
+      ? (sourceUrl
+        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>`
+        : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`)
+      : '';
+
+    // Multi-hider: detect which sections exist
+    const hidden = aiData.tgpost_hidden || {};
+    const hasLink = !!linkHeaderHtml;
+    const hasFiles = !!mediaHtml;
+    const hasText = !!(textContent || '').trim();
+    const sectionCount = [hasLink, hasFiles, hasText].filter(Boolean).length;
+    const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot" data-action="toggle-hider">
+      <div class="tgpost-hider-popup">
+        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${eyeSvg}<span>link</span></div>` : ''}
+        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${eyeSvg}<span>files</span></div>` : ''}
+        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${eyeSvg}<span>text</span></div>` : ''}
+      </div>
+    </div>` : '';
+
+    const showLink = !hidden.link;
+    const showFiles = !hidden.files;
+    const showText = !hidden.text;
+
     const quoteText = allCaptions.length > 1 ? allCaptions.join('\n') : textContent;
-    return `<div class="card card-tgpost" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteText)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
+    return `<div class="card card-tgpost${bgClass}" data-id="${item.id}" data-action="quote" data-quote-text="${escapeHtml(quoteText)}" data-source-url="${escapeHtml(sourceUrl)}" data-domain="${escapeHtml(tgLabel || 'telegram')}">
       ${pendingDot}
       ${tgTranscriptBtn}
-      ${mediaHtml}
-      ${bodyHtml}
+      ${showLink ? linkHeaderHtml : ''}
+      ${showFiles ? mediaHtml : ''}
+      ${showText ? bodyHtml : ''}
       ${tgTranscriptHtml}
       <div class="quote-footer">
-        ${domainHtml}
+        <div class="tg-footer-left">
+          ${TG_ICON_SVG}
+          ${domainHtml}
+        </div>
+        ${hiderDotHtml}
       </div>
     </div>`;
   }
@@ -1932,6 +1962,51 @@ async function toggleXpostCollapse(pageId) {
         }
       }
     }
+  }
+}
+
+async function toggleTgpostSection(pageId, section) {
+  const item = STATE.items.find(i => i.id === pageId);
+  if (!item) return;
+
+  const hidden = item.ai_data.tgpost_hidden || {};
+  const newHidden = { ...hidden, [section]: !hidden[section] };
+
+  // Count visible sections: must keep at least one visible
+  const card = document.querySelector(`.card[data-id="${pageId}"]`);
+  if (!card) return;
+  const allSections = card.querySelectorAll('.tgpost-hider-item');
+  const sectionKeys = Array.from(allSections).map(el => el.dataset.hiderSection);
+  const visibleCount = sectionKeys.filter(k => !newHidden[k]).length;
+  if (visibleCount < 1) return;
+
+  item.ai_data.tgpost_hidden = newHidden;
+
+  // Optimistic re-render
+  if (card) card.outerHTML = renderCard(item);
+
+  // Persist to Notion
+  const aiDataStr = JSON.stringify(item.ai_data);
+  try {
+    await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        properties: {
+          'ai_data': { rich_text: [{ text: { content: aiDataStr.slice(0, 2000) } }] }
+        }
+      })
+    });
+  } catch (e) {
+    console.error('[Viewer] Toggle tgpost section error:', e);
+    // Rollback
+    item.ai_data.tgpost_hidden = hidden;
+    const revertCard = document.querySelector(`.card[data-id="${pageId}"]`);
+    if (revertCard) revertCard.outerHTML = renderCard(item);
   }
 }
 
@@ -2428,6 +2503,21 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // "toggle-hider" — show/hide tgpost multi-hider popup, or toggle section
+    if (action === 'toggle-hider') {
+      e.stopPropagation();
+      const hiderItem = e.target.closest('.tgpost-hider-item');
+      if (hiderItem) {
+        const section = hiderItem.dataset.hiderSection;
+        const card = actionEl.closest('.card[data-id]');
+        if (card && section) toggleTgpostSection(card.dataset.id, section);
+        return;
+      }
+      const popup = actionEl.querySelector('.tgpost-hider-popup');
+      if (popup) popup.classList.toggle('visible');
+      return;
+    }
+
     // "xpost" — tweet card click: check truncation
     if (action === 'xpost') {
       const card = actionEl;
@@ -2547,7 +2637,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ctxTargetItemId = null;
   }
 
-  document.addEventListener('click', closeCtxMenu);
+  document.addEventListener('click', e => {
+    closeCtxMenu();
+    // Close tgpost hider popups on outside click
+    if (!e.target.closest('.tgpost-hider-dot')) {
+      document.querySelectorAll('.tgpost-hider-popup.visible').forEach(p => p.classList.remove('visible'));
+    }
+  });
   window.addEventListener('scroll', closeCtxMenu, true);
 
   ctxMenu.addEventListener('click', async e => {
