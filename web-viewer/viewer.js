@@ -302,16 +302,35 @@ async function resolveRemainingImages(items, fileCache) {
     const fname = it.ai_data?.fileName || it.content || '';
     return /\.heic$/i.test(fname) && it._resolvedImg;
   });
-  if (heicItems.length > 0 && typeof heic2any !== 'undefined') {
-    Promise.all(heicItems.map(async it => {
+  const heicAlbumItems = items.filter(it =>
+    it.albumMedia?.some(m => /\.heic$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
+  );
+  const heicItemsAll = [...new Set([...heicItems, ...heicAlbumItems])];
+  if (heicItemsAll.length > 0 && typeof heic2any !== 'undefined') {
+    Promise.all(heicItemsAll.map(async it => {
+      // Convert standalone HEIC
       const fname = it.ai_data?.fileName || it.content || '';
-      const converted = await maybeConvertHeic(it._resolvedImg, fname);
-      if (converted !== it._resolvedImg) {
-        it._resolvedImg = converted;
-        STATE.imageMap[it.fileId] = converted;
+      if (/\.heic$/i.test(fname) && it._resolvedImg) {
+        const converted = await maybeConvertHeic(it._resolvedImg, fname);
+        if (converted !== it._resolvedImg) {
+          it._resolvedImg = converted;
+          STATE.imageMap[it.fileId] = converted;
+        }
+      }
+      // Convert HEIC entries inside albumMedia
+      if (it.albumMedia) {
+        for (const m of it.albumMedia) {
+          const mfname = m.fileName || '';
+          if (/\.heic$/i.test(mfname) && STATE.imageMap[m.fileId]) {
+            const conv = await maybeConvertHeic(STATE.imageMap[m.fileId], mfname);
+            if (conv !== STATE.imageMap[m.fileId]) {
+              STATE.imageMap[m.fileId] = conv;
+            }
+          }
+        }
       }
       return it;
-    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg)));
+    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg || it.albumMedia?.length)));
   }
 }
 
@@ -621,21 +640,43 @@ async function resolveImagesBatch(items, tgToken, cache) {
   }
 
   // HEIC conversion: fire-and-forget, patches cards after page renders
+  // Collect HEIC conversions for both standalone items and albumMedia entries
   const heicBatchItems = items.filter(it => {
     const fname = it.ai_data?.fileName || '';
     return /\.heic$/i.test(fname) && it._resolvedImg;
   });
-  if (heicBatchItems.length > 0 && typeof heic2any !== 'undefined') {
-    Promise.all(heicBatchItems.map(async it => {
+  // Also collect album items that have HEIC in albumMedia
+  const heicAlbumItems = items.filter(it =>
+    it.albumMedia?.some(m => /\.heic$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
+  );
+  const heicItemsAll = [...new Set([...heicBatchItems, ...heicAlbumItems])];
+  if (heicItemsAll.length > 0 && typeof heic2any !== 'undefined') {
+    Promise.all(heicItemsAll.map(async it => {
+      // Convert standalone HEIC
       const fname = it.ai_data?.fileName || '';
-      const converted = await maybeConvertHeic(it._resolvedImg, fname);
-      if (converted !== it._resolvedImg) {
-        it._resolvedImg = converted;
-        map[it.fileId] = converted;
-        STATE.imageMap[it.fileId] = converted;
+      if (/\.heic$/i.test(fname) && it._resolvedImg) {
+        const converted = await maybeConvertHeic(it._resolvedImg, fname);
+        if (converted !== it._resolvedImg) {
+          it._resolvedImg = converted;
+          map[it.fileId] = converted;
+          STATE.imageMap[it.fileId] = converted;
+        }
+      }
+      // Convert HEIC entries inside albumMedia
+      if (it.albumMedia) {
+        for (const m of it.albumMedia) {
+          const mfname = m.fileName || '';
+          if (/\.heic$/i.test(mfname) && STATE.imageMap[m.fileId]) {
+            const conv = await maybeConvertHeic(STATE.imageMap[m.fileId], mfname);
+            if (conv !== STATE.imageMap[m.fileId]) {
+              map[m.fileId] = conv;
+              STATE.imageMap[m.fileId] = conv;
+            }
+          }
+        }
       }
       return it;
-    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg)));
+    })).then(converted => patchCardImages(converted.filter(it => it._resolvedImg || it.albumMedia?.length)));
   }
 
   return map;
@@ -1765,9 +1806,19 @@ function renderCard(item) {
           const docAction = docStorageUrl ? `data-action="open" data-url="${escapeHtml(docStorageUrl)}"` : (m.fileId ? `data-action="open-file" data-file-id="${escapeHtml(m.fileId)}"` : '');
           return `<div class="tgpost-album-item is-document" ${docAction}><div class="tgpost-album-img tgpost-album-doc"><div class="album-doc-icon">${docSvg}${docExtUpper ? `<span class="doc-file-ext album-doc-ext">.${escapeHtml(docExtUpper)}</span>` : ''}</div>${docFname ? `<div class="album-doc-name">${escapeHtml(docFname)}</div>` : ''}</div></div>`;
         }
-        return resolvedUrl
-          ? `<div class="tgpost-album-item" data-action="album-gallery" data-gallery-type="image" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
-          : `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
+        if (resolvedUrl) {
+          const isHeicAlbum = /\.heic$/i.test(m.fileName || '');
+          const isHeicConverted = resolvedUrl.startsWith('blob:');
+          if (isHeicAlbum && !isHeicConverted) {
+            return `<div class="tgpost-album-item tgpost-album-heic-placeholder"><div class="tgpost-album-img tgpost-album-heic-inner"><span class="heic-label">HEIC</span><span class="heic-converting">converting…</span></div></div>`;
+          }
+          return `<div class="tgpost-album-item" data-action="album-gallery" data-gallery-type="image" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`;
+        }
+        const isHeicAlbumNoUrl = /\.heic$/i.test(m.fileName || '');
+        if (isHeicAlbumNoUrl) {
+          return `<div class="tgpost-album-item tgpost-album-heic-placeholder"><div class="tgpost-album-img tgpost-album-heic-inner"><span class="heic-label">HEIC</span><span class="heic-converting">converting…</span></div></div>`;
+        }
+        return `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
       }).filter(Boolean);
       if (albumItems.length > 0) {
         const cols = albumItems.length > 4 ? 3 : 2;

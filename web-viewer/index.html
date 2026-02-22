@@ -211,7 +211,7 @@
 
     /* HEIC placeholder */
     .card-heic-placeholder {
-      aspect-ratio: 1;
+      aspect-ratio: 4 / 3;
       background: #1a1a1a;
       display: flex;
       flex-direction: column;
@@ -235,6 +235,26 @@
     @keyframes heic-pulse {
       0%, 100% { opacity: 0.4; }
       50% { opacity: 1; }
+    }
+    /* HEIC placeholder inside album grid cell */
+    .tgpost-album-heic-inner {
+      background: #1a1a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .tgpost-album-heic-inner .heic-label {
+      font-family: 'Anybody', sans-serif;
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.05em;
+    }
+    .tgpost-album-heic-inner .heic-converting {
+      font-size: 9px;
+      color: rgba(255,255,255,0.2);
+      animation: heic-pulse 1.5s ease-in-out infinite;
     }
 
     /* Link card */
