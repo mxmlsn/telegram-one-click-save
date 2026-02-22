@@ -643,8 +643,9 @@
       flex-shrink: 0;
     }
     .card-document .doc-file-icon {
-      width: 160px;
-      height: 202px;
+      width: 72%;
+      height: auto;
+      aspect-ratio: 80 / 101;
     }
     .doc-file-icon .doc-file-body {
       width: 100%;
@@ -661,23 +662,27 @@
       line-height: 1;
     }
     .card-document .doc-file-ext {
-      top: 20px;
-      left: 20px;
-      font-size: 30px;
+      top: 13%;
+      left: 13%;
+      font-size: clamp(14px, 5.5cqi, 28px);
+      font-weight: 600;
+      text-transform: lowercase;
     }
     .doc-file-title {
       position: absolute;
-      bottom: 16px;
-      left: 20px;
-      right: 20px;
+      bottom: 12%;
+      left: 13%;
+      right: 13%;
       font-family: Arial, sans-serif;
-      font-size: 16px;
-      font-weight: 600;
-      color: white;
-      line-height: 1.2;
+      font-size: clamp(10px, 4cqi, 22px);
+      font-weight: 400;
+      color: rgba(255, 255, 255, 0.75);
+      line-height: 1.35;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      -webkit-box-orient: vertical;
       text-align: left;
     }
     .doc-file-name {
