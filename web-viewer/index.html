@@ -474,9 +474,8 @@
       aspect-ratio: auto;
       height: auto;
     }
-    /* Spanned items: match row height by using correct aspect ratio for span width */
-    .album-span-2 { aspect-ratio: 2 / 1; }
-    .album-span-3 { aspect-ratio: 3 / 1; }
+    /* Spanned items: height matches other rows via grid-auto-rows: 1fr */
+    .album-span-2, .album-span-3 { aspect-ratio: unset; }
     .tgpost-video-preview {
       position: relative;
       cursor: pointer;

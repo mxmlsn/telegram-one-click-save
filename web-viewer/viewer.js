@@ -1190,7 +1190,9 @@ function renderCard(item) {
       }
       // If no word match, check if starts with known symbol
       if (!sym) { const m = rawPrice.match(/^([^\d\s]+)/); sym = m ? m[1] : '$'; }
-      formattedPrice = sym + num;
+      // Strip trailing .00 or ,00 (zero cents)
+      const cleanNum = num.replace(/[.,]00$/, '');
+      formattedPrice = sym + cleanNum;
     }
     const colorKey = aiData.color_subject || aiData.color_top3?.[0] || aiData.color_palette || 'violet';
     const theme = PRODUCT_PALETTE[colorKey] || PRODUCT_PALETTE.purple;
