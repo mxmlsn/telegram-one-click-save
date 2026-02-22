@@ -2091,7 +2091,9 @@ function renderCard(item) {
     const isHeicFile = /\.heic$/i.test(aiData.fileName || '');
     const isConverted = imgUrl.startsWith('blob:');
     if (isHeicFile && !isConverted) {
-      return `<div class="card card-heic-placeholder" data-id="${item.id}">
+      const heicW = aiData.imageWidth || 4;
+      const heicH = aiData.imageHeight || 3;
+      return `<div class="card card-heic-placeholder" data-id="${item.id}" style="aspect-ratio:${heicW}/${heicH}">
         ${pendingDot}
         <div class="heic-icon"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg></div>
         <div class="heic-label">HEIC</div>

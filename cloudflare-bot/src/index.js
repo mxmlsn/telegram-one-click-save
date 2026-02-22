@@ -207,7 +207,10 @@ function parseMessage(message, env) {
 
   // Photo (array of sizes, take largest)
   if (message.photo && message.photo.length > 0) {
-    result.fileId = message.photo[message.photo.length - 1].file_id;
+    const largestPhoto = message.photo[message.photo.length - 1];
+    result.fileId = largestPhoto.file_id;
+    if (largestPhoto.width) result.imageWidth = largestPhoto.width;
+    if (largestPhoto.height) result.imageHeight = largestPhoto.height;
     result.mediaType = 'image';
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
@@ -459,6 +462,8 @@ async function saveToNotion(parsed, env) {
   if (parsed.audioFileName) aiDataInit.audioFileName = parsed.audioFileName;
   if (parsed.fileName) aiDataInit.fileName = parsed.fileName;
   if (parsed.fileSize) aiDataInit.fileSize = parsed.fileSize;
+  if (parsed.imageWidth) aiDataInit.imageWidth = parsed.imageWidth;
+  if (parsed.imageHeight) aiDataInit.imageHeight = parsed.imageHeight;
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
@@ -556,6 +561,8 @@ async function forwardToStorageChannel(message, chatId, notionPageId, parsed, en
     if (parsed.audioFileName) currentAiData.audioFileName = parsed.audioFileName;
     if (parsed.fileName) currentAiData.fileName = parsed.fileName;
     if (parsed.fileSize) currentAiData.fileSize = parsed.fileSize;
+    if (parsed.imageWidth) currentAiData.imageWidth = parsed.imageWidth;
+    if (parsed.imageHeight) currentAiData.imageHeight = parsed.imageHeight;
     currentAiData.storageUrl = storageUrl;
 
     // Store on parsed so analyzeAndPatch (which runs after) preserves it
@@ -1163,6 +1170,8 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   if (parsed.forwardFrom) aiDataPayload.forwardFrom = parsed.forwardFrom;
   if (parsed.forwardUserUrl) aiDataPayload.forwardUserUrl = parsed.forwardUserUrl;
   if (parsed.fileSize) aiDataPayload.fileSize = parsed.fileSize;
+  if (parsed.imageWidth) aiDataPayload.imageWidth = parsed.imageWidth;
+  if (parsed.imageHeight) aiDataPayload.imageHeight = parsed.imageHeight;
   if (parsed.audioFileName) aiDataPayload.audioFileName = parsed.audioFileName;
   if (parsed.fileName) aiDataPayload.fileName = parsed.fileName;
   if (parsed.storageUrl) aiDataPayload.storageUrl = parsed.storageUrl;
