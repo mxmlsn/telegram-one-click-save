@@ -634,13 +634,9 @@
       display: block;
       width: 100%;
     }
-    .card-tgvideo .tgpost-play-icon {
-      width: 96px;
-      height: 96px;
-    }
     .card-tgvideo .tgpost-play-icon svg {
-      width: 44px;
-      height: 44px;
+      width: 56px;
+      height: 56px;
     }
     /* TG video glow (inline video cards) */
     .card-tgvideo,
@@ -673,31 +669,24 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 72px;
-      height: 72px;
-      background: rgba(255,255,255,0.12);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: none;
+      border: none;
       pointer-events: none;
       z-index: 2;
     }
     .tgpost-play-icon svg {
-      width: 36px;
-      height: 36px;
-      margin-left: 3px;
-      opacity: 0.5;
-    }
-    .tgpost-video-preview .tgpost-play-icon {
-      width: 96px;
-      height: 96px;
-    }
-    .tgpost-video-preview .tgpost-play-icon svg {
       width: 44px;
       height: 44px;
+      margin-left: 3px;
+      opacity: 0.5;
+      filter: drop-shadow(0 0 12px rgba(0,0,0,0.5));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .tgpost-video-preview .tgpost-play-icon svg,
+    .card-tgvideo .tgpost-play-icon svg {
+      width: 56px;
+      height: 56px;
     }
     /* Full-width PDF preview in tgpost */
     /* PDF section inside tgpost — reuses pdf-blur-wrap and pdf-title from card-pdf */
