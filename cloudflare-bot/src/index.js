@@ -549,6 +549,7 @@ async function forwardToStorageChannel(message, chatId, notionPageId, parsed, en
     if (parsed.mediaGroupId) currentAiData.mediaGroupId = parsed.mediaGroupId;
     if (parsed.channelTitle) currentAiData.channelTitle = parsed.channelTitle;
     if (parsed.forwardFrom) currentAiData.forwardFrom = parsed.forwardFrom;
+    if (parsed.forwardUserUrl) currentAiData.forwardUserUrl = parsed.forwardUserUrl;
     if (parsed.audioTitle) currentAiData.audioTitle = parsed.audioTitle;
     if (parsed.audioPerformer) currentAiData.audioPerformer = parsed.audioPerformer;
     if (parsed.audioDuration) currentAiData.audioDuration = parsed.audioDuration;
@@ -826,6 +827,7 @@ async function transcribeAndPatch(parsed, notionPageId, env) {
     if (parsed.thumbnailFileId) aiData.thumbnailFileId = parsed.thumbnailFileId;
     if (parsed.channelTitle) aiData.channelTitle = parsed.channelTitle;
     if (parsed.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
+    if (parsed.forwardUserUrl) aiData.forwardUserUrl = parsed.forwardUserUrl;
     if (parsed.audioDuration) aiData.audioDuration = parsed.audioDuration;
     if (parsed.fileSize) aiData.fileSize = parsed.fileSize;
     if (parsed.storageUrl) aiData.storageUrl = parsed.storageUrl;
@@ -875,6 +877,7 @@ async function analyzeAudioCover(parsed, notionPageId, env, provider) {
   if (parsed.thumbnailFileId && !aiData.thumbnailFileId) aiData.thumbnailFileId = parsed.thumbnailFileId;
   if (parsed.channelTitle && !aiData.channelTitle) aiData.channelTitle = parsed.channelTitle;
   if (parsed.forwardFrom && !aiData.forwardFrom) aiData.forwardFrom = parsed.forwardFrom;
+  if (parsed.forwardUserUrl && !aiData.forwardUserUrl) aiData.forwardUserUrl = parsed.forwardUserUrl;
   if (parsed.audioTitle && !aiData.audioTitle) aiData.audioTitle = parsed.audioTitle;
   if (parsed.audioPerformer && !aiData.audioPerformer) aiData.audioPerformer = parsed.audioPerformer;
   if (parsed.audioDuration && !aiData.audioDuration) aiData.audioDuration = parsed.audioDuration;
@@ -1158,6 +1161,7 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   if (parsed.mediaGroupId) aiDataPayload.mediaGroupId = parsed.mediaGroupId;
   if (parsed.channelTitle) aiDataPayload.channelTitle = parsed.channelTitle;
   if (parsed.forwardFrom) aiDataPayload.forwardFrom = parsed.forwardFrom;
+  if (parsed.forwardUserUrl) aiDataPayload.forwardUserUrl = parsed.forwardUserUrl;
   if (parsed.fileSize) aiDataPayload.fileSize = parsed.fileSize;
   if (parsed.audioFileName) aiDataPayload.audioFileName = parsed.audioFileName;
   if (parsed.fileName) aiDataPayload.fileName = parsed.fileName;
