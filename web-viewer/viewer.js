@@ -1496,15 +1496,22 @@ function renderCard(item) {
       const pdfIsHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
       const pdfDisplayText = textContent.length > 700 ? textContent.slice(0, 700) : textContent;
       const pdfDisplayHtml = pdfIsHtml ? sanitizeHtml(pdfDisplayText) : escapeHtml(pdfDisplayText);
-      const pdfBodyHtml = textContent.trim()
-        ? `<div class="tgpost-body"><div class="quote-text">${pdfDisplayHtml}</div></div>`
+      const hasPdfText = !!textContent.trim();
+      const pdfBodyHtml = hasPdfText
+        ? `<div class="tgpost-body pdf-text-collapsible"><div class="quote-text">${pdfDisplayHtml}</div></div>`
         : '';
       // Author footer — clickable, opens source post (not the PDF)
       const pdfFooterHtml = tgLabel
-        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
+        ? `<div class="quote-footer pdf-text-collapsible"><div class="tg-footer-left">${TG_ICON_SVG}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
+        : '';
+      // Toggle button (collapse/expand text) — only when text exists
+      const collapseCircle = `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+      const pdfToggleBtn = hasPdfText
+        ? `<button class="pdf-text-toggle" data-action="toggle-pdf-text">${collapseCircle}</button>`
         : '';
       return `<div class="card card-pdf" data-id="${item.id}" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}" data-source-url="${escapeHtml(sourceUrl)}">
         ${pendingDot}
+        ${pdfToggleBtn}
         ${pdfPreviewHtml}
         ${pdfTitle ? `<div class="pdf-title">${escapeHtml(pdfTitle)}</div>` : ''}
         ${pdfBodyHtml}
@@ -2702,6 +2709,19 @@ document.addEventListener('DOMContentLoaded', () => {
       if (transcriptEl) {
         transcriptEl.classList.toggle('hidden');
         actionEl.classList.toggle('active');
+      }
+      return;
+    }
+
+    // "toggle-pdf-text" — collapse/expand text in PDF card
+    if (action === 'toggle-pdf-text') {
+      e.stopPropagation();
+      const card = actionEl.closest('.card.card-pdf');
+      if (card) {
+        card.classList.toggle('pdf-text-hidden');
+        const circleIcon = `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/></svg>`;
+        const lineIcon = `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+        actionEl.innerHTML = card.classList.contains('pdf-text-hidden') ? circleIcon : lineIcon;
       }
       return;
     }

@@ -1195,6 +1195,34 @@
     .card-pdf .quote-source-link:hover {
       color: rgba(255,255,255,0.65);
     }
+    /* PDF text toggle button */
+    .pdf-text-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 10;
+      padding: 0;
+    }
+    .card-pdf:hover .pdf-text-toggle { opacity: 1; }
+    .card-pdf.pdf-text-hidden .pdf-text-toggle { opacity: 0.6; }
+    .card-pdf.pdf-text-hidden:hover .pdf-text-toggle { opacity: 1; }
+    .pdf-text-toggle:hover { background: rgba(0,0,0,0.6); }
+    .pdf-text-toggle:hover svg line,
+    .pdf-text-toggle:hover svg circle { stroke: rgba(255,255,255,0.7); }
+    .card-pdf.pdf-text-hidden .pdf-text-collapsible { display: none; }
 
     /* ── Video Note card (circle video) ── */
     .card.card-videonote { border-radius: 20px; overflow: clip; }
