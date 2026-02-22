@@ -669,24 +669,20 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: none;
-      border: none;
-      pointer-events: none;
-      z-index: 2;
-    }
-    .tgpost-play-icon svg {
-      width: 44px;
-      height: 44px;
-      margin-left: 3px;
-      opacity: 0.5;
-      filter: drop-shadow(0 0 12px rgba(0,0,0,0.5));
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    .tgpost-video-preview .tgpost-play-icon svg,
-    .card-tgvideo .tgpost-play-icon svg {
       width: 56px;
       height: 56px;
+      pointer-events: none;
+      z-index: 2;
+      clip-path: polygon(15% 0%, 100% 50%, 15% 100%);
+      background: rgba(255,255,255,0.35);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .tgpost-play-icon svg { display: none; }
+    .tgpost-video-preview .tgpost-play-icon,
+    .card-tgvideo .tgpost-play-icon {
+      width: 72px;
+      height: 72px;
     }
     /* Full-width PDF preview in tgpost */
     /* PDF section inside tgpost — reuses pdf-blur-wrap and pdf-title from card-pdf */
