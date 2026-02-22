@@ -2324,6 +2324,7 @@ async function _showLightboxItem() {
 
   if (isVideo) {
     video.src = item.url;
+    video.loop = true;
     video.play().catch(() => {});
     img.src = '';
   } else if (item.video && !item.url && item.thumb) {
