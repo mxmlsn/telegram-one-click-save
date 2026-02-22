@@ -276,8 +276,12 @@ function parseMessage(message, env) {
     if (message.document.file_size) result.fileSize = message.document.file_size;
     if (message.document.thumbnail?.file_id) {
       result.thumbnailFileId = message.document.thumbnail.file_id;
+      if (message.document.thumbnail.width) result.thumbnailWidth = message.document.thumbnail.width;
+      if (message.document.thumbnail.height) result.thumbnailHeight = message.document.thumbnail.height;
     } else if (message.document.thumb?.file_id) {
       result.thumbnailFileId = message.document.thumb.file_id;
+      if (message.document.thumb.width) result.thumbnailWidth = message.document.thumb.width;
+      if (message.document.thumb.height) result.thumbnailHeight = message.document.thumb.height;
     }
     if (isImageDoc) {
       // Image sent as document — treat like a photo
@@ -464,6 +468,8 @@ async function saveToNotion(parsed, env) {
   if (parsed.fileSize) aiDataInit.fileSize = parsed.fileSize;
   if (parsed.imageWidth) aiDataInit.imageWidth = parsed.imageWidth;
   if (parsed.imageHeight) aiDataInit.imageHeight = parsed.imageHeight;
+  if (parsed.thumbnailWidth) aiDataInit.thumbnailWidth = parsed.thumbnailWidth;
+  if (parsed.thumbnailHeight) aiDataInit.thumbnailHeight = parsed.thumbnailHeight;
   if (Object.keys(aiDataInit).length) {
     properties['ai_data'] = {
       rich_text: [{ text: { content: JSON.stringify(aiDataInit) } }]
@@ -563,6 +569,8 @@ async function forwardToStorageChannel(message, chatId, notionPageId, parsed, en
     if (parsed.fileSize) currentAiData.fileSize = parsed.fileSize;
     if (parsed.imageWidth) currentAiData.imageWidth = parsed.imageWidth;
     if (parsed.imageHeight) currentAiData.imageHeight = parsed.imageHeight;
+    if (parsed.thumbnailWidth) currentAiData.thumbnailWidth = parsed.thumbnailWidth;
+    if (parsed.thumbnailHeight) currentAiData.thumbnailHeight = parsed.thumbnailHeight;
     currentAiData.storageUrl = storageUrl;
 
     // Store on parsed so analyzeAndPatch (which runs after) preserves it
@@ -1172,6 +1180,8 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   if (parsed.fileSize) aiDataPayload.fileSize = parsed.fileSize;
   if (parsed.imageWidth) aiDataPayload.imageWidth = parsed.imageWidth;
   if (parsed.imageHeight) aiDataPayload.imageHeight = parsed.imageHeight;
+  if (parsed.thumbnailWidth) aiDataPayload.thumbnailWidth = parsed.thumbnailWidth;
+  if (parsed.thumbnailHeight) aiDataPayload.thumbnailHeight = parsed.thumbnailHeight;
   if (parsed.audioFileName) aiDataPayload.audioFileName = parsed.audioFileName;
   if (parsed.fileName) aiDataPayload.fileName = parsed.fileName;
   if (parsed.storageUrl) aiDataPayload.storageUrl = parsed.storageUrl;

@@ -715,8 +715,11 @@ function patchCardImages(items) {
     const newCard = document.querySelector(`.card[data-id="${item.id}"]`);
     // Fade in if replacing a HEIC placeholder
     if (wasHeicPlaceholder && newCard) {
-      newCard.classList.add('card-fade-in');
-      requestAnimationFrame(() => requestAnimationFrame(() => newCard.classList.remove('card-fade-in')));
+      newCard.style.opacity = '0';
+      requestAnimationFrame(() => {
+        newCard.style.transition = 'opacity 0.4s ease';
+        newCard.style.opacity = '1';
+      });
     }
     if (newCard && newCard.classList.contains('card-xpost')) {
       const textEl = newCard.querySelector('.xpost-text');
@@ -2147,10 +2150,11 @@ function renderCard(item) {
     const isHeicFile = /\.heic$/i.test(aiData.fileName || '');
     const isConverted = imgUrl.startsWith('blob:');
     if (isHeicFile && !isConverted) {
-      const heicW = aiData.imageWidth || 0;
-      const heicH = aiData.imageHeight || 0;
+      const heicW = aiData.thumbnailWidth || aiData.imageWidth || 0;
+      const heicH = aiData.thumbnailHeight || aiData.imageHeight || 0;
       const heicRatioStyle = (heicW && heicH) ? ` style="aspect-ratio:${heicW}/${heicH}"` : '';
-      const thumbFid = aiData.thumbnailFileId ? ` data-thumb-fid="${escapeHtml(aiData.thumbnailFileId)}"` : '';
+      // data-thumb-fid only needed as fallback for old records without stored dimensions
+      const thumbFid = (!heicW && aiData.thumbnailFileId) ? ` data-thumb-fid="${escapeHtml(aiData.thumbnailFileId)}"` : '';
       return `<div class="card card-heic-placeholder" data-id="${item.id}"${heicRatioStyle}${thumbFid}>
         ${pendingDot}
         <div class="heic-icon"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg></div>
