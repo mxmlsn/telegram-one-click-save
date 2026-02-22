@@ -218,12 +218,16 @@ async function startApp() {
 async function resolveRemainingImages(items, fileCache) {
   const now = Date.now();
 
-  // Collect all unique fileIds (main + album extras)
+  // Collect all unique fileIds (main + album extras + HEIC thumbnails)
   const allFileIds = new Set();
   for (const item of items) {
     if (item.fileId) allFileIds.add(item.fileId);
     if (item.fileIds?.length > 1) {
       for (const fid of item.fileIds) if (fid) allFileIds.add(fid);
+    }
+    const fname = item.ai_data?.fileName || '';
+    if (/\.heic$/i.test(fname) && item.ai_data?.thumbnailFileId) {
+      allFileIds.add(item.ai_data.thumbnailFileId);
     }
   }
 
@@ -578,12 +582,17 @@ async function resolveImagesBatch(items, tgToken, cache) {
   const toFetch = [];
   const map = {};
 
-  // Collect all fileIds that need resolution (main + album extras)
+  // Collect all fileIds that need resolution (main + album extras + HEIC thumbnails)
   const allFileIds = new Set();
   for (const item of items) {
     if (item.fileId) allFileIds.add(item.fileId);
     if (item.fileIds?.length > 1) {
       for (const fid of item.fileIds) if (fid) allFileIds.add(fid);
+    }
+    // Pre-resolve thumbnails for HEIC items so placeholder size is instant
+    const fname = item.ai_data?.fileName || '';
+    if (/\.heic$/i.test(fname) && item.ai_data?.thumbnailFileId) {
+      allFileIds.add(item.ai_data.thumbnailFileId);
     }
   }
 
@@ -699,10 +708,16 @@ function patchCardImages(items) {
     const card = document.querySelector(`.card[data-id="${item.id}"]`);
     if (!card) continue;
     if (card.querySelector('.videonote-circle')) hasVideoNotes = true;
+    const wasHeicPlaceholder = card.classList.contains('card-heic-placeholder');
     // Replace the whole card HTML to get correct card type rendering
     card.outerHTML = renderCard(item);
     // Re-check xpost truncation on the new card
     const newCard = document.querySelector(`.card[data-id="${item.id}"]`);
+    // Fade in if replacing a HEIC placeholder
+    if (wasHeicPlaceholder && newCard) {
+      newCard.classList.add('card-fade-in');
+      requestAnimationFrame(() => requestAnimationFrame(() => newCard.classList.remove('card-fade-in')));
+    }
     if (newCard && newCard.classList.contains('card-xpost')) {
       const textEl = newCard.querySelector('.xpost-text');
       if (textEl && textEl.scrollHeight > textEl.clientHeight + 2) {
