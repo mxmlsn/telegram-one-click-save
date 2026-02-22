@@ -1505,11 +1505,15 @@ function renderCard(item) {
         ? `<div class="quote-footer pdf-text-collapsible"><div class="tg-footer-left">${TG_ICON_SVG}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
         : '';
       // Toggle button (collapse/expand text) — only when text exists
-      const collapseCircle = `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+      const pdfTextCollapsed = !!(aiData.pdf_text_collapsed);
+      const pdfCollapsedClass = pdfTextCollapsed ? ' pdf-text-hidden' : '';
+      const pdfToggleIcon = pdfTextCollapsed
+        ? `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/></svg>`
+        : `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
       const pdfToggleBtn = hasPdfText
-        ? `<button class="pdf-text-toggle" data-action="toggle-pdf-text">${collapseCircle}</button>`
+        ? `<button class="pdf-text-toggle" data-action="toggle-pdf-text">${pdfToggleIcon}</button>`
         : '';
-      return `<div class="card card-pdf" data-id="${item.id}" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}" data-source-url="${escapeHtml(sourceUrl)}">
+      return `<div class="card card-pdf${pdfCollapsedClass}" data-id="${item.id}" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}" data-source-url="${escapeHtml(sourceUrl)}">
         ${pendingDot}
         ${pdfToggleBtn}
         ${pdfPreviewHtml}
@@ -2171,6 +2175,41 @@ async function toggleXpostCollapse(pageId) {
   }
 }
 
+async function togglePdfTextCollapse(pageId) {
+  const item = STATE.items.find(i => i.id === pageId);
+  if (!item) return;
+
+  const newCollapsed = !item.ai_data.pdf_text_collapsed;
+  item.ai_data.pdf_text_collapsed = newCollapsed;
+
+  // Optimistic re-render
+  const cardEl = document.querySelector(`.card[data-id="${pageId}"]`);
+  if (cardEl) cardEl.outerHTML = renderCard(item);
+
+  // Persist to Notion
+  const aiDataStr = JSON.stringify(item.ai_data);
+  try {
+    await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        properties: {
+          'ai_data': { rich_text: [{ text: { content: aiDataStr.slice(0, 2000) } }] }
+        }
+      })
+    });
+  } catch (e) {
+    console.error('[Viewer] Toggle PDF text error:', e);
+    item.ai_data.pdf_text_collapsed = !newCollapsed;
+    const revertCard = document.querySelector(`.card[data-id="${pageId}"]`);
+    if (revertCard) revertCard.outerHTML = renderCard(item);
+  }
+}
+
 async function toggleTgpostSection(pageId, section) {
   const item = STATE.items.find(i => i.id === pageId);
   if (!item) return;
@@ -2713,16 +2752,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "toggle-pdf-text" — collapse/expand text in PDF card
+    // "toggle-pdf-text" — collapse/expand text in PDF card (persisted)
     if (action === 'toggle-pdf-text') {
       e.stopPropagation();
-      const card = actionEl.closest('.card.card-pdf');
-      if (card) {
-        card.classList.toggle('pdf-text-hidden');
-        const circleIcon = `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/></svg>`;
-        const lineIcon = `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-        actionEl.innerHTML = card.classList.contains('pdf-text-hidden') ? circleIcon : lineIcon;
-      }
+      const card = actionEl.closest('.card.card-pdf[data-id]');
+      if (card) togglePdfTextCollapse(card.dataset.id);
       return;
     }
 
