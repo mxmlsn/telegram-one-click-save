@@ -1609,10 +1609,12 @@ function renderCard(item) {
       const ytFallback = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
       const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
       const ytOnload = !imgUrl ? `onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'"` : '';
+      const ytShareIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
       mediaHtml = `<div class="tgpost-yt-card" data-action="open" data-url="${escapeHtml(ytUrl)}">
         <div class="video-header">
           <img class="video-favicon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=64" alt="" onerror="this.style.display='none'">
           <span class="video-domain">youtube.com</span>
+          <button class="video-share-btn" data-action="open" data-url="${escapeHtml(ytUrl)}" title="Open">${ytShareIcon}</button>
         </div>
         <div class="video-preview">
           <div class="video-glow-wrap">
@@ -1636,10 +1638,12 @@ function renderCard(item) {
           if (el) el.src = src;
           if (glowEl) glowEl.src = src;
         }).catch(() => {});
+      const vimeoShareIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
       mediaHtml = `<div class="tgpost-yt-card" data-action="open" data-url="${escapeHtml(vimeoUrl)}">
         <div class="video-header">
           <img class="video-favicon" src="https://www.google.com/s2/favicons?domain=vimeo.com&sz=64" alt="" onerror="this.style.display='none'">
           <span class="video-domain">vimeo.com</span>
+          <button class="video-share-btn" data-action="open" data-url="${escapeHtml(vimeoUrl)}" title="Open">${vimeoShareIcon}</button>
         </div>
         <div class="video-preview">
           <div class="video-glow-wrap">

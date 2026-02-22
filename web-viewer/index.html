@@ -493,8 +493,50 @@
       width: 100%;
     }
     .tgpost-yt-card { cursor: pointer; }
-    .tgpost-yt-card .video-header { padding: 10px 14px 6px; }
-    .tgpost-yt-card .video-preview { padding: 0 14px; }
+    .tgpost-yt-card .video-header {
+      height: 56px;
+      display: flex; align-items: center;
+      padding: 0 15px;
+      gap: 10px;
+      position: relative;
+    }
+    .tgpost-yt-card .video-favicon {
+      width: 27px; height: 27px;
+      border-radius: 4px; flex-shrink: 0;
+      object-fit: contain;
+    }
+    .tgpost-yt-card .video-domain {
+      font-family: 'Anybody', sans-serif;
+      font-size: 12px;
+      color: rgba(255,255,255,0.3);
+      font-weight: 400;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+      -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+    }
+    .tgpost-yt-card .video-share-btn {
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%;
+      background: none;
+      border: none;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease;
+      flex-shrink: 0;
+    }
+    .tgpost-yt-card .video-share-btn svg {
+      width: 42px; height: 42px;
+    }
+    .tgpost-yt-card:hover .video-share-btn {
+      opacity: 0.8;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));
+      transform: translateX(3px);
+    }
+    .tgpost-yt-card .video-preview { padding: 0 10px 10px; }
     .tgpost-yt-card .video-glow-wrap { position: relative; }
     .tgpost-yt-card .video-glow {
       position: absolute;
@@ -506,6 +548,11 @@
       opacity: 0.7;
       pointer-events: none;
       z-index: 0;
+      transition: filter 0.3s ease, opacity 0.3s ease;
+    }
+    .tgpost-yt-card:hover .video-glow {
+      filter: blur(60px) saturate(2);
+      opacity: 1;
     }
     .tgpost-yt-card .video-screenshot {
       position: relative;
