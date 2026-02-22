@@ -1084,34 +1084,78 @@ function renderCard(item) {
     const thumbGlowAttr = ytOnload;
     const thumbImgAttr = ytOnload;
 
-    // Direct TG video (no YouTube/Vimeo) — play inline via lightbox
+    // Direct TG video (no YouTube/Vimeo) — render as card-tgvideo (full-width thumb + play icon)
     const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
-    const isLargeFile = (aiData.fileSize || 0) > 20 * 1024 * 1024;
-    const playbackFileId = item.videoFileId || item.fileId;
-    const cardAction = isTgDirectVideo ? 'video-play' : 'open';
-    const cardUrl = isTgDirectVideo ? '' : url;
-    const domainLabel = isTgDirectVideo ? 'Telegram video' : domain;
-
-    const hasStorageUrl = !!aiData.storageUrl;
-    let videoBadge;
-    if (isTgDirectVideo && isLargeFile) {
-      const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
-      videoBadge = hasStorageUrl
-        ? `<div class="video-badge video-badge-large">${sizeMB} MB · open in TG</div>`
-        : `<div class="video-badge video-badge-large">${sizeMB} MB</div>`;
-    } else if (isTgDirectVideo) {
-      videoBadge = '<div class="video-badge video-badge-inline">inline</div>';
-    } else {
-      videoBadge = '<div class="video-badge video-badge-external">external</div>';
+    if (isTgDirectVideo) {
+      const isLargeFile = (aiData.fileSize || 0) > 20 * 1024 * 1024;
+      const playbackFileId = item.videoFileId || item.fileId;
+      const tgSourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
+      const tgThumbUrl = imgUrl || '';
+      const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
+      // Large file badge
+      let tgVideoBadge = '';
+      if (isLargeFile) {
+        const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+        tgVideoBadge = aiData.storageUrl
+          ? `<div class="video-badge video-badge-large">${sizeMB} MB · open in TG</div>`
+          : `<div class="video-badge video-badge-large">${sizeMB} MB</div>`;
+      }
+      // Text + author from ai_data
+      const tgVideoText = item.content || '';
+      const tgVideoAuthor = aiData.channelTitle || aiData.forwardFrom || '';
+      const tgVideoBodyHtml = tgVideoText.trim()
+        ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(tgVideoText.length > 700 ? tgVideoText.slice(0, 700) : tgVideoText)}</div></div>`
+        : '';
+      const tgVideoFooterHtml = tgVideoAuthor
+        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(tgVideoAuthor)}</span></div></div>`
+        : '';
+      const hasExtras = tgVideoBodyHtml || tgVideoFooterHtml;
+      if (hasExtras) {
+        // Render as tgpost-style card with video + text + author
+        return `<div class="card card-tgpost tgpost-bg-video" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
+          ${pendingDot}
+          ${tgVideoBadge}
+          ${tgThumbUrl
+            ? `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}">
+                <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+                <div class="tgpost-play-icon">${playIconSvg}</div>
+              </div>`
+            : `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}">
+                <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:16px auto">${playIconSvg}</div>
+              </div>`}
+          ${tgVideoBodyHtml}
+          ${tgVideoFooterHtml}
+        </div>`;
+      }
+      // No text/author — plain card-tgvideo
+      return tgThumbUrl
+        ? `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
+          ${pendingDot}
+          ${tgVideoBadge}
+          <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+          <div class="tgpost-play-icon">${playIconSvg}</div>
+        </div>`
+        : `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
+          ${pendingDot}
+          ${tgVideoBadge}
+          <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:40px auto">${playIconSvg}</div>
+        </div>`;
     }
+
+    // External video (YouTube/Vimeo/other links)
+    const cardAction = 'open';
+    const cardUrl = url;
+    const domainLabel = domain;
+
+    const videoBadge = '<div class="video-badge video-badge-external">external</div>';
     const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
-    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${isTgDirectVideo ? ` data-file-id="${escapeHtml(playbackFileId)}"` : ''}${sourceUrlAttr}>
+    return `<div class="card card-video" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}"${sourceUrlAttr}>
       ${pendingDot}
       ${videoBadge}
       <div class="video-header">
-        ${faviconUrl && !isTgDirectVideo ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
+        ${faviconUrl ? `<img class="video-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
         <span class="video-domain">${escapeHtml(domainLabel)}</span>
-        <button class="video-share-btn" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}" title="${isTgDirectVideo ? 'Play' : 'Open'}">${shareIcon}</button>
+        <button class="video-share-btn" data-action="${cardAction}" data-url="${escapeHtml(cardUrl)}" title="Open">${shareIcon}</button>
       </div>
       ${(thumbSrc || vimeoId) ? `<div class="video-preview">
         <div class="video-glow-wrap">
