@@ -1157,13 +1157,24 @@
       overflow: hidden;
     }
     /* PDF card with text + author (extends base card-pdf) */
-    .card-pdf .tgpost-body { padding: 10px 18px 8px; }
+    .card-pdf .tgpost-body { padding: 5px 18px 8px; }
     .card-pdf .quote-text {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 13px;
       line-height: 1.5;
       color: rgba(255,255,255,0.6);
       white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    .card-pdf .quote-text a {
+      color: rgba(255,255,255,0.75);
+      text-decoration: underline;
+      text-decoration-color: rgba(255,255,255,0.25);
+      word-break: break-all;
+    }
+    .card-pdf .quote-text a:hover {
+      text-decoration-color: rgba(255,255,255,0.5);
     }
     .card-pdf .quote-footer {
       display: flex;
@@ -1176,6 +1187,11 @@
       font-size: 10px;
       color: rgba(255,255,255,0.4);
       text-decoration: none;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .card-pdf .quote-source-link:hover {
+      color: rgba(255,255,255,0.65);
     }
 
     /* ── Video Note card (circle video) ── */

@@ -1492,11 +1492,16 @@ function renderCard(item) {
       const pdfPreviewHtml = pdfThumbUrl
         ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`
         : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`;
+      // Sanitize HTML in text (links, bold, italic etc)
+      const pdfIsHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
+      const pdfDisplayText = textContent.length > 700 ? textContent.slice(0, 700) : textContent;
+      const pdfDisplayHtml = pdfIsHtml ? sanitizeHtml(pdfDisplayText) : escapeHtml(pdfDisplayText);
       const pdfBodyHtml = textContent.trim()
-        ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(textContent.length > 700 ? textContent.slice(0, 700) : textContent)}</div></div>`
+        ? `<div class="tgpost-body"><div class="quote-text">${pdfDisplayHtml}</div></div>`
         : '';
+      // Author footer — clickable, opens source post (not the PDF)
       const pdfFooterHtml = tgLabel
-        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(tgLabel)}</span></div></div>`
+        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
         : '';
       return `<div class="card card-pdf" data-id="${item.id}" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}" data-source-url="${escapeHtml(sourceUrl)}">
         ${pendingDot}
