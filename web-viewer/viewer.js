@@ -1406,8 +1406,7 @@ function renderCard(item) {
     const pdfFooterHtml = pdfAuthorLabel
       ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(pdfAuthorLabel)}</span></div></div>`
       : '';
-    const pdfHasExtras = pdfBodyHtml || pdfFooterHtml;
-    return `<div class="card card-pdf${pdfHasExtras ? ' card-pdf-tgpost' : ''}" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}${pdfSourceAttr}>
+    return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}${pdfSourceAttr}>
       ${pendingDot}
       ${previewHtml}
       <div class="pdf-title">${escapeHtml(pdfTitle)}</div>
