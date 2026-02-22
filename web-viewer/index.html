@@ -642,18 +642,16 @@
       width: 36px;
       height: 36px;
     }
-    /* TG video glow (inline video cards) — same principle as .card-video */
-    .card-tgvideo .video-preview,
-    .tgpost-video-preview .video-preview { padding: 0 10px 10px; }
-    .card-tgvideo .video-glow-wrap,
-    .tgpost-video-preview .video-glow-wrap { position: relative; }
+    /* TG video glow (inline video cards) */
+    .card-tgvideo,
+    .card-tgpost.tgpost-bg-video { overflow: visible; }
     .card-tgvideo .video-glow,
     .tgpost-video-preview .video-glow {
       position: absolute;
       bottom: -1px; left: 50%;
       transform: translateX(-50%) scaleX(0.85);
       width: 100%;
-      border-radius: 11px;
+      border-radius: var(--radius);
       filter: blur(30px) saturate(1.4);
       opacity: 0.7;
       pointer-events: none;
@@ -661,18 +659,15 @@
       transition: filter 0.3s ease, opacity 0.3s ease;
     }
     .card-tgvideo:hover .video-glow,
-    .card-tgpost:hover .tgpost-video-preview .video-glow {
+    .card-tgpost.tgpost-bg-video:hover .video-glow {
       filter: blur(60px) saturate(2);
       opacity: 1;
     }
-    .card-tgvideo .video-glow-wrap .card-img,
-    .tgpost-video-preview .video-glow-wrap .card-img {
+    .card-tgvideo .card-img,
+    .tgpost-video-preview .card-img {
       position: relative;
-      display: block;
-      width: 100%;
-      object-fit: cover;
       z-index: 1;
-      border-radius: 11px;
+      border-radius: var(--radius);
     }
     .tgpost-play-icon {
       position: absolute;
