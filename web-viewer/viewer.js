@@ -2325,6 +2325,7 @@ async function _showLightboxItem() {
     img.src = '';
     // Set glow thumbnail
     videoGlow.src = item.thumb || '';
+    console.log('[lightbox-glow] thumb:', item.thumb, 'videoGlow.src:', videoGlow.src);
   } else if (item.video && !item.url && item.thumb) {
     // Video couldn't be resolved (>20MB) — show thumbnail
     img.src = item.thumb;
@@ -2539,15 +2540,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       // Grab thumbnail from the card for lightbox glow
-      const card = actionEl.closest('.card[data-id]');
-      const thumbImg = card && card.querySelector('.card-img, .tgpost-album-img, .video-screenshot');
+      const vpCard = actionEl.closest('.card[data-id]');
+      const thumbImg = vpCard && vpCard.querySelector('.card-img, .tgpost-album-img, .video-screenshot');
       const thumbUrl = thumbImg ? thumbImg.src : '';
       if (videoUrl) {
         openLightbox(videoUrl, '', { video: true, thumb: thumbUrl });
       } else {
         // File too large for Bot API (>20MB) — try storageUrl or sourceUrl
-        const card = actionEl.closest('.card[data-id]');
-        const item = card ? STATE.items.find(i => i.id === card.dataset.id) : null;
+        const item = vpCard ? STATE.items.find(i => i.id === vpCard.dataset.id) : null;
         const fallbackUrl = item?.ai_data?.storageUrl || card?.dataset?.sourceUrl;
         if (fallbackUrl && /^https?:\/\//.test(fallbackUrl)) {
           showToast('Видео &gt;20 МБ — открываю в Telegram');
