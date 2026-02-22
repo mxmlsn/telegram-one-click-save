@@ -385,22 +385,14 @@
     /* Multi-hider */
     .tgpost-hider-dot {
       width: 16px; height: 16px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.1);
       cursor: pointer;
       flex-shrink: 0;
-      transition: background 0.15s;
       position: relative;
       display: flex; align-items: center; justify-content: center;
       margin-right: -4px;
     }
-    .tgpost-hider-dot:hover { background: rgba(255,255,255,0.22); }
-    .tgpost-hider-dot.has-hidden::after {
-      content: '';
-      width: 4px; height: 4px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.4);
-    }
+    .tgpost-hider-dot svg { transition: opacity 0.15s; }
+    .tgpost-hider-dot:hover svg { opacity: 0.8; }
     .tgpost-hider-popup {
       position: absolute;
       bottom: calc(100% + 8px);

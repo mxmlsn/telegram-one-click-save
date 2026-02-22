@@ -1103,12 +1103,15 @@ function renderCard(item) {
       // Text + author from ai_data
       const tgVideoText = item.content || '';
       // forwardFrom only shown if sourceUrl exists (user has public username)
-      const tgVideoAuthor = aiData.channelTitle || (aiData.forwardFrom && item.sourceUrl ? aiData.forwardFrom : '') || '';
+      // forwardFrom only shown if bot saved a t.me/username link
+      const tgVideoUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(item.sourceUrl) ? item.sourceUrl : '';
+      const tgVideoAuthor = aiData.channelTitle || (tgVideoUserUrl ? aiData.forwardFrom : '') || '';
       const tgVideoBodyHtml = tgVideoText.trim()
         ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(tgVideoText.length > 700 ? tgVideoText.slice(0, 700) : tgVideoText)}</div></div>`
         : '';
+      const tgVideoLabelUrl = tgVideoUserUrl || item.sourceUrl || '';
       const tgVideoFooterHtml = tgVideoAuthor
-        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(tgVideoAuthor)}</span></div></div>`
+        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}${tgVideoLabelUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(tgVideoLabelUrl)}">${escapeHtml(tgVideoAuthor)}</a>` : `<span class="quote-source-link">${escapeHtml(tgVideoAuthor)}</span>`}</div></div>`
         : '';
       const hasExtras = tgVideoBodyHtml || tgVideoFooterHtml;
       if (hasExtras) {
@@ -1289,11 +1292,13 @@ function renderCard(item) {
   if (effectiveType === 'video_note') {
     const vnFileId = item.videoFileId || item.audioFileId || item.fileId;
     const vnSourceUrl = item.sourceUrl || '';
-    // forwardFrom only shown if sourceUrl exists (user has public username)
-    const authorLabel = (aiData.forwardFrom && vnSourceUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    // forwardFrom only shown if bot saved a t.me/username link
+    const vnUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(vnSourceUrl) ? vnSourceUrl : '';
+    const authorLabel = (vnUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    const authorLinkUrl = vnUserUrl || vnSourceUrl;
     const authorHtml = authorLabel
-      ? (vnSourceUrl
-        ? `<a class="videonote-author" data-action="open" data-url="${escapeHtml(vnSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+      ? (authorLinkUrl
+        ? `<a class="videonote-author" data-action="open" data-url="${escapeHtml(authorLinkUrl)}">${escapeHtml(authorLabel)}</a>`
         : `<span class="videonote-author">${escapeHtml(authorLabel)}</span>`)
       : '';
     const vnTranscript = aiData.transcript || '';
@@ -1319,12 +1324,14 @@ function renderCard(item) {
   if (effectiveType === 'voice') {
     const voiceFileId = item.audioFileId || item.fileId;
     const voiceSourceUrl = item.sourceUrl || '';
-    // forwardFrom only shown if sourceUrl exists (user has public username)
-    const authorLabel = (aiData.forwardFrom && voiceSourceUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    // forwardFrom only shown if bot saved a t.me/username link
+    const voiceUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(voiceSourceUrl) ? voiceSourceUrl : '';
+    const authorLabel = (voiceUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
-    const authorHtml = (authorLabel && voiceSourceUrl)
-      ? `<a class="voice-author" data-action="open" data-url="${escapeHtml(voiceSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+    const authorLinkUrl = voiceUserUrl || voiceSourceUrl;
+    const authorHtml = (authorLabel && authorLinkUrl)
+      ? `<a class="voice-author" data-action="open" data-url="${escapeHtml(authorLinkUrl)}">${escapeHtml(authorLabel)}</a>`
       : '';
     const voiceTranscript = aiData.transcript || '';
     const voiceTranscriptBtn = voiceTranscript
@@ -1358,10 +1365,12 @@ function renderCard(item) {
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const coverUrl = imgUrl || '';
     const audioSourceUrl = item.sourceUrl || '';
-    // forwardFrom only shown if sourceUrl exists (user has public username)
-    const authorLabel = (aiData.forwardFrom && audioSourceUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
-    const authorHtml = (authorLabel && audioSourceUrl)
-      ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(audioSourceUrl)}">${escapeHtml(authorLabel)}</a>`
+    // forwardFrom only shown if bot saved a t.me/username link
+    const audioUserUrl = aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(audioSourceUrl) ? audioSourceUrl : '';
+    const authorLabel = (audioUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    const authorLinkUrl = audioUserUrl || audioSourceUrl;
+    const authorHtml = (authorLabel && authorLinkUrl)
+      ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(authorLinkUrl)}">${escapeHtml(authorLabel)}</a>`
       : '';
     const audioAccent = getAccentColor(aiData.color_subject, '#18bb3e');
     const hasCoverClass = coverUrl ? ' audio-has-cover' : '';
@@ -1390,8 +1399,8 @@ function renderCard(item) {
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTextContent = item.content || '';
-    // forwardFrom only shown if sourceUrl exists (user has public username)
-    const pdfAuthorLabel = aiData.channelTitle || (aiData.forwardFrom && item.sourceUrl ? aiData.forwardFrom : '') || '';
+    // forwardFrom only shown if bot saved a t.me/username link
+    const pdfAuthorLabel = aiData.channelTitle || (aiData.forwardFrom && /^https?:\/\/t\.me\/[^\/]+$/i.test(item.sourceUrl) ? aiData.forwardFrom : '') || '';
     // Use content as title only if there's no separate text body (i.e. content IS the filename)
     const pdfTitle = toTitleCase(aiData.title || (!pdfTextContent.includes(' ') ? pdfTextContent : '') || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
@@ -1446,8 +1455,9 @@ function renderCard(item) {
   // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
-    // forwardFrom (user) only shown if there's a sourceUrl (user has public username)
-    const forwardLabel = aiData.forwardFrom && sourceUrl ? aiData.forwardFrom : '';
+    // forwardFrom (user) only shown if bot saved a t.me/username link
+    const userSourceUrl = aiData.forwardFrom && item.sourceUrl && /^https?:\/\/t\.me\/[^\/]+$/i.test(item.sourceUrl) ? item.sourceUrl : '';
+    const forwardLabel = userSourceUrl ? aiData.forwardFrom : '';
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
@@ -1796,9 +1806,11 @@ function renderCard(item) {
     }
 
     // Footer with TG icon + author + multi-hider
+    // For user forwards, link to user profile; for channels, link to source post
+    const labelUrl = userSourceUrl || (aiData.channelTitle ? sourceUrl : '') || sourceUrl;
     const domainHtml = tgLabel
-      ? (sourceUrl
-        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>`
+      ? (labelUrl
+        ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(labelUrl)}">${escapeHtml(tgLabel)}</a>`
         : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`)
       : '';
 
@@ -1811,7 +1823,9 @@ function renderCard(item) {
     const hiderDash = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="3" y1="7" x2="11" y2="7" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
     const hiderCircle = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.3" fill="none"/></svg>`;
     const hasHidden = hidden.link || hidden.files || hidden.text;
-    const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot${hasHidden ? ' has-hidden' : ''}" data-action="toggle-hider">
+    const hiderDotIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="rgba(255,255,255,0.4)" stroke-width="1.3"/>${hasHidden ? '<circle cx="8" cy="8" r="1.5" fill="rgba(255,255,255,0.4)"/>' : ''}</svg>`;
+    const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot" data-action="toggle-hider">
+      ${hiderDotIcon}
       <div class="tgpost-hider-popup">
         ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${hidden.link ? hiderCircle : hiderDash}<span>link</span></div>` : ''}
         ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${hidden.files ? hiderCircle : hiderDash}<span>files</span></div>` : ''}
