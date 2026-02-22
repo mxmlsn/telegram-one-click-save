@@ -1457,10 +1457,11 @@ function renderCard(item) {
   // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
-    // forwardUserUrl = t.me/username or tg://user?id=N (stored in ai_data by bot)
+    // forwardUserUrl = t.me/username (stored in ai_data by bot)
     const forwardUserUrl = aiData.forwardUserUrl || '';
     // forwardFrom always shown as label (clickable if forwardUserUrl exists, plain text otherwise)
     const forwardLabel = aiData.forwardFrom || '';
+    if (forwardLabel) console.log('[VIEWER_DEBUG] tgpost card', item.id, '— forwardFrom:', forwardLabel, 'forwardUserUrl:', forwardUserUrl);
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
@@ -2435,6 +2436,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const action = actionEl.dataset.action;
     const url = actionEl.dataset.url || '';
 
+    // Debug: log clicks on quote-source-link area
+    if (actionEl.classList.contains('quote-source-link') || actionEl.closest('.quote-footer')) {
+      console.log('[CLICK_DEBUG] target:', e.target.tagName, e.target.className, '→ action:', action, 'url:', url, 'element:', actionEl.outerHTML.slice(0, 200));
+    }
+
     // "stop" — absorb click, prevent bubbling to parent card action
     if (action === 'stop') {
       e.stopPropagation();
@@ -2444,6 +2450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
     if (action === 'open' && url) {
       e.stopPropagation();
+      console.log('[CLICK_DEBUG] opening URL:', url);
       window.open(url, '_blank');
       return;
     }
