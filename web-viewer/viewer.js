@@ -1525,7 +1525,7 @@ function renderCard(item) {
         : '';
       // Author footer — clickable, opens source post (not the PDF)
       const pdfFooterHtml = tgLabel
-        ? `<div class="quote-footer pdf-text-collapsible"><div class="tg-footer-left">${(labelUrl || sourceUrl) ? TG_ICON_SVG : ''}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
+        ? `<div class="quote-footer pdf-text-collapsible"><div class="tg-footer-left">${(forwardUserUrl || sourceUrl) ? TG_ICON_SVG : ''}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
         : '';
       // Toggle button (collapse/expand text) — only when text exists
       const pdfTextCollapsed = !!(aiData.pdf_text_collapsed);
