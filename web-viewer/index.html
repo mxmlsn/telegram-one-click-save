@@ -642,6 +642,32 @@
       width: 36px;
       height: 36px;
     }
+    /* TG video glow (inline video cards) */
+    .card-tgvideo .video-glow-wrap,
+    .tgpost-video-preview .video-glow-wrap { position: relative; }
+    .card-tgvideo .video-glow,
+    .tgpost-video-preview .video-glow {
+      position: absolute;
+      bottom: -1px; left: 50%;
+      transform: translateX(-50%) scaleX(0.85);
+      width: 100%;
+      border-radius: 0;
+      filter: blur(30px) saturate(1.4);
+      opacity: 0.7;
+      pointer-events: none;
+      z-index: 0;
+      transition: filter 0.3s ease, opacity 0.3s ease;
+    }
+    .card-tgvideo:hover .video-glow,
+    .card-tgpost:hover .tgpost-video-preview .video-glow {
+      filter: blur(60px) saturate(2);
+      opacity: 1;
+    }
+    .card-tgvideo .card-img,
+    .tgpost-video-preview .card-img {
+      position: relative;
+      z-index: 1;
+    }
     .tgpost-play-icon {
       position: absolute;
       top: 50%;
