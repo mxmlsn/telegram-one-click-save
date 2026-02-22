@@ -186,9 +186,15 @@ function parseMessage(message, env) {
       // Skip author for messages forwarded from the bot owner (self)
       const isSelf = env?.ALLOWED_CHAT_ID && String(origin.sender_user?.id) === env.ALLOWED_CHAT_ID;
       if (!isSelf) {
-        const name = [origin.sender_user.first_name, origin.sender_user.last_name]
-          .filter(Boolean).join(' ');
-        if (name) result.forwardFrom = name;
+        const username = origin.sender_user?.username;
+        if (username) {
+          // User has public username — build clickable t.me link
+          const name = [origin.sender_user.first_name, origin.sender_user.last_name]
+            .filter(Boolean).join(' ');
+          if (name) result.forwardFrom = name;
+          result.sourceUrl = `https://t.me/${username}`;
+        }
+        // No username → privacy settings hide it; skip label entirely
       }
     }
   }

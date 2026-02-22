@@ -1102,7 +1102,8 @@ function renderCard(item) {
       }
       // Text + author from ai_data
       const tgVideoText = item.content || '';
-      const tgVideoAuthor = aiData.channelTitle || aiData.forwardFrom || '';
+      // forwardFrom only shown if sourceUrl exists (user has public username)
+      const tgVideoAuthor = aiData.channelTitle || (aiData.forwardFrom && item.sourceUrl ? aiData.forwardFrom : '') || '';
       const tgVideoBodyHtml = tgVideoText.trim()
         ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(tgVideoText.length > 700 ? tgVideoText.slice(0, 700) : tgVideoText)}</div></div>`
         : '';
@@ -1287,8 +1288,9 @@ function renderCard(item) {
   // ── Video Note card (круглое видео) ──
   if (effectiveType === 'video_note') {
     const vnFileId = item.videoFileId || item.audioFileId || item.fileId;
-    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const vnSourceUrl = item.sourceUrl || '';
+    // forwardFrom only shown if sourceUrl exists (user has public username)
+    const authorLabel = (aiData.forwardFrom && vnSourceUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const authorHtml = authorLabel
       ? (vnSourceUrl
         ? `<a class="videonote-author" data-action="open" data-url="${escapeHtml(vnSourceUrl)}">${escapeHtml(authorLabel)}</a>`
@@ -1316,8 +1318,9 @@ function renderCard(item) {
   // ── Voice message card ──
   if (effectiveType === 'voice') {
     const voiceFileId = item.audioFileId || item.fileId;
-    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const voiceSourceUrl = item.sourceUrl || '';
+    // forwardFrom only shown if sourceUrl exists (user has public username)
+    const authorLabel = (aiData.forwardFrom && voiceSourceUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const authorHtml = (authorLabel && voiceSourceUrl)
@@ -1353,9 +1356,10 @@ function renderCard(item) {
     const performer = aiData.audioPerformer || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
-    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const coverUrl = imgUrl || '';
     const audioSourceUrl = item.sourceUrl || '';
+    // forwardFrom only shown if sourceUrl exists (user has public username)
+    const authorLabel = (aiData.forwardFrom && audioSourceUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
     const authorHtml = (authorLabel && audioSourceUrl)
       ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(audioSourceUrl)}">${escapeHtml(authorLabel)}</a>`
       : '';
@@ -1386,7 +1390,8 @@ function renderCard(item) {
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTextContent = item.content || '';
-    const pdfAuthorLabel = aiData.channelTitle || aiData.forwardFrom || '';
+    // forwardFrom only shown if sourceUrl exists (user has public username)
+    const pdfAuthorLabel = aiData.channelTitle || (aiData.forwardFrom && item.sourceUrl ? aiData.forwardFrom : '') || '';
     // Use content as title only if there's no separate text body (i.e. content IS the filename)
     const pdfTitle = toTitleCase(aiData.title || (!pdfTextContent.includes(' ') ? pdfTextContent : '') || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
@@ -1441,7 +1446,9 @@ function renderCard(item) {
   // ── Telegram Post card (dark theme, modular) ──
   if (item.type === 'tgpost') {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
-    const rawTgLabel = aiData.channelTitle || aiData.forwardFrom || domain;
+    // forwardFrom (user) only shown if there's a sourceUrl (user has public username)
+    const forwardLabel = aiData.forwardFrom && sourceUrl ? aiData.forwardFrom : '';
+    const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
 
@@ -1801,14 +1808,14 @@ function renderCard(item) {
     const hasFiles = !!mediaHtml;
     const hasText = !!(textContent || '').trim();
     const sectionCount = [hasLink, hasFiles, hasText].filter(Boolean).length;
-    const eyeOpen = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 7s2.2-3.5 5.5-3.5S12.5 7 12.5 7s-2.2 3.5-5.5 3.5S1.5 7 1.5 7z" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.8" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/></svg>`;
-    const eyeClosed = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 7s2.2-3.5 5.5-3.5S12.5 7 12.5 7s-2.2 3.5-5.5 3.5S1.5 7 1.5 7z" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.8" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/><line x1="2.5" y1="11.5" x2="11.5" y2="2.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+    const hiderDash = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><line x1="3" y1="7" x2="11" y2="7" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    const hiderCircle = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.3" fill="none"/></svg>`;
     const hasHidden = hidden.link || hidden.files || hidden.text;
     const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot${hasHidden ? ' has-hidden' : ''}" data-action="toggle-hider">
       <div class="tgpost-hider-popup">
-        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${hidden.link ? eyeClosed : eyeOpen}<span>link</span></div>` : ''}
-        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${hidden.files ? eyeClosed : eyeOpen}<span>files</span></div>` : ''}
-        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${hidden.text ? eyeClosed : eyeOpen}<span>text</span></div>` : ''}
+        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${hidden.link ? hiderCircle : hiderDash}<span>link</span></div>` : ''}
+        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${hidden.files ? hiderCircle : hiderDash}<span>files</span></div>` : ''}
+        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${hidden.text ? hiderCircle : hiderDash}<span>text</span></div>` : ''}
       </div>
     </div>` : '';
 
