@@ -720,7 +720,8 @@ function patchCardImages(items) {
       card.dataset.action = 'lightbox';
       card.dataset.img = blobUrl;
       card.dataset.url = sourceUrl;
-      card.innerHTML = `<img class="card-img" src="${escapeHtml(blobUrl)}" alt="" style="opacity:0;transition:opacity 0.4s ease">`;
+      const downloadSvgHeic = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+      card.innerHTML = `<img class="card-img" src="${escapeHtml(blobUrl)}" alt="" style="opacity:0;transition:opacity 0.4s ease"><div class="img-hover-bar"><button class="img-download-btn" data-action="download" data-url="${escapeHtml(blobUrl)}">${downloadSvgHeic}</button></div>`;
       const img = card.querySelector('img');
       img.onload = () => {
         card.style.aspectRatio = '';  // release constraint only after img has size
