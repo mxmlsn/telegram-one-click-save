@@ -1108,7 +1108,7 @@ function renderCard(item) {
       // forwardFrom only shown if sourceUrl exists (user has public username)
       // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
       const tgVideoUserUrl = aiData.forwardUserUrl || '';
-      const tgVideoAuthor = aiData.channelTitle || (aiData.forwardFrom && tgVideoUserUrl ? aiData.forwardFrom : '') || '';
+      const tgVideoAuthor = aiData.channelTitle || aiData.forwardFrom || '';
       const tgVideoBodyHtml = tgVideoText.trim()
         ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(tgVideoText.length > 700 ? tgVideoText.slice(0, 700) : tgVideoText)}</div></div>`
         : '';
@@ -1297,7 +1297,7 @@ function renderCard(item) {
     const vnSourceUrl = item.sourceUrl || '';
     // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
     const vnUserUrl = aiData.forwardUserUrl || '';
-    const authorLabel = (aiData.forwardFrom && vnUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const authorLinkUrl = vnUserUrl || vnSourceUrl;
     const authorHtml = authorLabel
       ? (authorLinkUrl
@@ -1329,7 +1329,7 @@ function renderCard(item) {
     const voiceSourceUrl = item.sourceUrl || '';
     // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
     const voiceUserUrl = aiData.forwardUserUrl || '';
-    const authorLabel = (aiData.forwardFrom && voiceUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const duration = aiData.audioDuration || 0;
     const durationStr = duration > 0 ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
     const authorLinkUrl = voiceUserUrl || voiceSourceUrl;
@@ -1370,7 +1370,7 @@ function renderCard(item) {
     const audioSourceUrl = item.sourceUrl || '';
     // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
     const audioUserUrl = aiData.forwardUserUrl || '';
-    const authorLabel = (aiData.forwardFrom && audioUserUrl ? aiData.forwardFrom : '') || aiData.channelTitle || '';
+    const authorLabel = aiData.forwardFrom || aiData.channelTitle || '';
     const authorLinkUrl = audioUserUrl || audioSourceUrl;
     const authorHtml = (authorLabel && authorLinkUrl)
       ? `<a class="audio-source" data-action="open" data-url="${escapeHtml(authorLinkUrl)}">${escapeHtml(authorLabel)}</a>`
@@ -1402,8 +1402,7 @@ function renderCard(item) {
     const pdfFid = item.pdfFileId || item.fileId;
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTextContent = item.content || '';
-    // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
-    const pdfAuthorLabel = aiData.channelTitle || (aiData.forwardFrom && aiData.forwardUserUrl ? aiData.forwardFrom : '') || '';
+    const pdfAuthorLabel = aiData.channelTitle || aiData.forwardFrom || '';
     // Use content as title only if there's no separate text body (i.e. content IS the filename)
     const pdfTitle = toTitleCase(aiData.title || (!pdfTextContent.includes(' ') ? pdfTextContent : '') || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
@@ -1460,8 +1459,8 @@ function renderCard(item) {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     // forwardUserUrl = t.me/username or tg://user?id=N (stored in ai_data by bot)
     const forwardUserUrl = aiData.forwardUserUrl || '';
-    // forwardFrom shown only if we have a profile link (hidden_user with no link → no label)
-    const forwardLabel = (aiData.forwardFrom && forwardUserUrl) ? aiData.forwardFrom : '';
+    // forwardFrom always shown as label (clickable if forwardUserUrl exists, plain text otherwise)
+    const forwardLabel = aiData.forwardFrom || '';
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
@@ -2439,7 +2438,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
     if (action === 'open' && url) {
       e.stopPropagation();
-      window.open(url, '_blank');
+      // tg:// deep links need location.href (window.open may be blocked for custom protocols)
+      if (/^tg:\/\//i.test(url)) {
+        window.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
       return;
     }
 
@@ -2858,13 +2862,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const isHtml = item?.ai_data?.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(quoteText);
       const textHtml = isHtml ? sanitizeHtml(quoteText) : escapeHtml(quoteText);
 
+      // For user forwards, use forwardUserUrl as the label link
+      const fwdUrl = item?.ai_data?.forwardUserUrl || '';
+      const labelUrl = fwdUrl || sourceUrl;
+
       let html = '<div class="overlay-quote">';
       html += '<div class="overlay-quote-body">';
       html += `<div class="overlay-quote-text">${textHtml}</div>`;
       html += '</div>';
       html += '<div class="overlay-quote-footer">';
-      html += (domain && sourceUrl)
-        ? `<a class="overlay-quote-source" href="${escapeHtml(sourceUrl)}" target="_blank">${escapeHtml(domain)}</a>`
+      html += (domain && labelUrl)
+        ? `<a class="overlay-quote-source" href="${escapeHtml(labelUrl)}" target="_blank">${escapeHtml(domain)}</a>`
         : (domain ? `<span class="overlay-quote-source">${escapeHtml(domain)}</span>` : '<span></span>');
       html += '</div>';
       html += '</div>';
