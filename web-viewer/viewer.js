@@ -709,18 +709,32 @@ function patchCardImages(items) {
     if (!card) continue;
     if (card.querySelector('.videonote-circle')) hasVideoNotes = true;
     const wasHeicPlaceholder = card.classList.contains('card-heic-placeholder');
+    if (wasHeicPlaceholder) {
+      // Mutate in-place: keep the card node so masonry doesn't reflow.
+      // Swap classes, add img, wire up lightbox — no outerHTML replacement.
+      const blobUrl = item._resolvedImg;
+      const sourceUrl = item.sourceUrl || '';
+      card.classList.remove('card-heic-placeholder');
+      card.classList.add('card-image');
+      // Keep aspect-ratio until img loads to prevent height collapse
+      card.dataset.action = 'lightbox';
+      card.dataset.img = blobUrl;
+      card.dataset.url = sourceUrl;
+      card.innerHTML = `<img class="card-img" src="${escapeHtml(blobUrl)}" alt="" style="opacity:0;transition:opacity 0.4s ease">`;
+      const img = card.querySelector('img');
+      img.onload = () => {
+        card.style.aspectRatio = '';  // release constraint only after img has size
+        img.style.opacity = '1';
+      };
+      // Clean up data-thumb attrs
+      delete card.dataset.thumbFid;
+      delete card.dataset.thumbSized;
+      continue;
+    }
     // Replace the whole card HTML to get correct card type rendering
     card.outerHTML = renderCard(item);
     // Re-check xpost truncation on the new card
     const newCard = document.querySelector(`.card[data-id="${item.id}"]`);
-    // Fade in if replacing a HEIC placeholder
-    if (wasHeicPlaceholder && newCard) {
-      newCard.style.opacity = '0';
-      requestAnimationFrame(() => {
-        newCard.style.transition = 'opacity 0.4s ease';
-        newCard.style.opacity = '1';
-      });
-    }
     if (newCard && newCard.classList.contains('card-xpost')) {
       const textEl = newCard.querySelector('.xpost-text');
       if (textEl && textEl.scrollHeight > textEl.clientHeight + 2) {
