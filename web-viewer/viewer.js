@@ -2289,6 +2289,7 @@ function openLightbox(imgUrl, sourceUrl, opts) {
   } else {
     const single = { url: imgUrl, sourceUrl };
     if (opts && opts.video) single.video = true;
+    if (opts && opts.thumb) single.thumb = opts.thumb;
     _gallery.items = [single];
     _gallery.index = 0;
   }
@@ -2299,7 +2300,9 @@ function openLightbox(imgUrl, sourceUrl, opts) {
 
 async function _showLightboxItem() {
   const img = document.getElementById('lightbox-img');
+  const videoWrap = document.getElementById('lightbox-video-wrap');
   const video = document.getElementById('lightbox-video');
+  const videoGlow = document.getElementById('lightbox-video-glow');
   const link = document.getElementById('lightbox-link');
   const dlBtn = document.getElementById('lightbox-download');
 
@@ -2314,21 +2317,25 @@ async function _showLightboxItem() {
 
   const isVideo = item.video && item.url;
   img.classList.toggle('hidden', !!isVideo);
-  video.classList.toggle('hidden', !isVideo);
+  videoWrap.classList.toggle('hidden', !isVideo);
 
   if (isVideo) {
     video.src = item.url;
     video.play().catch(() => {});
     img.src = '';
+    // Set glow thumbnail
+    videoGlow.src = item.thumb || '';
   } else if (item.video && !item.url && item.thumb) {
     // Video couldn't be resolved (>20MB) — show thumbnail
     img.src = item.thumb;
     video.pause();
     video.src = '';
+    videoGlow.src = '';
   } else {
     img.src = item.url || '';
     video.pause();
     video.src = '';
+    videoGlow.src = '';
   }
 
   dlBtn.onclick = (e) => { e.stopPropagation(); downloadImage(item.url); };
@@ -2373,6 +2380,7 @@ function closeLightbox() {
   const video = document.getElementById('lightbox-video');
   lb.classList.add('hidden');
   document.getElementById('lightbox-img').src = '';
+  document.getElementById('lightbox-video-glow').src = '';
   video.pause();
   video.src = '';
   _gallery.items = [];
@@ -2530,8 +2538,12 @@ document.addEventListener('DOMContentLoaded', () => {
           videoUrl = await resolveFileId(STATE.botToken, fileId);
         }
       }
+      // Grab thumbnail from the card for lightbox glow
+      const card = actionEl.closest('.card[data-id]');
+      const thumbImg = card && card.querySelector('.card-img, .tgpost-album-img, .video-screenshot');
+      const thumbUrl = thumbImg ? thumbImg.src : '';
       if (videoUrl) {
-        openLightbox(videoUrl, '', { video: true });
+        openLightbox(videoUrl, '', { video: true, thumb: thumbUrl });
       } else {
         // File too large for Bot API (>20MB) — try storageUrl or sourceUrl
         const card = actionEl.closest('.card[data-id]');
@@ -2847,7 +2859,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Lightbox close + gallery navigation ──
   const lb = document.getElementById('lightbox');
   lb.addEventListener('click', e => {
-    if (e.target === lb || e.target === document.getElementById('lightbox-img') || e.target === document.getElementById('lightbox-video')) {
+    if (e.target === lb || e.target === document.getElementById('lightbox-img') || e.target === document.getElementById('lightbox-video') || e.target === document.getElementById('lightbox-video-glow') || e.target === document.getElementById('lightbox-video-wrap')) {
       closeLightbox();
     }
   });

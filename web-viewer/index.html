@@ -1979,7 +1979,32 @@
     }
     #lightbox.hidden { display: none; }
     #lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 0; object-fit: contain; }
-    #lightbox video { max-width: 90vw; max-height: 88vh; border-radius: 8px; outline: none; }
+    #lightbox video { max-width: 90vw; max-height: 88vh; border-radius: 8px; outline: none; position: relative; z-index: 1; }
+    #lightbox-video-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #lightbox-video-wrap.hidden { display: none; }
+    #lightbox-video-glow {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.92);
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 8px;
+      filter: blur(40px) saturate(1.4);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 0;
+      transition: filter 0.3s ease, opacity 0.3s ease;
+    }
+    #lightbox-video-wrap:hover #lightbox-video-glow {
+      filter: blur(60px) saturate(2);
+      opacity: 1;
+    }
     #lightbox-bottom { position: absolute; bottom: 28px; display: flex; align-items: center; gap: 12px; }
     #lightbox-link { color: #888; font-size: 13px; text-decoration: none; }
     #lightbox-link:hover { color: #bbb; }
@@ -2591,7 +2616,10 @@
   <button id="lightbox-prev" class="lightbox-arrow lightbox-arrow-left hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
   <button id="lightbox-next" class="lightbox-arrow lightbox-arrow-right hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></button>
   <img id="lightbox-img" src="" alt="">
-  <video id="lightbox-video" class="hidden" controls playsinline></video>
+  <div id="lightbox-video-wrap" class="hidden">
+    <img id="lightbox-video-glow" src="" alt="" aria-hidden="true">
+    <video id="lightbox-video" controls playsinline></video>
+  </div>
   <div id="lightbox-bottom">
     <span id="lightbox-counter" class="hidden"></span>
     <a id="lightbox-link" href="#" target="_blank"></a>
