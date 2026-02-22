@@ -1114,7 +1114,7 @@ function renderCard(item) {
         : '';
       const tgVideoLabelUrl = tgVideoUserUrl || item.sourceUrl || '';
       const tgVideoFooterHtml = tgVideoAuthor
-        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}${tgVideoLabelUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(tgVideoLabelUrl)}">${escapeHtml(tgVideoAuthor)}</a>` : `<span class="quote-source-link">${escapeHtml(tgVideoAuthor)}</span>`}</div></div>`
+        ? `<div class="quote-footer"><div class="tg-footer-left">${tgVideoLabelUrl ? TG_ICON_SVG : ''}${tgVideoLabelUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(tgVideoLabelUrl)}">${escapeHtml(tgVideoAuthor)}</a>` : `<span class="quote-source-link" data-action="stop">${escapeHtml(tgVideoAuthor)}</span>`}</div></div>`
         : '';
       const hasExtras = tgVideoBodyHtml || tgVideoFooterHtml;
       if (hasExtras) {
@@ -1344,7 +1344,7 @@ function renderCard(item) {
       ? `<div class="transcript-text hidden">${escapeHtml(voiceTranscript)}</div>`
       : '';
     const voiceFooterHtml = authorLabel
-      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
+      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${authorLinkUrl ? TG_ICON_SVG : ''}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
       : '';
     return `<div class="card card-voice" data-id="${item.id}">
       ${pendingDot}
@@ -1378,7 +1378,7 @@ function renderCard(item) {
     const audioAccent = getAccentColor(aiData.color_subject, '#18bb3e');
     const hasCoverClass = coverUrl ? ' audio-has-cover' : '';
     const audioFooterHtml = authorLabel
-      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
+      ? `<div class="quote-footer" style="padding:0 14px 10px"><div class="tg-footer-left">${authorLinkUrl ? TG_ICON_SVG : ''}<span class="quote-source-link">${escapeHtml(authorLabel)}</span></div></div>`
       : '';
     return `<div class="card card-audio${hasCoverClass}" data-id="${item.id}" style="--audio-accent:${audioAccent}">
       ${pendingDot}
@@ -1403,6 +1403,7 @@ function renderCard(item) {
     const hasTgFile = pdfFid && !/^https?:\/\//i.test(pdfUrl);
     const pdfTextContent = item.content || '';
     const pdfAuthorLabel = aiData.channelTitle || aiData.forwardFrom || '';
+    const pdfLabelUrl = aiData.forwardUserUrl || item.sourceUrl || '';
     // Use content as title only if there's no separate text body (i.e. content IS the filename)
     const pdfTitle = toTitleCase(aiData.title || (!pdfTextContent.includes(' ') ? pdfTextContent : '') || pdfUrl.split('?')[0].split('/').pop() || 'document.pdf');
     // Show preview: for TG files only if thumbnail differs from PDF fileId; for URL-based PDFs always show imgUrl
@@ -1422,7 +1423,7 @@ function renderCard(item) {
       : '';
     // Author footer
     const pdfFooterHtml = pdfAuthorLabel
-      ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(pdfAuthorLabel)}</span></div></div>`
+      ? `<div class="quote-footer"><div class="tg-footer-left">${pdfLabelUrl ? TG_ICON_SVG : ''}<span class="quote-source-link">${escapeHtml(pdfAuthorLabel)}</span></div></div>`
       : '';
     return `<div class="card card-pdf" data-id="${item.id}" data-action="${cardAction}" data-url="${escapeHtml(cardDataUrl)}"${hasTgFile ? ` data-file-id="${escapeHtml(pdfFid)}"` : ''}${pdfSourceAttr}>
       ${pendingDot}
@@ -1524,7 +1525,7 @@ function renderCard(item) {
         : '';
       // Author footer — clickable, opens source post (not the PDF)
       const pdfFooterHtml = tgLabel
-        ? `<div class="quote-footer pdf-text-collapsible"><div class="tg-footer-left">${TG_ICON_SVG}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
+        ? `<div class="quote-footer pdf-text-collapsible"><div class="tg-footer-left">${(labelUrl || sourceUrl) ? TG_ICON_SVG : ''}${sourceUrl ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(tgLabel)}</a>` : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`}</div></div>`
         : '';
       // Toggle button (collapse/expand text) — only when text exists
       const pdfTextCollapsed = !!(aiData.pdf_text_collapsed);
@@ -1851,7 +1852,7 @@ function renderCard(item) {
       ${tgTranscriptHtml}
       ${(tgLabel || hiderDotHtml) ? `<div class="quote-footer">
         <div class="tg-footer-left">
-          ${tgLabel ? TG_ICON_SVG : ''}
+          ${(tgLabel && labelUrl) ? TG_ICON_SVG : ''}
           ${domainHtml}
         </div>
         ${hiderDotHtml}
