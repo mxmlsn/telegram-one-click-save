@@ -1482,6 +1482,31 @@ function renderCard(item) {
         </div>`;
     }
 
+    // Short-circuit: tgpost with PDF → render as card-pdf with text+author below
+    if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
+      const pdfFid = item.pdfFileId || item.fileId;
+      const pdfThumbUrl = imgUrl || '';
+      const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+      const pdfArrow = aiData.storageUrl ? pdfArrowSvg : '';
+      const pdfTitle = toTitleCase(aiData.title || aiData.fileName || '');
+      const pdfPreviewHtml = pdfThumbUrl
+        ? `<div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`
+        : `<div style="padding:16px 16px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>`;
+      const pdfBodyHtml = textContent.trim()
+        ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(textContent.length > 700 ? textContent.slice(0, 700) : textContent)}</div></div>`
+        : '';
+      const pdfFooterHtml = tgLabel
+        ? `<div class="quote-footer"><div class="tg-footer-left">${TG_ICON_SVG}<span class="quote-source-link">${escapeHtml(tgLabel)}</span></div></div>`
+        : '';
+      return `<div class="card card-pdf" data-id="${item.id}" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}" data-source-url="${escapeHtml(sourceUrl)}">
+        ${pendingDot}
+        ${pdfPreviewHtml}
+        ${pdfTitle ? `<div class="pdf-title">${escapeHtml(pdfTitle)}</div>` : ''}
+        ${pdfBodyHtml}
+        ${pdfFooterHtml}
+      </div>`;
+    }
+
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
     const isTruncated = textContent.length > 700;
     const displayText = isTruncated ? textContent.slice(0, 700) : textContent;
