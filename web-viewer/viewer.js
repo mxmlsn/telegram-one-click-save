@@ -32,6 +32,45 @@ function getAccentColor(colorKey, fallback) {
   if (!colorKey) return fallback || '#5B68E0';
   return PRODUCT_PALETTE[colorKey]?.accent || fallback || '#5B68E0';
 }
+function getFileIconColor(ext) {
+  const e = (ext || '').toLowerCase();
+  // Adobe
+  if (['psd', 'psb'].includes(e)) return '#31A8FF';
+  if (['ai', 'eps'].includes(e)) return '#FF9A00';
+  if (['indd', 'indt'].includes(e)) return '#FF3366';
+  if (['xd'].includes(e)) return '#FF26BE';
+  if (['ae', 'aep'].includes(e)) return '#9999FF';
+  if (['pr', 'prproj'].includes(e)) return '#9999FF';
+  if (['pdf'].includes(e)) return '#FF4444';
+  // Figma / Sketch
+  if (['fig', 'figma'].includes(e)) return '#A259FF';
+  if (['sketch'].includes(e)) return '#F7B500';
+  // 3D / CAD
+  if (['blend', 'blender'].includes(e)) return '#E87D0D';
+  if (['fbx', 'obj', 'stl', 'dae', 'gltf', 'glb'].includes(e)) return '#7EC8E3';
+  if (['dwg', 'dxf'].includes(e)) return '#CC2222';
+  // Archives
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2'].includes(e)) return '#8A8A8A';
+  // Code
+  if (['js', 'ts', 'jsx', 'tsx'].includes(e)) return '#F7DF1E';
+  if (['py'].includes(e)) return '#3572A5';
+  if (['swift'].includes(e)) return '#F05138';
+  if (['kt', 'kts'].includes(e)) return '#A97BFF';
+  if (['rs'].includes(e)) return '#DEA584';
+  if (['go'].includes(e)) return '#00ADD8';
+  if (['rb'].includes(e)) return '#CC342D';
+  if (['java'].includes(e)) return '#B07219';
+  // Fonts
+  if (['ttf', 'otf', 'woff', 'woff2'].includes(e)) return '#6B7280';
+  // Video / Audio
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(e)) return '#9B59B6';
+  if (['mp3', 'wav', 'flac', 'aac', 'm4a'].includes(e)) return '#2ECC71';
+  // Default
+  return '#5B8DEF';
+}
+function makeFileIconSvg(color) {
+  return `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="${color}"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
+}
 const TG_ICON_SVG = `<svg width="12" height="10" viewBox="0 0 12.3848 10.2636" fill="none" style="flex-shrink:0"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.85139 4.41839L7.50196 1.55371C10.669 0.23644 11.327 0.00763 11.756 0.00008C11.8503-0.00158 12.0612 0.02179 12.1979 0.13266C12.3133 0.22627 12.345 0.35276 12.3602 0.44148C12.3754 0.53021 12.3943 0.73244 12.3793 0.89044C12.2076 2.69363 11.465 7.06966 11.0872 9.0893C10.9274 9.94392 10.6128 10.2305 10.3079 10.2585C9.64564 10.3194 9.14274 9.8208 8.50131 9.40036L5.95631 7.69083C4.83037 6.94889 5.56027 6.54108 6.20195 5.87463C6.36987 5.70015 9.28776 3.04613 9.34421 2.80537C9.35105 2.77526 9.35782 2.66305 9.29115 2.60375C9.22449 2.54445 9.12602 2.56497 9.05502 2.58087C8.95437 2.60372 7.35095 3.66352 4.24478 5.7603C3.78965 6.07284 3.37739 6.22512 3.00806 6.21714C2.60087 6.20834 1.81763 5.98692 1.23536 5.79763C0.521177 5.56549-0.0464449 5.44274 0.00300277 5.04849C0.0287301 4.84315 0.311526 4.63315 0.851367 4.41844Z" fill="white" fill-opacity="0.3"/></svg>`;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -1439,19 +1478,21 @@ function renderCard(item) {
   // ── Document file card (.psd, .ai, .zip etc) ──
   if (effectiveType === 'document') {
     const docFileName = aiData.fileName || item.content || 'file';
-    const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
+    const docExt = docFileName.includes('.') ? docFileName.split('.').pop() : '';
+    const docExtUpper = docExt.toUpperCase();
+    const iconColor = getFileIconColor(docExt);
     const storageUrl = aiData.storageUrl || '';
     const docSourceUrl = item.sourceUrl || '';
     const docOpenUrl = storageUrl || docSourceUrl;
     const docAction = docOpenUrl ? 'open' : (item.fileId ? 'open-file' : '');
     const docActionUrl = docOpenUrl || '';
-    const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
+    const docFileIconSvg = makeFileIconSvg(iconColor);
     const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
     return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
       ${pendingDot}
       <div class="doc-file-icon">
         ${docFileIconSvg}
-        ${docExt ? `<span class="doc-file-ext">.${escapeHtml(docExt)}</span>` : ''}
+        ${docExtUpper ? `<span class="doc-file-ext">.${escapeHtml(docExtUpper)}</span>` : ''}
       </div>
       <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
     </div>`;
@@ -1631,6 +1672,16 @@ function renderCard(item) {
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
             : `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
         }
+        if (m.mediaType === 'document') {
+          const docFname = m.fileName || m.fileContent || '';
+          const docExt = docFname.includes('.') ? docFname.split('.').pop() : '';
+          const docExtUpper = docExt.toUpperCase();
+          const docColor = getFileIconColor(docExt);
+          const docSvg = makeFileIconSvg(docColor);
+          const docStorageUrl = m.storageUrl || aiData.storageUrl || '';
+          const docAction = docStorageUrl ? `data-action="open" data-url="${escapeHtml(docStorageUrl)}"` : (m.fileId ? `data-action="open-file" data-file-id="${escapeHtml(m.fileId)}"` : '');
+          return `<div class="tgpost-album-item is-document" ${docAction}><div class="tgpost-album-img tgpost-album-doc"><div class="album-doc-icon">${docSvg}${docExtUpper ? `<span class="doc-file-ext album-doc-ext">.${escapeHtml(docExtUpper)}</span>` : ''}</div>${docFname ? `<div class="album-doc-name">${escapeHtml(docFname)}</div>` : ''}</div></div>`;
+        }
         return resolvedUrl
           ? `<div class="tgpost-album-item" data-action="album-gallery" data-gallery-type="image" data-img="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""></div>`
           : `<div class="tgpost-album-item"><div class="tgpost-album-img" style="background:#1a1a1a"></div></div>`;
@@ -1700,15 +1751,17 @@ function renderCard(item) {
       </div>`;
     } else if (aiData.mediaType === 'document' && !imgUrl) {
       const docFileName = aiData.fileName || item.content || 'file';
-      const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
+      const docExt = docFileName.includes('.') ? docFileName.split('.').pop() : '';
+      const docExtUpper = docExt.toUpperCase();
       const docStorageUrl = aiData.storageUrl || '';
       const docOpenUrl2 = docStorageUrl || sourceUrl;
       const docAction = docOpenUrl2 ? `data-action="open" data-url="${escapeHtml(docOpenUrl2)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
-      const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
+      const docIconColor = getFileIconColor(docExt);
+      const docFileIconSvg = makeFileIconSvg(docIconColor);
       mediaHtml = `<div class="tgpost-document" ${docAction}>
         <div class="doc-file-icon">
           ${docFileIconSvg}
-          ${docExt ? `<span class="doc-file-ext">.${escapeHtml(docExt)}</span>` : ''}
+          ${docExtUpper ? `<span class="doc-file-ext">.${escapeHtml(docExtUpper)}</span>` : ''}
         </div>
         <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
       </div>`;
