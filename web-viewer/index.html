@@ -1157,6 +1157,8 @@
       overflow: hidden;
     }
     /* PDF card with text + author (extends base card-pdf) */
+    .card-pdf .pdf-title + .tgpost-body { padding-top: 0; }
+    .card-pdf .pdf-title:has(+ .tgpost-body) { padding-bottom: 6px; }
     .card-pdf .tgpost-body { padding: 5px 18px 8px; }
     .card-pdf .quote-text {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
