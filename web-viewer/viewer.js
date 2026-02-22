@@ -1461,6 +1461,8 @@ function renderCard(item) {
     const forwardUserUrl = aiData.forwardUserUrl || '';
     // forwardFrom always shown as label (clickable if forwardUserUrl exists, plain text otherwise)
     const forwardLabel = aiData.forwardFrom || '';
+    // TEMP DEBUG: log ai_data keys for cards with forwardFrom
+    if (forwardLabel) console.log('[FWD]', forwardLabel, '| ai_data keys:', Object.keys(aiData).join(','), '| forwardUserUrl:', JSON.stringify(aiData.forwardUserUrl));
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     const textContent = item.content || '';
