@@ -1814,7 +1814,7 @@ function renderCard(item) {
     const domainHtml = tgLabel
       ? (labelUrl
         ? `<a class="quote-source-link" data-action="open" data-url="${escapeHtml(labelUrl)}">${escapeHtml(tgLabel)}</a>`
-        : `<span class="quote-source-link">${escapeHtml(tgLabel)}</span>`)
+        : `<span class="quote-source-link" data-action="stop">${escapeHtml(tgLabel)}</span>`)
       : '';
 
     // Multi-hider: detect which sections exist
@@ -2435,6 +2435,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const action = actionEl.dataset.action;
     const url = actionEl.dataset.url || '';
 
+    // "stop" — absorb click, prevent bubbling to parent card action
+    if (action === 'stop') {
+      e.stopPropagation();
+      return;
+    }
+
     // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
     if (action === 'open' && url) {
       e.stopPropagation();
@@ -2899,6 +2905,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   co.querySelector('.overlay-close').addEventListener('click', closeContentOverlay);
+
+  // Handle link clicks inside content overlay (tg:// deep links, etc.)
+  co.addEventListener('click', e => {
+    const link = e.target.closest('a[href]');
+    if (link) {
+      e.preventDefault();
+      e.stopPropagation();
+      const href = link.getAttribute('href');
+      if (/^tg:\/\//i.test(href)) {
+        window.location.href = href;
+      } else if (href) {
+        window.open(href, '_blank');
+      }
+    }
+  });
 
   // ── Custom context menu ──
   let ctxTargetItemId = null;
