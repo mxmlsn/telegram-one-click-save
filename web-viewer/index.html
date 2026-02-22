@@ -435,8 +435,8 @@
     .tgpost-album {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      grid-auto-rows: 1fr;
-      gap: 2px;
+      column-gap: 2px;
+      row-gap: 1px;
     }
     .tgpost-album.album-3col {
       grid-template-columns: repeat(3, 1fr);
@@ -474,8 +474,9 @@
       aspect-ratio: auto;
       height: auto;
     }
-    /* Spanned items: height matches other rows via grid-auto-rows: 1fr */
-    .album-span-2, .album-span-3 { aspect-ratio: unset; }
+    /* Spanned items: match row height by using correct aspect ratio for span width */
+    .album-span-2 { aspect-ratio: 2 / 1; }
+    .album-span-3 { aspect-ratio: 3 / 1; }
     .tgpost-video-preview {
       position: relative;
       cursor: pointer;
