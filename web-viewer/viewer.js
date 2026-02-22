@@ -380,7 +380,7 @@ function mergeMediaGroups(items) {
     if (gid) {
       // Determine media type: ai_data.mediaType is authoritative, fall back to item.type
       const mType = item.ai_data?.mediaType
-        || (['video', 'image', 'gif', 'pdf', 'audio', 'voice', 'video_note'].includes(item.type) ? item.type : 'image');
+        || (['video', 'image', 'gif', 'pdf', 'audio', 'voice', 'video_note', 'document'].includes(item.type) ? item.type : 'image');
       const mediaEntry = {
         fileId: item.fileId,
         mediaType: mType,
@@ -393,6 +393,8 @@ function mergeMediaGroups(items) {
         audioFileName: item.ai_data?.audioFileName || '',
         audioContent: item.content || '',
         coverFileId: (mType === 'audio' && item.ai_data?.thumbnailFileId) ? item.ai_data.thumbnailFileId : '',
+        fileName: item.ai_data?.fileName || '',
+        storageUrl: item.ai_data?.storageUrl || '',
       };
       if (!groups[gid]) {
         groups[gid] = item;
@@ -1081,7 +1083,6 @@ function renderCard(item) {
   // Video notes always render as standalone circles (no tgpost card wrapper)
   const isVideoNoteTgpost = item.type === 'tgpost' && aiData.mediaType === 'video_note';
   const effectiveType = isVideoNoteTgpost ? 'video_note'
-    : (item.type === 'document' && imgUrl) ? 'image'
     : (item.type === 'document') ? 'document'
     : KEEP_BASE_TYPES.includes(item.type) ? item.type
     : (isInstagramReel ? 'video' : (aiType || item.type));
@@ -1488,9 +1489,13 @@ function renderCard(item) {
     const docActionUrl = docOpenUrl || '';
     const docFileIconSvg = makeFileIconSvg(iconColor);
     const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
+    const thumbHtml = imgUrl
+      ? `<div class="doc-thumb-wrap"><img class="doc-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>`
+      : '';
     return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
       ${pendingDot}
-      <div class="doc-file-icon">
+      ${thumbHtml}
+      <div class="doc-file-icon${imgUrl ? ' doc-file-icon-small' : ''}">
         ${docFileIconSvg}
         ${docExtUpper ? `<span class="doc-file-ext">.${escapeHtml(docExtUpper)}</span>` : ''}
       </div>
