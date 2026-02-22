@@ -1801,13 +1801,14 @@ function renderCard(item) {
     const hasFiles = !!mediaHtml;
     const hasText = !!(textContent || '').trim();
     const sectionCount = [hasLink, hasFiles, hasText].filter(Boolean).length;
-    const hiderCircle = `<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none"/></svg>`;
-    const hiderSlash = `<svg width="14" height="14" viewBox="0 0 14 14"><line x1="3" y1="11" x2="11" y2="3" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-    const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot" data-action="toggle-hider">
+    const eyeOpen = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 7s2.2-3.5 5.5-3.5S12.5 7 12.5 7s-2.2 3.5-5.5 3.5S1.5 7 1.5 7z" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.8" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/></svg>`;
+    const eyeClosed = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1.5 7s2.2-3.5 5.5-3.5S12.5 7 12.5 7s-2.2 3.5-5.5 3.5S1.5 7 1.5 7z" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.8" stroke="rgba(255,255,255,0.5)" stroke-width="1.2"/><line x1="2.5" y1="11.5" x2="11.5" y2="2.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+    const hasHidden = hidden.link || hidden.files || hidden.text;
+    const hiderDotHtml = sectionCount > 1 ? `<div class="tgpost-hider-dot${hasHidden ? ' has-hidden' : ''}" data-action="toggle-hider">
       <div class="tgpost-hider-popup">
-        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${hidden.link ? hiderSlash : hiderCircle}<span>link</span></div>` : ''}
-        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${hidden.files ? hiderSlash : hiderCircle}<span>files</span></div>` : ''}
-        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${hidden.text ? hiderSlash : hiderCircle}<span>text</span></div>` : ''}
+        ${hasLink ? `<div class="tgpost-hider-item${hidden.link ? ' hidden-section' : ''}" data-hider-section="link">${hidden.link ? eyeClosed : eyeOpen}<span>link</span></div>` : ''}
+        ${hasFiles ? `<div class="tgpost-hider-item${hidden.files ? ' hidden-section' : ''}" data-hider-section="files">${hidden.files ? eyeClosed : eyeOpen}<span>files</span></div>` : ''}
+        ${hasText ? `<div class="tgpost-hider-item${hidden.text ? ' hidden-section' : ''}" data-hider-section="text">${hidden.text ? eyeClosed : eyeOpen}<span>text</span></div>` : ''}
       </div>
     </div>` : '';
 
