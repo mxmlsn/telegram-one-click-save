@@ -552,6 +552,25 @@
       margin-top: 8px;
       font-size: 8.6px;
     }
+    /* Standalone TG video card (no text) */
+    .card-tgvideo {
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      background: rgb(53,66,81);
+    }
+    .card-tgvideo .card-img {
+      display: block;
+      width: 100%;
+    }
+    .card-tgvideo .tgpost-play-icon {
+      width: 80px;
+      height: 80px;
+    }
+    .card-tgvideo .tgpost-play-icon svg {
+      width: 36px;
+      height: 36px;
+    }
     .tgpost-play-icon {
       position: absolute;
       top: 50%;
@@ -570,6 +589,41 @@
       width: 22px;
       height: 22px;
       margin-left: 2px;
+    }
+    /* Full-width PDF preview in tgpost */
+    .tgpost-pdf-full {
+      cursor: pointer;
+      position: relative;
+    }
+    .tgpost-pdf-full .tgpost-pdf-blur-bg {
+      position: relative;
+      overflow: hidden;
+      max-height: 180px;
+    }
+    .tgpost-pdf-full .tgpost-pdf-blur-img {
+      display: block;
+      width: calc(100% + 20px);
+      margin: -10px;
+      max-height: 200px;
+      object-fit: cover;
+      object-position: top;
+      filter: blur(7px);
+      transition: filter 0.25s ease;
+    }
+    .tgpost-pdf-full:hover .tgpost-pdf-blur-img {
+      filter: blur(0px);
+    }
+    .tgpost-pdf-full .pdf-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+    }
+    .tgpost-pdf-title {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 24px;
+      line-height: 27px;
+      color: white;
+      padding: 14px 20px 0;
     }
     .tgpost-pdf-preview {
       cursor: pointer;

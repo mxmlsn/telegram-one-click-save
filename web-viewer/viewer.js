@@ -352,6 +352,7 @@ function mergeMediaGroups(items) {
         audioPerformer: item.ai_data?.audioPerformer || '',
         audioDuration: item.ai_data?.audioDuration || 0,
         audioFileName: item.ai_data?.audioFileName || '',
+        audioContent: item.content || '',
         coverFileId: (mType === 'audio' && item.ai_data?.thumbnailFileId) ? item.ai_data.thumbnailFileId : '',
       };
       if (!groups[gid]) {
@@ -1403,6 +1404,24 @@ function renderCard(item) {
       </div>`;
     }
 
+    // Short-circuit: inline TG video with no text → render as plain video card
+    const isSingleVideo = !albumMedia.length && (aiData.mediaType === 'video' || item.videoFileId) && item.fileId && !textContent.trim() && !hasExternalLink;
+    if (isSingleVideo) {
+      const thumbUrl = imgUrl || '';
+      const vfId = item.videoFileId || item.fileId;
+      const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
+      return thumbUrl
+        ? `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(vfId)}" data-source-url="${escapeHtml(sourceUrl)}">
+          ${pendingDot}
+          <img class="card-img" src="${escapeHtml(thumbUrl)}" loading="lazy" alt="">
+          <div class="tgpost-play-icon">${playIconSvg}</div>
+        </div>`
+        : `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(vfId)}" data-source-url="${escapeHtml(sourceUrl)}">
+          ${pendingDot}
+          <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:40px auto">${playIconSvg}</div>
+        </div>`;
+    }
+
     const isHtml = aiData.htmlContent || /<(?:a\s+href=|b>|i>|u>|s>|code>)/.test(textContent);
     const isTruncated = textContent.length > 700;
     const displayText = isTruncated ? textContent.slice(0, 700) : textContent;
@@ -1412,10 +1431,11 @@ function renderCard(item) {
     // Background class by media type
     const mt = aiData.mediaType;
     const hasPrice = !!aiData.price;
+    const hasYtOrVimeo = !!(tgYtMatch || tgVimeoMatch);
     const bgClass = hasPrice ? ' tgpost-paid'
       : mt === 'voice' ? ' tgpost-bg-voice'
       : mt === 'audio' ? (imgUrl ? ' tgpost-bg-audio-cover' : ' tgpost-bg-audio')
-      : (mt === 'video' || mt === 'video_note') ? ' tgpost-bg-video'
+      : (mt === 'video' || mt === 'video_note' || hasYtOrVimeo) ? ' tgpost-bg-video'
       : mt === 'pdf' ? ' tgpost-bg-pdf'
       : '';
 
@@ -1443,7 +1463,7 @@ function renderCard(item) {
       if (audioTracks.length > 1) {
         const miniPlayers = audioTracks.map(m => {
           const aFid = m.audioFileId || m.fileId;
-          const title = m.audioTitle || m.audioFileName || 'Audio';
+          const title = m.audioTitle || m.audioFileName || m.audioContent || 'Audio';
           const performer = m.audioPerformer || '';
           const dur = m.audioDuration || 0;
           const durStr = dur > 0 ? `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` : '';
@@ -1509,10 +1529,10 @@ function renderCard(item) {
       const pdfThumbUrl = hasPdfThumb ? (imgUrl || '') : '';
       const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
       const pdfArrow = aiData.storageUrl ? pdfArrowSvg : '';
-      const pdfFileName = aiData.fileName || '';
+      const pdfTitle = aiData.title || aiData.fileName || '';
       mediaHtml = pdfThumbUrl
-        ? `<div class="tgpost-pdf-preview" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="pdf-blur-wrap"><img class="pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div></div>`
-        : `<div class="tgpost-pdf-badge" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div style="padding:16px 14px"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div>${pdfFileName ? `<div class="doc-file-name" style="margin-top:8px;text-align:left">${escapeHtml(pdfFileName)}</div>` : ''}</div></div>`;
+        ? `<div class="tgpost-pdf-full" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="tgpost-pdf-blur-bg"><img class="tgpost-pdf-blur-img" src="${escapeHtml(pdfThumbUrl)}" loading="lazy" alt=""></div><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div>${pdfTitle ? `<div class="tgpost-pdf-title">${escapeHtml(pdfTitle)}</div>` : ''}</div>`
+        : `<div class="tgpost-pdf-full" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div style="padding:16px 14px 0"><div class="pdf-badge" style="position:relative;top:auto;left:auto;display:inline-block"><span class="pdf-badge-text">pdf</span>${pdfArrow}</div></div>${pdfTitle ? `<div class="tgpost-pdf-title">${escapeHtml(pdfTitle)}</div>` : ''}</div>`;
     } else if (aiData.mediaType === 'video_note' && (item.videoFileId || item.fileId)) {
       const vnFid = item.videoFileId || item.fileId;
       mediaHtml = `<div class="tgpost-videonote">
@@ -1551,8 +1571,8 @@ function renderCard(item) {
     } else if (aiData.mediaType === 'document' && !imgUrl) {
       const docFileName = aiData.fileName || item.content || 'file';
       const docExt = docFileName.includes('.') ? docFileName.split('.').pop().toUpperCase() : '';
-      const storageUrl = aiData.storageUrl || '';
-      const docAction = storageUrl ? `data-action="open" data-url="${escapeHtml(storageUrl)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
+      const docStorageUrl = aiData.storageUrl || '';
+      const docAction = docStorageUrl ? `data-action="open" data-url="${escapeHtml(docStorageUrl)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
       const docFileIconSvg = `<svg class="doc-file-body" width="81" height="102" viewBox="0 0 80.85 101.37" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="#31A8FF"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/></svg>`;
       mediaHtml = `<div class="tgpost-document" ${docAction}>
         <div class="doc-file-icon">
@@ -1561,25 +1581,13 @@ function renderCard(item) {
         </div>
         <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
       </div>`;
-    } else if (imgUrl) {
-      const tgImgLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
-      const tgImgStorage = aiData.storageUrl || '';
-      if (tgImgLarge && tgImgStorage) {
-        const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
-        const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
-        mediaHtml = `<div class="largefile-inline" data-action="open" data-url="${escapeHtml(tgImgStorage)}">
-          <div class="largefile-preview"><img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
-          <div class="largefile-footer"><span class="largefile-size">${sizeMB} MB</span><span class="largefile-arrow">${arrowSvg}</span></div>
-        </div>`;
-      } else {
-        mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
-      }
     } else if (tgYtMatch) {
+      // YouTube — glow-wrap screenshot (uses imgUrl from TG preview or YT thumbnail)
       const ytId = tgYtMatch[1];
-      const ytThumb = `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
+      const ytThumb = imgUrl || `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
       const ytFallback = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
       const ytUrl = `https://www.youtube.com/watch?v=${ytId}`;
-      const ytOnload = `onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'"`;
+      const ytOnload = !imgUrl ? `onload="if(this.naturalWidth<=120)this.src='${ytFallback}'" onerror="this.src='${ytFallback}'"` : '';
       mediaHtml = `<div class="tgpost-yt-card" data-action="open" data-url="${escapeHtml(ytUrl)}">
         <div class="video-header">
           <img class="video-favicon" src="https://www.google.com/s2/favicons?domain=youtube.com&sz=64" alt="" onerror="this.style.display='none'">
@@ -1608,15 +1616,30 @@ function renderCard(item) {
         <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
       </div>`;
     } else if ((aiData.mediaType === 'video' || item.videoFileId) && item.fileId) {
+      // Inline TG video — full-width thumbnail with play icon
       const thumbUrl = imgUrl || '';
+      const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
       mediaHtml = thumbUrl
         ? `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(item.videoFileId || item.fileId)}">
             <img class="card-img" src="${escapeHtml(thumbUrl)}" loading="lazy" alt="">
-            <div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+            <div class="tgpost-play-icon">${playIconSvg}</div>
           </div>`
         : `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(item.videoFileId || item.fileId)}">
-            <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:16px auto"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div>
+            <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:16px auto">${playIconSvg}</div>
           </div>`;
+    } else if (imgUrl) {
+      const tgImgLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
+      const tgImgStorage = aiData.storageUrl || '';
+      if (tgImgLarge && tgImgStorage) {
+        const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+        const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+        mediaHtml = `<div class="largefile-inline" data-action="open" data-url="${escapeHtml(tgImgStorage)}">
+          <div class="largefile-preview"><img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
+          <div class="largefile-footer"><span class="largefile-size">${sizeMB} MB</span><span class="largefile-arrow">${arrowSvg}</span></div>
+        </div>`;
+      } else {
+        mediaHtml = `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="" data-action="lightbox" data-img="${escapeHtml(imgUrl)}">`;
+      }
     }
 
     // Transcript
@@ -1677,13 +1700,13 @@ function renderCard(item) {
       ${showFiles ? mediaHtml : ''}
       ${showText ? bodyHtml : ''}
       ${tgTranscriptHtml}
-      <div class="quote-footer">
+      ${(tgLabel || hiderDotHtml) ? `<div class="quote-footer">
         <div class="tg-footer-left">
-          ${TG_ICON_SVG}
+          ${tgLabel ? TG_ICON_SVG : ''}
           ${domainHtml}
         </div>
         ${hiderDotHtml}
-      </div>
+      </div>` : ''}
     </div>`;
   }
 
@@ -2276,7 +2299,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // "open-file" — resolve TG file_id and open PDF in browser viewer
+    // "open-file" — resolve TG file_id and open file in browser
     if (action === 'open-file') {
       e.stopPropagation();
       const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
@@ -2287,8 +2310,10 @@ document.addEventListener('DOMContentLoaded', () => {
           const getFileData = await getFileRes.json();
           if (!getFileData.ok) throw new Error('getFile failed');
           const filePath = getFileData.result.file_path;
+          const fileExt = (filePath.split('.').pop() || '').toLowerCase();
+          const isPdf = fileExt === 'pdf';
 
-          // Fetch binary via CORS proxy with forced PDF Content-Type
+          // Fetch binary via CORS proxy
           const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
           const res = await fetch(proxyUrl, {
             method: 'POST',
@@ -2299,12 +2324,22 @@ document.addEventListener('DOMContentLoaded', () => {
               path: `/file/${filePath}`,
               method: 'GET',
               binary: true,
-              contentType: 'application/pdf'
+              contentType: isPdf ? 'application/pdf' : 'application/octet-stream'
             })
           });
           const buf = await res.arrayBuffer();
-          const pdfBlob = new Blob([buf], { type: 'application/pdf' });
-          window.open(URL.createObjectURL(pdfBlob), '_blank');
+          if (isPdf) {
+            const pdfBlob = new Blob([buf], { type: 'application/pdf' });
+            window.open(URL.createObjectURL(pdfBlob), '_blank');
+          } else {
+            // Non-PDF: trigger download
+            const blob = new Blob([buf]);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filePath.split('/').pop() || 'file';
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }
         } catch (err) {
           // Fallback: resolve and open directly (will likely download)
           const fileUrl = await resolveFileId(STATE.botToken, fileId);
