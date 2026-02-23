@@ -6,3 +6,7 @@ workers_dev = true
 
 [observability]
 enabled = true
+
+[[kv_namespaces]]
+binding = "TAGS_KV"
+id = "bf6f10f79b334011992e8cf223ae138d"

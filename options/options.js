@@ -1,4 +1,4 @@
-import { EMOJI_PACKS, DEFAULT_SETTINGS, AI_MODELS, AI_DEFAULT_MODEL, COLOR_ID_TO_INDEX } from '../src/shared/constants.js';
+import { EMOJI_PACKS, DEFAULT_SETTINGS, AI_MODELS, AI_DEFAULT_MODEL, COLOR_ID_TO_INDEX, BOT_WORKER_URL } from '../src/shared/constants.js';
 
 function populateAiModels(provider, selectedModel) {
   const sel = document.getElementById('aiModel');
@@ -162,6 +162,7 @@ autoSaveInputs.forEach(item => {
       // Toggle emoji pack selector visibility
       if (item.key === 'sendWithColor') {
         toggleEmojiPackSettings(item.el.checked);
+        syncTagsToBot();
       }
 
       // Toggle hashtags settings visibility
@@ -269,6 +270,7 @@ document.querySelectorAll('.emoji-tab').forEach(tab => {
     // Save setting
     saveSetting('emojiPack', packName);
     updateLivePreview();
+    syncTagsToBot();
   });
 });
 
@@ -549,6 +551,9 @@ async function saveCredentials() {
   columnThird.classList.remove('not-connected');
   saveBtn.classList.add('grayed-out');
   saveBtn.disabled = true;
+
+  // Sync tags to bot on connection
+  syncTagsToBot();
 }
 
 async function testConnection(botToken, chatId) {
@@ -896,6 +901,34 @@ async function saveCustomTagsOnly() {
   await chrome.storage.local.set({ customTags });
   showSavedIndicator();
   updateLivePreview();
+  syncTagsToBot();
+}
+
+async function syncTagsToBot() {
+  try {
+    const settings = await chrome.storage.local.get({
+      botToken: '', customTags: DEFAULT_SETTINGS.customTags,
+      emojiPack: 'circle', customEmoji: DEFAULT_SETTINGS.customEmoji,
+      sendWithColor: true
+    });
+    if (!settings.botToken) return;
+
+    await fetch(`${BOT_WORKER_URL}/api/tags`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${settings.botToken}`
+      },
+      body: JSON.stringify({
+        customTags: settings.customTags,
+        emojiPack: settings.emojiPack,
+        customEmoji: settings.customEmoji,
+        sendWithColor: settings.sendWithColor
+      })
+    });
+  } catch (e) {
+    console.warn('Tags sync to bot failed:', e);
+  }
 }
 
 function toggleQuickTagsSettings(enabled) {
@@ -990,6 +1023,7 @@ async function updateEmojiPreview(packName) {
       e.target.value = finalEmojis.join('');
       showSavedIndicator();
       updateLivePreview();
+      syncTagsToBot();
     });
   } else {
     // Show read-only preview

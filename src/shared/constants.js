@@ -1,3 +1,6 @@
+// Bot worker URL for tags sync
+export const BOT_WORKER_URL = 'https://stash-telegram-bot.mxmlsn-co.workers.dev';
+
 // Emoji packs definition
 // Order: red, yellow, green, blue, purple, black, white
 export const EMOJI_PACKS = {

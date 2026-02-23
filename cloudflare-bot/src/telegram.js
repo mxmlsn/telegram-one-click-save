@@ -1,5 +1,81 @@
 // Telegram API helpers
 
+const COLOR_ID_TO_INDEX = {
+  'red': 0, 'yellow': 1, 'green': 2, 'blue': 3,
+  'purple': 4, 'black': 5, 'white': 6
+};
+
+const EMOJI_PACKS = {
+  circle: ['\u{1F534}', '\u{1F7E1}', '\u{1F7E2}', '\u{1F535}', '\u{1F7E3}', '\u26AB\uFE0F', '\u26AA\uFE0F'],
+  heart: ['\u2764\uFE0F', '\u{1F49B}', '\u{1F49A}', '\u{1F499}', '\u{1F49C}', '\u{1F5A4}', '\u{1F90D}'],
+  soft: ['\u{1F344}', '\u{1F424}', '\u{1F438}', '\u{1F4A7}', '\u{1F52E}', '\u{1F31A}', '\u{1F4AD}']
+};
+
+function getEmojiForTag(tag, config) {
+  if (!config || !config.sendWithColor) return '';
+  const idx = COLOR_ID_TO_INDEX[tag.id] ?? 0;
+  if (config.emojiPack === 'custom' && config.customEmoji) {
+    return config.customEmoji[idx] || '';
+  }
+  const pack = EMOJI_PACKS[config.emojiPack || 'circle'] || EMOJI_PACKS.circle;
+  return pack[idx] || '';
+}
+
+export async function sendTagKeyboard(env, chatId, replyToMessageId, notionPageId, activeTags, config) {
+  // Build inline keyboard — tags in rows of 3
+  const buttons = activeTags.map(tag => {
+    const emoji = getEmojiForTag(tag, config);
+    const label = emoji ? `${emoji} ${tag.name}` : tag.name;
+    return {
+      text: label,
+      callback_data: `tag:${notionPageId}:${tag.name}`
+    };
+  });
+
+  // Add "no tag" button
+  buttons.push({
+    text: '\u2715',
+    callback_data: `tag:${notionPageId}:`
+  });
+
+  // Arrange in rows of 3
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 3) {
+    rows.push(buttons.slice(i, i + 3));
+  }
+
+  try {
+    await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: '\u{1F3F7}',
+        reply_to_message_id: replyToMessageId,
+        reply_markup: { inline_keyboard: rows },
+        disable_notification: true
+      })
+    });
+  } catch (e) {
+    console.warn('Tag keyboard send failed:', e);
+  }
+}
+
+export async function deleteMessage(env, chatId, messageId) {
+  try {
+    await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId
+      })
+    });
+  } catch (e) {
+    console.warn('Delete message failed:', e);
+  }
+}
+
 export async function setReaction(env, chatId, messageId, emoji) {
   try {
     await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/setMessageReaction`, {
