@@ -2774,10 +2774,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (gallery.length === 0) return;
       // For the clicked item, if it's a video, resolve it now
       const clicked = gallery[idx];
+      console.log('[album-gallery click]', { clicked, botToken: !!STATE.botToken });
       if (clicked.video && clicked.fileId && !clicked.url) {
         const resolved = await resolveFileId(STATE.botToken, clicked.fileId);
+        console.log('[album-gallery resolved]', resolved);
         if (resolved) clicked.url = resolved;
       }
+      console.log('[album-gallery open]', { url: clicked.url, isVideo: clicked.video });
       openLightbox(clicked.url, '', { gallery, galleryIndex: idx });
       return;
     }
