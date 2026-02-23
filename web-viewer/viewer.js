@@ -1718,21 +1718,6 @@ function renderCard(item) {
       || allAlbumAreDocs
       || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
     const textContent = isDocumentContent ? '' : (item.content || '');
-    // DEBUG: log items that have content to find why filenames still show
-    if (item.content) {
-      console.log('[DOC-DEBUG]', {
-        id: item.id,
-        content: item.content,
-        'aiData.mediaType': aiData.mediaType,
-        'aiData.fileName': aiData.fileName,
-        albumMediaCount: albumMedia.length,
-        albumMediaTypes: albumMedia.map(m => m.mediaType),
-        allAlbumAreDocs,
-        isDocumentContent,
-        textContent,
-        _allCaptions: item._allCaptions,
-      });
-    }
     const isSingleImage = !albumMedia.length && imgUrl
       && (!aiData.mediaType || aiData.mediaType === 'image')
       && !textContent.trim();
