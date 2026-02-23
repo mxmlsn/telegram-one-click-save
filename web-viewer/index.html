@@ -631,30 +631,31 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Folded corner — pure CSS, lives inside overflow:hidden so never sticks out */
-    .doc-corner {
+    /* Folded corner via pseudo-elements on doc-sheet itself — guaranteed inside overflow:hidden */
+    /* ::before = dark bg triangle (top-right), ::after = white fold highlight */
+    .doc-sheet::before {
+      content: '';
       position: absolute;
       top: 0;
       right: 0;
       width: 30%;
       aspect-ratio: 1;
-      pointer-events: none;
-    }
-    /* Dark bg triangle — covers the actual corner of the sheet */
-    .doc-corner::before {
-      content: '';
-      position: absolute;
-      inset: 0;
       background: var(--card-bg, #0d1a24);
       clip-path: polygon(100% 0, 0 0, 100% 100%);
+      pointer-events: none;
+      z-index: 1;
     }
-    /* White fold highlight triangle */
-    .doc-corner::after {
+    .doc-sheet::after {
       content: '';
       position: absolute;
-      inset: 0;
+      top: 0;
+      right: 0;
+      width: 30%;
+      aspect-ratio: 1;
       background: rgba(255,255,255,0.55);
       clip-path: polygon(0 0, 100% 100%, 0 100%);
+      pointer-events: none;
+      z-index: 1;
     }
     .doc-sheet-ext {
       font-family: 'Anybody', sans-serif;
