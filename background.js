@@ -505,17 +505,25 @@ async function analyzeWithAI(item, settings) {
         responseText = await callAnthropic(messages, settings);
       }
     } else if (item.fileId && settings.botToken) {
+      // For TG gif (animation): file_path has no extension (mp4 stored without .mp4).
+      // Use thumbnail file_id if available — thumbnail is a JPEG, works with image AI.
+      const gifThumbFileId = item.type === 'gif' && item.existingAiData?.thumbnailFileId
+        ? item.existingAiData.thumbnailFileId : null;
+      const fileIdToFetch = gifThumbFileId || item.fileId;
+
       // Get Telegram file (photo, etc.)
       const fileRes = await fetch(
-        `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${item.fileId}`
+        `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${fileIdToFetch}`
       );
       const fileData = await fileRes.json();
       if (fileData.ok) {
         const filePath = fileData.result.file_path;
         const ext = filePath.split('.').pop()?.toLowerCase();
         const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
+        // For gif thumbnails: treat as jpeg even if ext is missing/unexpected
+        const isGifThumb = gifThumbFileId && fileIdToFetch === gifThumbFileId;
         // Only send to AI vision if it's actually an image — otherwise fall through to text fallback
-        if (IMAGE_EXTS.includes(ext)) {
+        if (IMAGE_EXTS.includes(ext) || isGifThumb) {
           const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
           const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
           const mimeType = ext === 'gif' ? 'image/gif'

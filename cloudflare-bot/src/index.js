@@ -233,6 +233,11 @@ function parseMessage(message, env) {
   if (message.animation) {
     result.fileId = message.animation.file_id;
     result.mediaType = 'gif';
+    if (message.animation.thumbnail?.file_id) {
+      result.thumbnailFileId = message.animation.thumbnail.file_id;
+    } else if (message.animation.thumb?.file_id) {
+      result.thumbnailFileId = message.animation.thumb.file_id;
+    }
     if (isForward || hasSubstantialCaption) {
       result.type = 'tgpost';
       const captionEntities = message.caption_entities || [];
@@ -474,6 +479,7 @@ async function saveToNotion(parsed, env) {
   if (parsed.fileSize) aiDataInit.fileSize = parsed.fileSize;
   if (parsed.imageWidth) aiDataInit.imageWidth = parsed.imageWidth;
   if (parsed.imageHeight) aiDataInit.imageHeight = parsed.imageHeight;
+  if (parsed.thumbnailFileId) aiDataInit.thumbnailFileId = parsed.thumbnailFileId;
   if (parsed.thumbnailWidth) aiDataInit.thumbnailWidth = parsed.thumbnailWidth;
   if (parsed.thumbnailHeight) aiDataInit.thumbnailHeight = parsed.thumbnailHeight;
   if (Object.keys(aiDataInit).length) {
