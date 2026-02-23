@@ -172,26 +172,6 @@ function notionPatch(pageId, body) {
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
-
-async function resolveChatId(botToken) {
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates?limit=10`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.ok || !data.result?.length) return null;
-    // Find the most recent chat_id from any message type
-    for (let i = data.result.length - 1; i >= 0; i--) {
-      const u = data.result[i];
-      const chat = u.message?.chat || u.channel_post?.chat || u.my_chat_member?.chat;
-      if (chat?.id) return String(chat.id);
-    }
-    return null;
-  } catch (e) {
-    console.warn('[resolveChatId] error:', e);
-    return null;
-  }
-}
-
 async function init() {
   setupSettingsPanel();  // always wire up panel events first
   const settings = await getSettings();
@@ -199,22 +179,10 @@ async function init() {
     STATE.notionToken = settings.notionToken;
     STATE.notionDbId = settings.notionDbId;
     STATE.botToken = settings.botToken;
+    STATE.chatId = settings.chatId || '';
     STATE.customTags = settings.customTags || [];
     STATE.aiEnabled = !!(settings.aiEnabled && settings.aiApiKey);
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
-
-    // Auto-resolve chatId: use saved value or detect from getUpdates
-    if (settings.chatId) {
-      STATE.chatId = settings.chatId;
-    } else {
-      const detected = await resolveChatId(settings.botToken);
-      if (detected) {
-        STATE.chatId = detected;
-        chrome.storage.local.set({ chatId: detected });
-        console.log('[init] Auto-detected chatId:', detected);
-      }
-    }
-
     startApp();
   } else {
     openSettingsPanel();
@@ -1113,15 +1081,7 @@ async function openSettingsPanel() {
   document.getElementById('sp-notion-token').value = s.notionToken || '';
   document.getElementById('sp-db-id').value = s.notionDbId || '';
   document.getElementById('sp-tg-token').value = s.botToken || '';
-  const chatIdInput = document.getElementById('sp-chat-id');
-  chatIdInput.value = s.chatId || STATE.chatId || '';
-  if (!chatIdInput.value && s.botToken) {
-    chatIdInput.placeholder = 'detecting…';
-    resolveChatId(s.botToken).then(id => {
-      if (id && !chatIdInput.value) { chatIdInput.value = id; chatIdInput.placeholder = '-100123456789'; }
-      else if (!chatIdInput.value) chatIdInput.placeholder = 'send /start to bot first';
-    });
-  }
+  document.getElementById('sp-chat-id').value = s.chatId || '';
   document.getElementById('sp-ai-enabled').checked = s.aiEnabled || false;
 
   const provider = s.aiProvider || 'google';
