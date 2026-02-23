@@ -459,6 +459,12 @@ function mergeMediaGroups(items) {
         item._groupPageIds = [item.id]; // track all Notion page IDs in this album
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) item.fileIds.push(mediaEntry.coverFileId);
+        // If first item is a document and its content is just the filename, clear it
+        // so a real caption from a later item can be picked up
+        const firstIsDoc = mType === 'document' || mType === 'pdf';
+        if (firstIsDoc && item.content && item.content.trim() === (item.ai_data?.fileName || '').trim()) {
+          item.content = '';
+        }
         result.push(item);
       } else {
         // Merge into existing group item — always add media entry

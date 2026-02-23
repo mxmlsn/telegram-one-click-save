@@ -68,10 +68,9 @@ async function handleUpdate(update, env, ctx) {
           }
         }
 
-        // For large files (>20MB) or unknown document types: forward to storage channel
+        // For large files (>20MB): forward to storage channel for direct download link
         const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
-        const isDocFile = parsed.type === 'document' || parsed.mediaType === 'document';
-        if ((isLargeFile || isDocFile) && env.STORAGE_CHANNEL_ID) {
+        if (isLargeFile && env.STORAGE_CHANNEL_ID) {
           await forwardToStorageChannel(message, chatId, notionPageId, parsed, env);
         }
 
