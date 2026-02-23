@@ -1414,6 +1414,10 @@
       cursor: pointer;
       background: #1a1a1a;
       flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .videonote-circle:hover {
+      transform: scale(0.96);
     }
     .videonote-video {
       width: 100%;
@@ -1445,6 +1449,7 @@
       text-decoration: none;
       display: block;
       cursor: pointer;
+      width: min(300px, 100%);
     }
     a.videonote-author:hover { color: rgba(255,255,255,0.7); }
     /* Video note inside tgpost */
