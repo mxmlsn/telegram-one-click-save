@@ -840,7 +840,8 @@ async function resolveImagesBatch(items, tgToken, cache) {
   }
 
   // SVG proxy: Telegram may serve SVGs with wrong content-type, so fetch through proxy.
-  // Awaited (not fire-and-forget) so album cards render with correct blob URLs on first paint.
+  // Sync map → STATE.imageMap so proxySvgItems can see album entries' resolved URLs.
+  Object.assign(STATE.imageMap, map);
   await proxySvgItems(items, map);
 
   return map;
