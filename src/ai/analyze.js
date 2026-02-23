@@ -100,9 +100,12 @@ export async function analyzeWithAI(item, settings) {
     }
     // Try Telegram file_id
     else if (item.fileId && settings.botToken) {
+      const isSvg = /\.svg$/i.test(item.existingAiData?.fileName || '');
       const gifThumbFileId = item.type === 'gif' && item.existingAiData?.thumbnailFileId
         ? item.existingAiData.thumbnailFileId : null;
-      const fileIdToFetch = gifThumbFileId || item.fileId;
+      const svgThumbFileId = isSvg && item.existingAiData?.thumbnailFileId
+        ? item.existingAiData.thumbnailFileId : null;
+      const fileIdToFetch = gifThumbFileId || svgThumbFileId || item.fileId;
 
       const fileRes = await fetch(
         `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${fileIdToFetch}`
@@ -112,9 +115,9 @@ export async function analyzeWithAI(item, settings) {
         const filePath = fileData.result.file_path;
         const ext = filePath.split('.').pop()?.toLowerCase();
         const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
-        const isGifThumb = gifThumbFileId && fileIdToFetch === gifThumbFileId;
+        const isThumbFallback = (gifThumbFileId || svgThumbFileId) && fileIdToFetch !== item.fileId;
 
-        if (IMAGE_EXTS.includes(ext) || isGifThumb) {
+        if (IMAGE_EXTS.includes(ext) || isThumbFallback) {
           const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
           const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
           responseText = await callAIWithImage(prompt, imgUrl, settings);
