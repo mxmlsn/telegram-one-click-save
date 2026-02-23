@@ -469,12 +469,14 @@ function mergeMediaGroups(items) {
         }
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) groups[gid].fileIds.push(mediaEntry.coverFileId);
-        // Use content from whichever has it (caption is usually on first message)
-        if (!groups[gid].content && item.content) {
+        // Use content from whichever has it — but skip document/pdf items
+        // (their content is the filename, not a user caption)
+        const isDocItem = mType === 'document' || mType === 'pdf';
+        if (!groups[gid].content && item.content && !isDocItem) {
           groups[gid].content = item.content;
         }
-        // Collect all unique captions for audio albums (used in rendering)
-        if (item.content) {
+        // Collect all unique captions for audio albums — skip document filenames
+        if (item.content && !isDocItem) {
           if (!groups[gid]._allCaptions) {
             groups[gid]._allCaptions = groups[gid].content ? [groups[gid].content] : [];
           }
@@ -1711,11 +1713,13 @@ function renderCard(item) {
     const albumMedia = item.albumMedia || [];
 
     // For document posts item.content is the filename — don't show it as message text
-    // Also suppress when: content matches aiData.fileName (channel-forwarded docs),
-    // or all albumMedia entries are documents (multi-file forward — content = filenames joined)
     const allAlbumAreDocs = albumMedia.length > 0 && albumMedia.every(m => m.mediaType === 'document' || m.mediaType === 'pdf');
+    // Also suppress when content matches any fileName in albumMedia (mixed image+doc albums)
+    const albumFileNames = albumMedia.map(m => (m.fileName || '').trim()).filter(Boolean);
+    const contentIsAlbumFileName = !!item.content && albumFileNames.includes(item.content.trim());
     const isDocumentContent = aiData.mediaType === 'document'
       || allAlbumAreDocs
+      || contentIsAlbumFileName
       || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
     const textContent = isDocumentContent ? '' : (item.content || '');
     const isSingleImage = !albumMedia.length && imgUrl
