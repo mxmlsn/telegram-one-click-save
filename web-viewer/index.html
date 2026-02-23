@@ -301,6 +301,16 @@
       color: #000;
       white-space: pre-wrap;
     }
+    .card-quote-new .quote-text a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: rgba(0,0,0,0.2);
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+    }
+    .card-quote-new .quote-text a:hover {
+      text-decoration-color: rgba(0,0,0,0.45);
+    }
     .card-quote-new .quote-text.truncated {
       mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
       -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
@@ -362,15 +372,25 @@
       mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
       -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
     }
-    .card-tgpost .quote-text a,
-    .overlay-quote-text a {
-      color: rgba(255,255,255,0.75);
+    .card-tgpost .quote-text a {
+      color: inherit;
       text-decoration: underline;
-      text-decoration-color: rgba(255,255,255,0.25);
+      text-decoration-color: rgba(255,255,255,0.2);
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
     }
-    .card-tgpost .quote-text a:hover,
+    .card-tgpost .quote-text a:hover {
+      text-decoration-color: rgba(255,255,255,0.45);
+    }
+    .overlay-quote-text a {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: rgba(0,0,0,0.2);
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
+    }
     .overlay-quote-text a:hover {
-      text-decoration-color: rgba(255,255,255,0.5);
+      text-decoration-color: rgba(0,0,0,0.45);
     }
     .card-tgpost .quote-footer {
       display: flex;
@@ -1314,13 +1334,15 @@
       overflow-wrap: break-word;
     }
     .card-pdf .quote-text a {
-      color: rgba(255,255,255,0.75);
+      color: inherit;
       text-decoration: underline;
-      text-decoration-color: rgba(255,255,255,0.25);
+      text-decoration-color: rgba(255,255,255,0.2);
+      text-underline-offset: 2px;
+      text-decoration-thickness: 1px;
       word-break: break-all;
     }
     .card-pdf .quote-text a:hover {
-      text-decoration-color: rgba(255,255,255,0.5);
+      text-decoration-color: rgba(255,255,255,0.45);
     }
     .card-pdf .quote-footer {
       display: flex;
