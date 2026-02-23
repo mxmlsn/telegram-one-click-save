@@ -75,6 +75,30 @@ async function callAIWithImage(prompt, imageUrl, settings) {
   }
 }
 
+async function blobToBase64(blob) {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+async function callAIWithBase64(prompt, base64, mimeType, settings) {
+  const provider = settings.aiProvider || 'google';
+  if (provider === 'google') {
+    return callGemini(prompt, base64, settings, mimeType);
+  } else {
+    const messages = [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+        { type: 'text', text: prompt }
+      ]
+    }];
+    return callAnthropic(messages, settings);
+  }
+}
+
 async function callAITextOnly(prompt, settings) {
   const provider = settings.aiProvider || 'google';
   if (provider === 'google') {
@@ -117,20 +141,32 @@ export async function analyzeWithAI(item, settings) {
         const isThumbFallback = gifThumbFileId && fileIdToFetch !== item.fileId;
 
         if (ext === 'svg') {
-          // SVG: fetch source code and send as text to AI
+          // SVG: rasterize to PNG via OffscreenCanvas, then send PNG to AI
           const svgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
           try {
             const svgRes = await fetch(svgUrl);
             if (svgRes.ok) {
-              const svgText = await svgRes.text();
-              if (svgText.length > 50 && svgText.length < 50000) {
-                const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
-                const svgPrompt = `${prompt}\n\nSVG source code:\n${svgText.slice(0, 10000)}`;
-                responseText = await callAITextOnly(svgPrompt, settings);
+              const svgBlob = await svgRes.blob();
+              const bitmap = await createImageBitmap(svgBlob);
+              if (bitmap.width > 0 && bitmap.height > 0) {
+                const scale = Math.min(1, 800 / Math.max(bitmap.width, bitmap.height));
+                const w = Math.round(bitmap.width * scale);
+                const h = Math.round(bitmap.height * scale);
+                const canvas = new OffscreenCanvas(w, h);
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(bitmap, 0, 0, w, h);
+                const pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+                if (pngBlob.size > 1024) {
+                  const pngBase64 = await blobToBase64(pngBlob);
+                  const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+                  responseText = await callAIWithBase64(prompt, pngBase64, 'image/png', settings);
+                }
               }
             }
           } catch (e) {
-            console.warn('[TG Saver] SVG text analysis failed:', e);
+            console.warn('[TG Saver] SVG rasterize+analyze failed:', e);
           }
         } else if (IMAGE_EXTS.includes(ext) || isThumbFallback) {
           const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;

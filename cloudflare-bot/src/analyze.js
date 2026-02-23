@@ -2,6 +2,7 @@
 
 import { fetchBase64, buildAiDataFromParsed } from './helpers.js';
 import { callGemini, callAnthropic, parseAiJson } from './ai.js';
+import { Resvg } from '@cf-wasm/resvg/workerd';
 import { patchNotionPage } from './notion.js';
 import {
   AI_PROMPT_IMAGE, AI_PROMPT_LINK, AI_PROMPT_PDF,
@@ -221,24 +222,34 @@ export async function analyzeAndPatch(parsed, notionPageId, env) {
         const base64 = await fetchBase64(imgUrl);
         responseText = await callGemini(prompt, base64, env, 'video/mp4');
       } else if (ext === 'svg') {
-        // SVG without thumbnail: send as text to AI for analysis
+        // SVG: rasterize to PNG via resvg-wasm, then send PNG to AI
         try {
           const svgRes = await fetch(imgUrl);
           if (svgRes.ok) {
             const svgText = await svgRes.text();
-            if (svgText.length > 50 && svgText.length < 50000) {
-              const svgPrompt = `${prompt}\n\nSVG source code:\n${svgText.slice(0, 10000)}`;
+            if (svgText.length > 50) {
+              const resvg = await Resvg.async(svgText, {
+                fitTo: { mode: 'width', value: 800 },
+                background: '#ffffff',
+              });
+              const pngData = resvg.render();
+              const pngBuffer = pngData.asPng();
+              const base64 = btoa(String.fromCharCode(...pngBuffer));
               if (provider === 'google') {
-                responseText = await callGemini(svgPrompt, null, env);
+                responseText = await callGemini(prompt, base64, env, 'image/png');
               } else {
-                responseText = await callAnthropic(
-                  [{ role: 'user', content: svgPrompt }], env
-                );
+                responseText = await callAnthropic([{
+                  role: 'user',
+                  content: [
+                    { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64 } },
+                    { type: 'text', text: prompt }
+                  ]
+                }], env);
               }
             }
           }
         } catch (e) {
-          console.warn('SVG text analysis failed:', e.message);
+          console.warn('SVG rasterize+analyze failed:', e.message);
         }
       }
     }
