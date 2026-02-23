@@ -365,6 +365,33 @@ async function resolveRemainingImages(items, fileCache) {
       return it;
     })).then(converted => patchCardImages(converted));
   }
+
+  // SVG proxy: same as in resolveImagesBatch
+  const svgStandalone2 = items.filter(it => /\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg);
+  const svgAlbumParents2 = items.filter(it =>
+    it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
+  );
+  const svgItemsAll2 = [...new Set([...svgStandalone2, ...svgAlbumParents2])];
+  if (svgItemsAll2.length > 0) {
+    Promise.all(svgItemsAll2.map(async it => {
+      if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
+        const blobUrl = await proxySvgFile(it._resolvedImg);
+        if (blobUrl) {
+          it._resolvedImg = blobUrl;
+          STATE.imageMap[it.fileId] = blobUrl;
+        }
+      }
+      if (it.albumMedia) {
+        for (const m of it.albumMedia) {
+          if (/\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId]) {
+            const blobUrl = await proxySvgFile(STATE.imageMap[m.fileId]);
+            if (blobUrl) { STATE.imageMap[m.fileId] = blobUrl; }
+          }
+        }
+      }
+      return it;
+    })).then(converted => patchCardImages(converted));
+  }
 }
 
 // ─── Notion fetch ─────────────────────────────────────────────────────────────
@@ -566,6 +593,34 @@ async function resolveFileId(tgToken, fileId) {
   } catch { return null; }
 }
 
+// Fetch SVG file through CORS proxy and return a blob URL
+// Telegram may serve SVGs with wrong content-type, blocking <img> rendering
+async function proxySvgFile(tgFileUrl) {
+  try {
+    const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
+    const filePath = tgFileUrl.replace(/^https:\/\/api\.telegram\.org\/file\/bot[^/]+/, '');
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service: 'telegram',
+        token: STATE.botToken,
+        path: `/file${filePath}`,
+        method: 'GET',
+        binary: true,
+        contentType: 'image/svg+xml'
+      })
+    });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const blob = new Blob([buf], { type: 'image/svg+xml' });
+    return URL.createObjectURL(blob);
+  } catch (e) {
+    console.warn('[Viewer] SVG proxy failed:', e);
+    return null;
+  }
+}
+
 async function maybeConvertHeic(url, fileName) {
   if (!url) return { url };
   const isHeic = /\.heic$/i.test(fileName || '') || /\.heic($|\?)/i.test(url);
@@ -724,6 +779,39 @@ async function resolveImagesBatch(items, tgToken, cache) {
               map[m.fileId] = convUrl;
               STATE.imageMap[m.fileId] = convUrl;
               if (width && height) { m.imageWidth = width; m.imageHeight = height; }
+            }
+          }
+        }
+      }
+      return it;
+    })).then(converted => patchCardImages(converted));
+  }
+
+  // SVG proxy: Telegram may serve SVGs with wrong content-type, so fetch through proxy
+  const svgStandalone = items.filter(it => /\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg);
+  const svgAlbumParents = items.filter(it =>
+    it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
+  );
+  const svgItemsAll = [...new Set([...svgStandalone, ...svgAlbumParents])];
+  if (svgItemsAll.length > 0) {
+    Promise.all(svgItemsAll.map(async it => {
+      // Convert standalone SVG
+      if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
+        const blobUrl = await proxySvgFile(it._resolvedImg);
+        if (blobUrl) {
+          it._resolvedImg = blobUrl;
+          map[it.fileId] = blobUrl;
+          STATE.imageMap[it.fileId] = blobUrl;
+        }
+      }
+      // Convert SVG entries inside albumMedia
+      if (it.albumMedia) {
+        for (const m of it.albumMedia) {
+          if (/\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId]) {
+            const blobUrl = await proxySvgFile(STATE.imageMap[m.fileId]);
+            if (blobUrl) {
+              map[m.fileId] = blobUrl;
+              STATE.imageMap[m.fileId] = blobUrl;
             }
           }
         }
@@ -1751,7 +1839,8 @@ function renderCard(item) {
         ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
         : '';
       const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
-      const isSvgCard = imgUrl.split('?')[0].split('#')[0].toLowerCase().endsWith('.svg');
+      const isSvgCard = imgUrl.split('?')[0].split('#')[0].toLowerCase().endsWith('.svg')
+        || /\.svg$/i.test(aiData.fileName || '');
       const svgClass = isSvgCard ? ' card-svg' : '';
       return `<div class="card card-image${svgClass}" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
         ${pendingDot}
@@ -2557,10 +2646,12 @@ async function toggleTgpostSection(pageId, section) {
 // ─── Download helper ─────────────────────────────────────────────────────────
 function downloadImage(url) {
   const ext = (url.match(/\.(jpe?g|png|gif|webp|svg)/i) || [])[1] || 'jpg';
-  const name = 'image_' + Date.now() + '.' + ext;
   fetch(url)
     .then(r => r.blob())
     .then(blob => {
+      // For blob URLs (e.g. proxied SVGs), detect type from blob instead of URL
+      const actualExt = (blob.type === 'image/svg+xml') ? 'svg' : ext;
+      const name = 'image_' + Date.now() + '.' + actualExt;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = name;
