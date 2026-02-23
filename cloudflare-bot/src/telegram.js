@@ -34,7 +34,7 @@ export async function sendTagKeyboard(env, chatId, replyToMessageId, notionPageI
 
   // Add "no tag" button
   buttons.push({
-    text: '\u2715',
+    text: '\u2715 no tag',
     callback_data: `tag:${notionPageId}:`
   });
 
@@ -50,7 +50,7 @@ export async function sendTagKeyboard(env, chatId, replyToMessageId, notionPageI
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text: '\u{1F3F7}',
+        text: 'Tags?',
         reply_to_message_id: replyToMessageId,
         reply_markup: { inline_keyboard: rows },
         disable_notification: true
