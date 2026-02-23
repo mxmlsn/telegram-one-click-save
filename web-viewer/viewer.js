@@ -1713,9 +1713,11 @@ function renderCard(item) {
     // Short-circuit: single image tgpost with no text → render as plain card-image
     const albumMedia = item.albumMedia || [];
 
-    // For document posts item.content is the filename — don't show it as message text
+    // For standalone document posts item.content is the filename — don't show as message text
+    // For albums: only suppress if content literally matches the filename (not a real caption)
     const allAlbumAreDocs = albumMedia.length > 0 && albumMedia.every(m => m.mediaType === 'document' || m.mediaType === 'pdf');
-    const isDocumentContent = aiData.mediaType === 'document'
+    const isStandaloneDoc = !albumMedia.length && aiData.mediaType === 'document';
+    const isDocumentContent = isStandaloneDoc
       || allAlbumAreDocs
       || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
     const textContent = isDocumentContent ? '' : (item.content || '');
