@@ -2144,9 +2144,16 @@ function renderCard(item) {
       ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(gifDomain)}</button>`
       : '';
     const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
-    return `<div class="card card-image card-gif" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
+    // Telegram stores animations as mp4 — use <video> instead of <img>
+    const isMp4Gif = /\.mp4($|\?)/i.test(imgUrl);
+    const mediaEl = isMp4Gif
+      ? `<video class="card-img" src="${escapeHtml(imgUrl)}" autoplay loop muted playsinline></video>`
+      : `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">`;
+    // For mp4 gifs: open via video lightbox; for true .gif: image lightbox
+    const lbAction = isMp4Gif ? 'gif-mp4-lightbox' : 'lightbox';
+    return `<div class="card card-image card-gif" data-id="${item.id}" data-action="${lbAction}" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}" data-file-id="${escapeHtml(item.fileId || '')}">
       ${pendingDot}
-      <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+      ${mediaEl}
       <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
     </div>`;
   }
@@ -2640,6 +2647,14 @@ async function _showLightboxItem() {
     // Fetch via CORS proxy and create a blob URL instead.
     video.src = '';
     video.loop = true;
+    // gif-mp4: mute + no controls (behaves like a gif)
+    if (item.isGifMp4) {
+      video.muted = true;
+      video.controls = false;
+    } else {
+      video.muted = false;
+      video.controls = true;
+    }
     try {
       const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
       const proxyRes = await fetch(proxyUrl, {
@@ -2721,6 +2736,8 @@ function closeLightbox() {
   document.getElementById('lightbox-img').src = '';
   video.pause();
   video.src = '';
+  video.muted = false;
+  video.controls = true;
   _gallery.items = [];
   _gallery.index = 0;
 }
@@ -2777,6 +2794,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (action === 'lightbox') {
       const imgSrc = actionEl.dataset.img || '';
       if (imgSrc) openLightbox(imgSrc, url);
+      return;
+    }
+
+    // "gif-mp4-lightbox" — open TG gif (stored as mp4) via video lightbox
+    if (action === 'gif-mp4-lightbox') {
+      const mp4Url = actionEl.dataset.img || '';
+      const fileId = actionEl.dataset.fileId || '';
+      if (mp4Url || fileId) {
+        openLightbox('', url, { gallery: [{ url: mp4Url, fileId: fileId || '', video: true, thumb: '', sourceUrl: url, isGifMp4: true }] });
+      }
       return;
     }
 
