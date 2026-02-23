@@ -2062,8 +2062,8 @@ function renderCard(item) {
       ? `<div class="transcript-text hidden" style="padding:0 16px 8px">${escapeHtml(tgTranscript)}</div>`
       : '';
 
-    // Body text
-    const allCaptions = item._allCaptions || [];
+    // Body text — suppress captions that are just filenames (document albums)
+    const allCaptions = isDocumentContent ? [] : (item._allCaptions || []);
     let bodyHtml = '';
     if (allCaptions.length > 1) {
       const parts = allCaptions.map(cap => {
