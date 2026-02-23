@@ -605,12 +605,13 @@
     }
     /* ── Document file cards (new design) ── */
     .card-document {
+      --card-bg: #0d1a24;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 16px;
       aspect-ratio: 1;
-      background: #0d1a24;
+      background: var(--card-bg);
       cursor: pointer;
     }
     /* The "sheet" container — limits max size */
@@ -630,14 +631,30 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Folded corner SVG — top-right */
+    /* Folded corner — pure CSS, lives inside overflow:hidden so never sticks out */
     .doc-corner {
       position: absolute;
       top: 0;
       right: 0;
       width: 30%;
-      height: auto;
+      aspect-ratio: 1;
       pointer-events: none;
+    }
+    /* Dark bg triangle — covers the actual corner of the sheet */
+    .doc-corner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--card-bg, #0d1a24);
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+    }
+    /* White fold highlight triangle */
+    .doc-corner::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.55);
+      clip-path: polygon(0 0, 100% 100%, 0 100%);
     }
     .doc-sheet-ext {
       font-family: 'Anybody', sans-serif;
