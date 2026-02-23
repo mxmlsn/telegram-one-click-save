@@ -850,6 +850,7 @@ async function resolveImagesBatch(items, tgToken, cache) {
 // Patch already-rendered cards with resolved image URLs
 function patchCardImages(items) {
   let hasVideoNotes = false;
+  let hasSmallVideos = false;
   for (const item of items) {
     if (!item._resolvedImg) continue;
     const card = document.querySelector(`.card[data-id="${item.id}"]`);
@@ -890,11 +891,13 @@ function patchCardImages(items) {
         if (newCard.classList.contains('xpost-collapsed')) textEl.classList.add('truncated-collapsed');
       }
     }
-    // Check if new card has video notes
+    // Check if new card has video notes or small autoplay videos
     if (!hasVideoNotes && newCard?.querySelector('.videonote-circle')) hasVideoNotes = true;
+    if (!hasSmallVideos && newCard?.classList.contains('tgvideo-autoplay')) hasSmallVideos = true;
   }
   // Re-autoload video notes if any were re-rendered
   if (hasVideoNotes) autoloadVideoNotes();
+  if (hasSmallVideos) autoloadSmallVideos();
   // Fix sizes for any newly rendered HEIC placeholders
   patchHeicPlaceholderSizes();
 }
@@ -1467,10 +1470,19 @@ function renderCard(item) {
     const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
     if (isTgDirectVideo) {
       const isLargeFile = (aiData.fileSize || 0) > 20 * 1024 * 1024;
+      const isSmallVideo = !isLargeFile && (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 3 * 1024 * 1024;
+      console.log('[SmallVideo] render id=%s fileSize=%d isSmall=%s fid=...%s',
+        item.id?.slice(0, 8), aiData.fileSize || 0, isSmallVideo,
+        (item.videoFileId || item.fileId || '').slice(-20));
       const playbackFileId = item.videoFileId || item.fileId;
       const tgSourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
       const tgThumbUrl = imgUrl || '';
       const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
+      // Small video inline element (muted autoplay loop, like video notes)
+      const smallVideoEl = isSmallVideo
+        ? `<video class="tgvideo-inline" muted loop playsinline preload="none"></video>`
+        : '';
+      const smallVideoClass = isSmallVideo ? ' tgvideo-autoplay' : '';
       // Large file badge
       let tgVideoBadge = '';
       if (isLargeFile) {
@@ -1495,16 +1507,18 @@ function renderCard(item) {
       const hasExtras = tgVideoBodyHtml || tgVideoFooterHtml;
       if (hasExtras) {
         // Render as tgpost-style card with video + text + author
-        return `<div class="card card-tgpost tgpost-bg-video" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
+        return `<div class="card card-tgpost tgpost-bg-video${smallVideoClass}" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
           ${pendingDot}
           ${tgVideoBadge}
           ${tgThumbUrl
             ? `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}">
                 <img class="video-glow" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="" aria-hidden="true">
                 <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+                ${smallVideoEl}
                 <div class="tgpost-play-icon">${playIconSvg}</div>
               </div>`
             : `<div class="tgpost-video-preview" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}">
+                ${smallVideoEl}
                 <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:16px auto">${playIconSvg}</div>
               </div>`}
           ${tgVideoBodyHtml}
@@ -1513,16 +1527,18 @@ function renderCard(item) {
       }
       // No text/author — plain card-tgvideo
       return tgThumbUrl
-        ? `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
+        ? `<div class="card card-tgvideo${smallVideoClass}" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
           ${pendingDot}
           ${tgVideoBadge}
           <img class="video-glow" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="" aria-hidden="true">
           <img class="card-img" src="${escapeHtml(tgThumbUrl)}" loading="lazy" alt="">
+          ${smallVideoEl}
           <div class="tgpost-play-icon">${playIconSvg}</div>
         </div>`
-        : `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
+        : `<div class="card card-tgvideo${smallVideoClass}" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(playbackFileId)}"${tgSourceUrlAttr}>
           ${pendingDot}
           ${tgVideoBadge}
+          ${smallVideoEl}
           <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:40px auto">${playIconSvg}</div>
         </div>`;
     }
@@ -1878,15 +1894,22 @@ function renderCard(item) {
     if (isSingleVideo) {
       const thumbUrl = imgUrl || '';
       const vfId = item.videoFileId || item.fileId;
+      const isSmallSingle = (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 3 * 1024 * 1024;
+      const smallSingleClass = isSmallSingle ? ' tgvideo-autoplay' : '';
+      const smallSingleEl = isSmallSingle ? `<video class="tgvideo-inline" muted loop playsinline preload="none"></video>` : '';
+      console.log('[SmallVideo] render-single id=%s fileSize=%d isSmall=%s fid=...%s',
+        item.id?.slice(0, 8), aiData.fileSize || 0, isSmallSingle, vfId?.slice(-20));
       const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
       return thumbUrl
-        ? `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(vfId)}" data-source-url="${escapeHtml(sourceUrl)}">
+        ? `<div class="card card-tgvideo${smallSingleClass}" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(vfId)}" data-source-url="${escapeHtml(sourceUrl)}">
           ${pendingDot}
           <img class="card-img" src="${escapeHtml(thumbUrl)}" loading="lazy" alt="">
+          ${smallSingleEl}
           <div class="tgpost-play-icon">${playIconSvg}</div>
         </div>`
-        : `<div class="card card-tgvideo" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(vfId)}" data-source-url="${escapeHtml(sourceUrl)}">
+        : `<div class="card card-tgvideo${smallSingleClass}" data-id="${item.id}" data-action="video-play" data-file-id="${escapeHtml(vfId)}" data-source-url="${escapeHtml(sourceUrl)}">
           ${pendingDot}
+          ${smallSingleEl}
           <div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none;margin:40px auto">${playIconSvg}</div>
         </div>`;
     }
@@ -2415,6 +2438,8 @@ function renderAll(items) {
 
   // Auto-load video notes
   autoloadVideoNotes();
+  // Auto-load small TG videos (≤3MB muted loop)
+  autoloadSmallVideos();
 }
 
 // ─── Video note autoload (survives DOM re-renders) ──────────────────────────
@@ -2490,6 +2515,103 @@ function autoloadVideoNotes() {
               break;
             }
           } catch { /* retry */ }
+          if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    };
+    for (let i = 0; i < Math.min(CONCURRENCY, uncached.length); i++) worker();
+  }
+}
+
+// ─── Small TG video autoplay (≤3MB, muted loop in grid) ─────────────────────
+// Reuses _vnUrlCache for resolved file URLs
+const _svAutoplayActive = new WeakSet(); // track which cards are already autoplaying
+
+function autoloadSmallVideos() {
+  const masonry = document.getElementById('masonry');
+  if (!masonry || !STATE.botToken) return;
+  const cards = masonry.querySelectorAll('.tgvideo-autoplay');
+  if (!cards.length) return;
+  console.log('[SmallVideo] autoloadSmallVideos: found %d tgvideo-autoplay cards', cards.length);
+
+  const entries = [...cards]
+    .filter(c => !_svAutoplayActive.has(c))
+    .map(c => {
+      const fileId = c.dataset.fileId
+        || c.querySelector('[data-file-id]')?.dataset.fileId;
+      const video = c.querySelector('.tgvideo-inline');
+      const playIcon = c.querySelector('.tgpost-play-icon');
+      const thumb = c.querySelector('.card-img');
+      return { card: c, fileId, video, playIcon, thumb };
+    })
+    .filter(e => e.fileId && e.video);
+
+  if (!entries.length) {
+    console.log('[SmallVideo] no new entries to autoload');
+    return;
+  }
+  console.log('[SmallVideo] will autoload %d small videos', entries.length);
+
+  const playVideo = (entry, url) => {
+    const { video, playIcon, card, thumb } = entry;
+    _svAutoplayActive.add(card);
+    video.preload = 'auto';
+    video.src = url;
+    video.muted = true;
+    console.log('[SmallVideo] set src for fid=...%s', entry.fileId.slice(-20));
+    video.play().then(() => {
+      console.log('[SmallVideo] playing fid=...%s', entry.fileId.slice(-20));
+      card.classList.add('tgvideo-playing');
+      if (playIcon) playIcon.style.display = 'none';
+    }).catch(err => {
+      console.log('[SmallVideo] autoplay blocked for fid=...%s: %s', entry.fileId.slice(-20), err.message);
+      // Retry on first user interaction
+      const retry = () => {
+        video.play().then(() => {
+          console.log('[SmallVideo] retry play OK fid=...%s', entry.fileId.slice(-20));
+          card.classList.add('tgvideo-playing');
+          if (playIcon) playIcon.style.display = 'none';
+        }).catch(() => {});
+        document.removeEventListener('click', retry);
+        document.removeEventListener('scroll', retry);
+      };
+      document.addEventListener('click', retry, { once: true });
+      document.addEventListener('scroll', retry, { once: true });
+    });
+  };
+
+  // Split: cached vs uncached
+  const cached = [];
+  const uncached = [];
+  for (const e of entries) {
+    if (_vnUrlCache[e.fileId]) {
+      cached.push(e);
+    } else {
+      uncached.push(e);
+    }
+  }
+  console.log('[SmallVideo] cached=%d uncached=%d', cached.length, uncached.length);
+
+  for (const e of cached) playVideo(e, _vnUrlCache[e.fileId]);
+
+  if (uncached.length) {
+    const CONCURRENCY = 3;
+    let idx = 0;
+    const worker = async () => {
+      while (idx < uncached.length) {
+        const entry = uncached[idx++];
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const url = await resolveFileId(STATE.botToken, entry.fileId);
+            if (url) {
+              _vnUrlCache[entry.fileId] = url;
+              playVideo(entry, url);
+              console.log('[SmallVideo] resolved fid=...%s', entry.fileId.slice(-20));
+              break;
+            }
+          } catch (err) {
+            console.log('[SmallVideo] resolve error fid=...%s attempt=%d: %s', entry.fileId.slice(-20), attempt, err.message);
+          }
           if (attempt === 0) await new Promise(r => setTimeout(r, 500));
         }
       }
@@ -3026,23 +3148,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // "video-play" — play TG video in lightbox
+    // For small autoplaying videos (≤3MB): pause inline, open lightbox with sound
     if (action === 'video-play') {
       e.stopPropagation();
-      let videoUrl = url;
-      // If URL is empty/expired, re-resolve from fileId
-      if (!videoUrl) {
-        const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
-        if (fileId && STATE.botToken) {
-          videoUrl = await resolveFileId(STATE.botToken, fileId);
+      const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;
+      const card = actionEl.closest('.card[data-id]') || actionEl.closest('.tgpost-video-preview')?.closest('.card[data-id]');
+      const isAutoplay = card?.classList.contains('tgvideo-autoplay');
+      console.log('[VideoPlay] action=video-play fileId=...%s isAutoplay=%s', fileId?.slice(-20), isAutoplay);
+
+      // Pause inline autoplay video before opening lightbox
+      if (isAutoplay) {
+        const inlineVideo = card.querySelector('.tgvideo-inline');
+        if (inlineVideo) {
+          inlineVideo.pause();
+          console.log('[VideoPlay] paused inline video');
         }
       }
+
+      let videoUrl = url;
+      // Try cached URL first (from autoplay resolution), then re-resolve
+      if (!videoUrl && fileId && _vnUrlCache[fileId]) {
+        videoUrl = _vnUrlCache[fileId];
+        console.log('[VideoPlay] using cached URL for fid=...%s', fileId?.slice(-20));
+      }
+      if (!videoUrl && fileId && STATE.botToken) {
+        console.log('[VideoPlay] resolving fid=...%s', fileId?.slice(-20));
+        videoUrl = await resolveFileId(STATE.botToken, fileId);
+      }
       if (videoUrl) {
+        console.log('[VideoPlay] opening lightbox with video');
         openLightbox(videoUrl, '', { video: true });
+        // Resume inline autoplay when lightbox closes
+        if (isAutoplay) {
+          const inlineVideo = card.querySelector('.tgvideo-inline');
+          if (inlineVideo) {
+            const observer = new MutationObserver(() => {
+              const lb = document.getElementById('lightbox');
+              if (lb?.classList.contains('hidden')) {
+                observer.disconnect();
+                inlineVideo.muted = true;
+                inlineVideo.play().catch(() => {});
+                console.log('[VideoPlay] resumed inline autoplay after lightbox close');
+              }
+            });
+            observer.observe(document.getElementById('lightbox'), { attributes: true, attributeFilter: ['class'] });
+          }
+        }
       } else {
         // File too large for Bot API (>20MB) — try storageUrl or sourceUrl
-        const card = actionEl.closest('.card[data-id]');
         const item = card ? STATE.items.find(i => i.id === card.dataset.id) : null;
         const fallbackUrl = item?.ai_data?.storageUrl || card?.dataset?.sourceUrl;
+        console.log('[VideoPlay] no URL resolved, fallback=%s', fallbackUrl?.slice(0, 60));
         if (fallbackUrl && /^https?:\/\//.test(fallbackUrl)) {
           showToast('Видео &gt;20 МБ — открываю в Telegram');
           window.open(fallbackUrl, '_blank');

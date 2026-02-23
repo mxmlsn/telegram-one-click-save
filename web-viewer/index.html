@@ -794,6 +794,35 @@
       width: 72px;
       height: 72px;
     }
+    /* ── Small TG video inline autoplay (≤3MB muted loop) ── */
+    .tgvideo-inline {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 1;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .tgvideo-playing .tgvideo-inline {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .tgvideo-playing .card-img {
+      opacity: 0;
+    }
+    .tgvideo-playing .tgpost-play-icon {
+      display: none !important;
+    }
+    .tgvideo-playing .video-glow {
+      opacity: 0 !important;
+    }
+    /* In tgpost-video-preview context */
+    .tgpost-video-preview .tgvideo-inline {
+      border-radius: var(--radius);
+    }
     /* Full-width PDF preview in tgpost */
     /* PDF section inside tgpost — reuses pdf-blur-wrap and pdf-title from card-pdf */
     .tgpost-pdf-section {
