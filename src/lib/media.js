@@ -75,12 +75,27 @@ export function detectMediaScript(isInstagram) {
   return { type: null };
 }
 
-// Fetch image blob with screenshot fallback
+// Fetch image blob with screenshot fallback.
+// Validates content-type to avoid sending SVG/HTML to Telegram (IMAGE_PROCESS_FAILED).
 export async function fetchImageBlob(imageUrl, tabId) {
   try {
     const response = await fetch(imageUrl);
     if (!response.ok) throw new Error('Failed to fetch image');
-    return { blob: await response.blob(), isScreenshot: false };
+
+    const blob = await response.blob();
+    const type = blob.type || response.headers.get('content-type') || '';
+
+    // Telegram sendPhoto can't process SVG, HTML error pages, or XML
+    if (type.includes('svg') || type.includes('html') || type.includes('xml')) {
+      throw new Error('Unsupported image format: ' + type);
+    }
+
+    // Very small blobs are likely error pages, not images
+    if (blob.size < 100) {
+      throw new Error('Image too small (' + blob.size + 'b), likely not a real image');
+    }
+
+    return { blob, isScreenshot: false };
   } catch (e) {
     console.error('[TG Saver] Image fetch error, using screenshot fallback:', e);
     if (tabId) {
