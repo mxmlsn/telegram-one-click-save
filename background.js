@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from './src/shared/constants.js';
 import { analyzeWithAI } from './src/ai/analyze.js';
 import { patchNotionWithAI } from './src/api/notion.js';
 import { sendImage, sendQuote, sendLink, sendPdf, sendScreenshot, sendFromPage } from './src/lib/senders.js';
-import { isPdfUrl } from './src/lib/media.js';
+import { isPdfUrl, isSvgUrl } from './src/lib/media.js';
 
 // ─── Icon Management ────────────────────────────────────────────────────────
 
@@ -146,6 +146,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       await sendPdf(tab.url, tab.url, settings, tab.id, selectedTag);
     } else if (info.srcUrl) {
       await sendImage(info.srcUrl, tab.url, settings, tab.id, selectedTag);
+    } else if (!info.srcUrl && isSvgUrl(tab.url)) {
+      // SVG opened as standalone page — no srcUrl from Chrome, use tab URL directly
+      await sendImage(tab.url, tab.url, settings, tab.id, selectedTag);
     } else if (info.selectionText) {
       await sendQuote(info.selectionText, tab.url, settings, tab.id, selectedTag);
     } else if (info.linkUrl) {
@@ -181,7 +184,11 @@ chrome.action.onClicked.addListener(async (tab) => {
     showToast(tab.id, 'pending', 'Sending');
   }
 
-  await sendScreenshot(tab, settings, selectedTag);
+  if (isSvgUrl(tab.url)) {
+    await sendImage(tab.url, tab.url, settings, tab.id, selectedTag);
+  } else {
+    await sendScreenshot(tab, settings, selectedTag);
+  }
 });
 
 // ─── Message Handling ───────────────────────────────────────────────────────
