@@ -68,13 +68,14 @@ function getFileIconColor(ext) {
   // Default
   return '#5B8DEF';
 }
-function svgEscape(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 // Build the HTML for a new-style file sheet card (rect + ext + name + corner)
 function makeFileSheetHtml(color, ext, name) {
-  const extHtml = ext ? `<span class="doc-sheet-ext">.${svgEscape(ext)}</span>` : '';
-  const nameHtml = name ? `<span class="doc-sheet-name">${svgEscape(name)}</span>` : '';
+  const extHtml = ext ? `<span class="doc-sheet-ext">.${escapeHtml(ext)}</span>` : '';
+  const nameHtml = name ? `<span class="doc-sheet-name">${escapeHtml(name)}</span>` : '';
   return `<div class="doc-sheet-wrap">
     <div class="doc-sheet" style="background:${color}">
       ${extHtml}
@@ -152,6 +153,19 @@ function bgFetch(url, options = {}) {
 function getSettings() {
   return new Promise(resolve => {
     chrome.storage.local.get(null, data => resolve(data || {}));
+  });
+}
+
+// Notion API PATCH helper — eliminates 6 duplicate header blocks
+function notionPatch(pageId, body) {
+  return bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${STATE.notionToken}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
   });
 }
 
@@ -1231,10 +1245,6 @@ function applyFilters() {
 }
 
 // ─── Card rendering ───────────────────────────────────────────────────────────
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
 
 function showToast(msg, duration = 4000) {
   let container = document.getElementById('toast-container');
@@ -2391,15 +2401,7 @@ async function deleteItem(pageId) {
 
   // ── Background: archive in Notion (fire-and-forget) ──
   Promise.all(idsToDelete.map(id =>
-    bgFetch(`https://api.notion.com/v1/pages/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ archived: true })
-    })
+    notionPatch(id, { archived: true })
   )).catch(e => console.error('[Viewer] Delete error:', e));
 }
 
@@ -2431,15 +2433,7 @@ async function changeItemType(pageId, newAiType, newSecondary) {
   }
 
   try {
-    const res = await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ properties })
-    });
+    const res = await notionPatch(pageId, { properties });
     if (!res.ok) { console.error('[Viewer] Type change failed:', res.status); return; }
   } catch (e) { console.error('[Viewer] Type change error:', e); return; }
 
@@ -2470,20 +2464,11 @@ async function toggleXpostCollapse(pageId) {
   }
 
   // Persist to Notion
-  const aiDataStr = JSON.stringify(item.ai_data);
   try {
-    await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        properties: {
-          'ai_data': { rich_text: [{ text: { content: aiDataStr.slice(0, 2000) } }] }
-        }
-      })
+    await notionPatch(pageId, {
+      properties: {
+        'ai_data': { rich_text: [{ text: { content: JSON.stringify(item.ai_data).slice(0, 2000) } }] }
+      }
     });
   } catch (e) {
     console.error('[Viewer] Toggle collapse error:', e);
@@ -2515,20 +2500,11 @@ async function togglePdfTextCollapse(pageId) {
   if (cardEl) cardEl.outerHTML = renderCard(item);
 
   // Persist to Notion
-  const aiDataStr = JSON.stringify(item.ai_data);
   try {
-    await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        properties: {
-          'ai_data': { rich_text: [{ text: { content: aiDataStr.slice(0, 2000) } }] }
-        }
-      })
+    await notionPatch(pageId, {
+      properties: {
+        'ai_data': { rich_text: [{ text: { content: JSON.stringify(item.ai_data).slice(0, 2000) } }] }
+      }
     });
   } catch (e) {
     console.error('[Viewer] Toggle PDF text error:', e);
@@ -2559,20 +2535,11 @@ async function toggleTgpostSection(pageId, section) {
   if (card) card.outerHTML = renderCard(item);
 
   // Persist to Notion
-  const aiDataStr = JSON.stringify(item.ai_data);
   try {
-    await bgFetch(`https://api.notion.com/v1/pages/${pageId}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        properties: {
-          'ai_data': { rich_text: [{ text: { content: aiDataStr.slice(0, 2000) } }] }
-        }
-      })
+    await notionPatch(pageId, {
+      properties: {
+        'ai_data': { rich_text: [{ text: { content: JSON.stringify(item.ai_data).slice(0, 2000) } }] }
+      }
     });
   } catch (e) {
     console.error('[Viewer] Toggle tgpost section error:', e);

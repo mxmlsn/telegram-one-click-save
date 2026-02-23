@@ -15,22 +15,23 @@ const mockStorage = {
     tagImage: '#image',
     tagLink: '#link',
     tagQuote: '#text',
+    tagGif: '#gif',
+    tagPdf: '#pdf',
     enableQuickTags: true,
     sendWithColor: true,
     timerDuration: 4,
     emojiPack: 'circle',
     customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
     toastStyle: 'normal',
-    popupStyleMinimalist: false,
     themeLight: false,
     isConnected: false,
     customTags: [
-      { name: 'important', color: '#E64541', id: 'red' },
-      { name: '', color: '#FFDE42', id: 'yellow' },
-      { name: 'urgent', color: '#4ED345', id: 'green' },
-      { name: 'work', color: '#377CDE', id: 'blue' },
-      { name: 'ideas', color: '#BB4FFF', id: 'purple' },
-      { name: 'personal', color: '#3D3D3B', id: 'black' },
+      { name: 'work', color: '#E64541', id: 'red' },
+      { name: 'study', color: '#FFDE42', id: 'yellow' },
+      { name: 'refs', color: '#4ED345', id: 'green' },
+      { name: 'project1', color: '#377CDE', id: 'blue' },
+      { name: '', color: '#BB4FFF', id: 'purple' },
+      { name: '', color: '#3D3D3B', id: 'black' },
       { name: '', color: '#DEDEDE', id: 'white' }
     ]
   },
@@ -78,13 +79,19 @@ window.chrome = {
 // Original options.js code below
 // ============================================
 
-// Emoji packs definition (red, yellow, green, blue, purple, black, white) - 7 tags only
+// Must match src/shared/constants.js
 const EMOJI_PACKS = {
   circle: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
   heart: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
   soft: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
 };
 
+const COLOR_ID_TO_INDEX = {
+  'red': 0, 'yellow': 1, 'green': 2, 'blue': 3,
+  'purple': 4, 'black': 5, 'white': 6
+};
+
+// Must match src/shared/constants.js DEFAULT_SETTINGS
 const DEFAULT_SETTINGS = {
   botToken: '',
   chatId: '',
@@ -98,19 +105,22 @@ const DEFAULT_SETTINGS = {
   tagImage: '#image',
   tagLink: '#link',
   tagQuote: '#text',
+  tagGif: '#gif',
+  tagPdf: '#pdf',
   enableQuickTags: true,
   sendWithColor: true,
   timerDuration: 4,
   emojiPack: 'circle',
   toastStyle: 'normal',
+  themeLight: false,
   isConnected: false,
   customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
   // Fixed 7 tags
   customTags: [
-    { name: '', color: '#E64541', id: 'red' },
-    { name: '', color: '#FFDE42', id: 'yellow' },
-    { name: '', color: '#4ED345', id: 'green' },
-    { name: '', color: '#377CDE', id: 'blue' },
+    { name: 'work', color: '#E64541', id: 'red' },
+    { name: 'study', color: '#FFDE42', id: 'yellow' },
+    { name: 'refs', color: '#4ED345', id: 'green' },
+    { name: 'project1', color: '#377CDE', id: 'blue' },
     { name: '', color: '#BB4FFF', id: 'purple' },
     { name: '', color: '#3D3D3B', id: 'black' },
     { name: '', color: '#DEDEDE', id: 'white' }
@@ -118,12 +128,12 @@ const DEFAULT_SETTINGS = {
   // Notion integration
   notionEnabled: false,
   notionToken: '',
-  notionDbId: '',
+  notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e',
   // AI Analysis
   aiEnabled: false,
-  aiProvider: 'anthropic',
+  aiProvider: 'google',
   aiApiKey: '',
-  aiModel: 'claude-haiku-4-5-20251001',
+  aiModel: 'gemini-2.0-flash',
   aiAutoOnSave: true,
   aiAutoInViewer: true
 };
@@ -502,9 +512,7 @@ async function loadSettings() {
   // Load custom tags
   // Ensure we have the structure of 8 tags even if loading old data
   customTags = mergeCustomTags(settings.customTags || []);
-  console.log('[loadSettings] About to call renderCustomTags, customTags:', customTags);
   renderCustomTags();
-  console.log('[loadSettings] renderCustomTags completed');
 
   // Toggle quick tags settings visibility based on enableQuickTags
   toggleQuickTagsSettings(settings.enableQuickTags !== false);
@@ -742,11 +750,7 @@ updateHowtoStep();
 
 // Custom tags functions
 function renderCustomTags() {
-  console.log('[renderCustomTags] Called with customTags:', customTags);
-  console.log('[renderCustomTags] customTagsList element:', customTagsList);
-
   if (!customTagsList) {
-    console.error('[renderCustomTags] ERROR: customTagsList is null!');
     return;
   }
 
@@ -1108,14 +1112,12 @@ async function updateLivePreview() {
       // defaultTags IDs are: red, yellow, green, blue, purple, black, white
       // corresponding indices: 0, 1, 2, 3, 4, 5, 6
       const colorId = activeCustomTag.id;
-      const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3, 'purple': 4, 'black': 5, 'white': 6 };
-      const idx = colorMap[colorId] !== undefined ? colorMap[colorId] : 0;
+      const idx = COLOR_ID_TO_INDEX[colorId] ?? 0;
       emoji = customEmojis[idx] || '🔴';
     } else {
       const pack = EMOJI_PACKS[settings.emojiPack || 'circle'];
       const colorId = activeCustomTag.id;
-      const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3, 'purple': 4, 'black': 5, 'white': 6 };
-      const idx = colorMap[colorId] !== undefined ? colorMap[colorId] : 0;
+      const idx = COLOR_ID_TO_INDEX[colorId] ?? 0;
       emoji = pack[idx] || '🔴';
     }
   }

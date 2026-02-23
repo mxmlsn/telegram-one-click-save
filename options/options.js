@@ -1,66 +1,4 @@
-// Emoji packs definition (red, yellow, green, blue, purple, black, white) - 7 tags only
-const EMOJI_PACKS = {
-  circle: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  heart: ['❤️', '💛', '💚', '💙', '💜', '🖤', '🤍'],
-  soft: ['🍄', '🐤', '🐸', '💧', '🔮', '🌚', '💭']
-};
-
-const DEFAULT_SETTINGS = {
-  botToken: '',
-  chatId: '',
-  addScreenshot: true,
-  imageCompression: true,
-  showLinkPreview: false,
-  showSelectionIcon: true,
-  quoteMonospace: true,
-  iconColor: 'clip1',
-  useHashtags: true,
-  tagImage: '#image',
-  tagLink: '#link',
-  tagQuote: '#text',
-  enableQuickTags: true,
-  sendWithColor: true,
-  timerDuration: 4,
-  emojiPack: 'circle',
-  toastStyle: 'normal',
-  popupStyleMinimalist: false,
-  themeLight: false,
-  isConnected: false,
-  customEmoji: ['🔴', '🟡', '🟢', '🔵', '🟣', '⚫️', '⚪️'],
-  // Fixed 7 tags
-  customTags: [
-    { name: 'work', color: '#E64541', id: 'red' },
-    { name: 'study', color: '#FFDE42', id: 'yellow' },
-    { name: 'refs', color: '#4ED345', id: 'green' },
-    { name: 'project1', color: '#377CDE', id: 'blue' },
-    { name: '', color: '#BB4FFF', id: 'purple' },
-    { name: '', color: '#3D3D3B', id: 'black' },
-    { name: '', color: '#DEDEDE', id: 'white' }
-  ],
-  // Notion integration
-  notionEnabled: false,
-  notionToken: '',
-  notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e',
-  // AI Analysis
-  aiEnabled: false,
-  aiProvider: 'anthropic',
-  aiApiKey: '',
-  aiModel: 'claude-haiku-4-5-20251001',
-  aiAutoOnSave: true,
-  aiAutoInViewer: true
-};
-
-const AI_MODELS = {
-  google: [
-    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (free)' },
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (free)' }
-  ],
-  anthropic: [
-    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku (fast)' },
-    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet (smart)' }
-  ]
-};
-const AI_DEFAULT_MODEL = { google: 'gemini-2.0-flash', anthropic: 'claude-haiku-4-5-20251001' };
+import { EMOJI_PACKS, DEFAULT_SETTINGS, AI_MODELS, AI_DEFAULT_MODEL, COLOR_ID_TO_INDEX } from '../src/shared/constants.js';
 
 function populateAiModels(provider, selectedModel) {
   const sel = document.getElementById('aiModel');
@@ -428,7 +366,6 @@ async function loadSettings() {
   toggleEmojiPackSettings(settings.sendWithColor !== false);
 
   // Load custom emoji
-  console.log('Loading settings customEmoji:', settings.customEmoji);
   if (settings.customEmoji && Array.isArray(settings.customEmoji) && settings.customEmoji.length === 7) {
     // Valid custom emoji saved
   } else {
@@ -472,9 +409,7 @@ async function loadSettings() {
   // Load custom tags
   // Ensure we have the structure of 8 tags even if loading old data
   customTags = mergeCustomTags(settings.customTags || []);
-  console.log('[loadSettings] About to call renderCustomTags, customTags:', customTags);
   renderCustomTags();
-  console.log('[loadSettings] renderCustomTags completed');
 
   // Toggle quick tags settings visibility based on enableQuickTags
   toggleQuickTagsSettings(settings.enableQuickTags !== false);
@@ -742,11 +677,7 @@ updateHowtoStep();
 
 // Custom tags functions
 function renderCustomTags() {
-  console.log('[renderCustomTags] Called with customTags:', customTags);
-  console.log('[renderCustomTags] customTagsList element:', customTagsList);
-
   if (!customTagsList) {
-    console.error('[renderCustomTags] ERROR: customTagsList is null!');
     return;
   }
 
@@ -1105,14 +1036,12 @@ async function updateLivePreview() {
       // defaultTags IDs are: red, yellow, green, blue, purple, black, white
       // corresponding indices: 0, 1, 2, 3, 4, 5, 6
       const colorId = activeCustomTag.id;
-      const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3, 'purple': 4, 'black': 5, 'white': 6 };
-      const idx = colorMap[colorId] !== undefined ? colorMap[colorId] : 0;
+      const idx = COLOR_ID_TO_INDEX[colorId] ?? 0;
       emoji = customEmojis[idx] || '🔴';
     } else {
       const pack = EMOJI_PACKS[settings.emojiPack || 'circle'];
       const colorId = activeCustomTag.id;
-      const colorMap = { 'red': 0, 'yellow': 1, 'green': 2, 'blue': 3, 'purple': 4, 'black': 5, 'white': 6 };
-      const idx = colorMap[colorId] !== undefined ? colorMap[colorId] : 0;
+      const idx = COLOR_ID_TO_INDEX[colorId] ?? 0;
       emoji = pack[idx] || '🔴';
     }
   }

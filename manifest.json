@@ -16,7 +16,8 @@
     "default_title": "Save to Telegram"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "options_page": "options/options.html",
   "content_scripts": [

@@ -3,11 +3,10 @@ document.addEventListener('contextmenu', (e) => {
   window.__tgSaverLastRightClicked = e.target;
 }, true);
 
-// Cache settings in content script for instant toast display
+// ─── Settings Cache ─────────────────────────────────────────────────────────
+
 let cachedContentSettings = null;
 
-// Load settings on script init
-// Load settings on script init - match defaults with options.js
 chrome.storage.local.get({
   customTags: [
     { name: 'work', color: '#E64541', id: 'red' },
@@ -28,7 +27,6 @@ chrome.storage.local.get({
   window.__TG_Settings = result;
 });
 
-// Keep cache updated
 chrome.storage.onChanged.addListener((changes) => {
   if (!cachedContentSettings) cachedContentSettings = {};
   for (const key of Object.keys(changes)) {
@@ -36,8 +34,6 @@ chrome.storage.onChanged.addListener((changes) => {
     if (window.__TG_Settings) {
       window.__TG_Settings[key] = changes[key].newValue;
     }
-
-    // Update local icon if color changed
     if (key === 'iconColor' && selectionIcon) {
       const img = selectionIcon.querySelector('img');
       if (img) {
@@ -47,9 +43,8 @@ chrome.storage.onChanged.addListener((changes) => {
   }
 });
 
-// ============ TOAST SYSTEM ============
+// ─── Toast State ────────────────────────────────────────────────────────────
 
-// Single state object - stored on window to persist across any re-injections
 window.__TG_ToastState = window.__TG_ToastState || {
   intervalId: null,
   timeLeft: 4000,
@@ -60,24 +55,23 @@ window.__TG_ToastState = window.__TG_ToastState || {
 
 const ToastState = window.__TG_ToastState;
 
-// Listen for messages from background
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[TG Saver] Content script received message:', message.action, message);
+// ─── Message Listener ───────────────────────────────────────────────────────
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'showToast') {
     showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
-    // Use DIRECTLY passed tags if available, otherwise fallback to cache
     showTagSelectionToast(message.customTags || cachedContentSettings?.customTags, message.requestId);
     sendResponse({ received: true });
     return true;
   } else if (message.action === 'preShowToast') {
-    // Pre-show toast instantly using tags from background if provided
     preShowTagSelection(message.requestId, message.customTags);
     sendResponse({ received: true });
     return true;
   }
 });
+
+// ─── Simple Toast (pending / success / error) ───────────────────────────────
 
 function showSimpleToast(state, message) {
   let toast = document.getElementById('tg-saver-toast');
@@ -96,53 +90,26 @@ function showSimpleToast(state, message) {
 
     requestAnimationFrame(() => {
       toast.classList.add('tg-saver-visible');
-      const icon = toast.querySelector('.tg-saver-icon');
       const text = toast.querySelector('.tg-saver-text');
-      if (icon) icon.classList.add('tg-saver-visible-content');
       if (text) text.classList.add('tg-saver-visible-content');
     });
   } else if (state === 'success') {
     killTimer();
-
-    // Check if we have minimalist wrapper (means we came from minimalist tag selection)
     const wrapper = document.getElementById('tg-saver-toast-wrapper');
 
     if (wrapper) {
-      // Minimalist mode - toast already morphed to "Sending" state with 168px width
-      // Just change to success state
+      // Minimalist mode — toast already morphed to "Sending" state
       const wrapperToast = wrapper.querySelector('.tg-saver-toast');
-
       if (wrapperToast) {
-        // Crossfade: fade out old text while fading in new text
-        const oldText = wrapperToast.querySelector('.tg-saver-text');
-        if (oldText) oldText.classList.remove('tg-saver-visible-content');
-
-        // Add new text on top immediately
-        const newText = document.createElement('span');
-        newText.className = 'tg-saver-text tg-saver-crossfade-text';
-        newText.textContent = message;
-        wrapperToast.appendChild(newText);
+        crossfadeText(wrapperToast, message);
         wrapperToast.classList.add('tg-saver-success');
-
-        // Fade in new text
-        requestAnimationFrame(() => {
-          newText.classList.add('tg-saver-visible-content');
-
-          // Remove old text after fade out
-          setTimeout(() => {
-            if (oldText) oldText.remove();
-          }, 150);
-        });
-
-        // After display time, fade out
         setTimeout(() => {
           wrapper.classList.add('tg-saver-fade-out');
           setTimeout(() => wrapper.remove(), 400);
         }, 1500);
       }
     } else {
-      // Normal mode - existing behavior
-      // Create new toast if it doesn't exist
+      // Normal mode
       if (!toast) {
         toast = document.createElement('div');
         toast.id = 'tg-saver-toast';
@@ -150,30 +117,11 @@ function showSimpleToast(state, message) {
         document.body.appendChild(toast);
       }
 
-      // Crossfade: fade out old text while fading in new text
-      const oldText = toast.querySelector('.tg-saver-text');
-      if (oldText) oldText.classList.remove('tg-saver-visible-content');
-
-      // Add new text on top immediately
-      const newText = document.createElement('span');
-      newText.className = 'tg-saver-text tg-saver-crossfade-text';
-      newText.textContent = message;
-      toast.appendChild(newText);
+      crossfadeText(toast, message);
       toast.classList.add('tg-saver-success');
       toast.classList.remove('tg-saver-with-tags');
       toast.classList.add('tg-saver-visible');
 
-      // Fade in new text
-      requestAnimationFrame(() => {
-        newText.classList.add('tg-saver-visible-content');
-
-        // Remove old text after fade out
-        setTimeout(() => {
-          if (oldText) oldText.remove();
-        }, 150);
-      });
-
-      // Keep success message visible for exactly 1500ms
       setTimeout(() => {
         toast.classList.remove('tg-saver-visible');
         setTimeout(() => toast.remove(), 400);
@@ -189,7 +137,6 @@ function showSimpleToast(state, message) {
       displayToast.classList.remove('tg-saver-with-tags');
       displayToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">${message}</span>`;
 
-      // Error stays longer (3s)
       setTimeout(() => {
         if (wrapper) {
           wrapper.classList.add('tg-saver-fade-out');
@@ -203,35 +150,33 @@ function showSimpleToast(state, message) {
   }
 }
 
-// Pre-show toast using passed tags or LOCAL cache
-// Exposed on window for executeScript access
+// Crossfade: fade out old text, fade in new text
+function crossfadeText(container, newMessage) {
+  const oldText = container.querySelector('.tg-saver-text');
+  if (oldText) oldText.classList.remove('tg-saver-visible-content');
+
+  const newText = document.createElement('span');
+  newText.className = 'tg-saver-text tg-saver-crossfade-text';
+  newText.textContent = newMessage;
+  container.appendChild(newText);
+
+  requestAnimationFrame(() => {
+    newText.classList.add('tg-saver-visible-content');
+    setTimeout(() => { if (oldText) oldText.remove(); }, 150);
+  });
+}
+
+// ─── Pre-show Tag Selection ─────────────────────────────────────────────────
+
 window.preShowTagSelection = function (requestId, passedTags = null) {
-  console.log('[TG Saver] preShowTagSelection called for request:', requestId, 'Passed tags:', passedTags?.length);
-
-  // Prioritize tags passed from background. If none, try cache.
   const tags = passedTags || cachedContentSettings?.customTags || [];
-
-  // If we still have nothing and background actually expected tags, we might be in trouble
-  // But if background passed tags (even empty ones), we follow that.
-
   const hasNonEmptyTags = tags.some(t => t.name && t.name.trim());
-
-  console.log('[TG Saver] Has non-empty tags:', hasNonEmptyTags);
 
   if (hasNonEmptyTags) {
     showTagSelectionToast(tags, requestId);
   } else {
-    // If we have no tags but were told to show something, show simple "Sending"
     showSimpleToast('pending', 'Sending');
-
-    // Only resolve as "no-tag" if we are absolutely sure there are no tags to show
-    // actually background already handles the no-tags case by calling showToast('pending')
-    // but if we got here, it's a preShowToast signal.
-    if (!passedTags && !cachedContentSettings) {
-      console.log('[TG Saver] Waiting for settings to pop up...');
-      // Don't send tagSelected:null yet, maybe settings will load?
-      // Actually, with passedTags this shouldn't happen.
-    } else if (!hasNonEmptyTags) {
+    if (passedTags || cachedContentSettings) {
       chrome.runtime.sendMessage({
         action: 'tagSelected',
         requestId: requestId,
@@ -241,21 +186,78 @@ window.preShowTagSelection = function (requestId, passedTags = null) {
   }
 };
 
+// ─── Morph Animation (shared between click and timer) ───────────────────────
+
+function morphToSending(requestId, selectedTag) {
+  const wrapper = document.getElementById('tg-saver-toast-wrapper');
+  const toast = document.getElementById('tg-saver-toast');
+
+  if (wrapper) {
+    // Minimalist mode — morph to "Sending" state, keep wrapper for success animation
+    const wrapperToast = wrapper.querySelector('.tg-saver-toast');
+    const currentWidth = wrapperToast ? wrapperToast.offsetWidth : 168;
+
+    const tagsContainer = wrapper.querySelector('.tg-saver-tags-container');
+    if (tagsContainer) tagsContainer.style.opacity = '0';
+
+    setTimeout(() => {
+      if (wrapperToast) {
+        wrapperToast.style.setProperty('--tg-toast-width', currentWidth + 'px');
+        wrapperToast.classList.add('tg-saver-animating-width');
+        wrapperToast.classList.remove('tg-saver-with-tags', 'tg-saver-minimalist');
+        wrapperToast.classList.add('tg-saver-visible');
+        wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
+
+        // Force reflow to apply starting width
+        wrapperToast.offsetWidth;
+
+        requestAnimationFrame(() => {
+          wrapperToast.style.setProperty('--tg-toast-width', '168px');
+          setTimeout(() => wrapperToast.classList.remove('tg-saver-animating-width'), 300);
+        });
+      }
+      doSend(requestId, selectedTag);
+    }, 150);
+  } else if (toast) {
+    // Normal mode — morph animation
+    const currentHeight = toast.offsetHeight;
+    toast.style.height = currentHeight + 'px';
+
+    const content = toast.querySelector('.tg-saver-toast-content');
+    if (content) content.style.opacity = '0';
+
+    requestAnimationFrame(() => {
+      toast.style.height = '52px';
+
+      setTimeout(() => {
+        toast.innerHTML = `<span class="tg-saver-text">Sending</span>`;
+        toast.classList.remove('tg-saver-with-tags');
+        toast.style.height = '';
+
+        requestAnimationFrame(() => {
+          const text = toast.querySelector('.tg-saver-text');
+          if (text) text.classList.add('tg-saver-visible-content');
+        });
+
+        doSend(requestId, selectedTag);
+      }, 200);
+    });
+  }
+}
+
+// ─── Tag Selection Toast ────────────────────────────────────────────────────
+
 function showTagSelectionToast(customTags, requestId) {
-  console.log('[TG Saver] showTagSelectionToast called', { requestId });
-  // Remove existing toast or wrapper
   const existingWrapper = document.getElementById('tg-saver-toast-wrapper');
   const existingToast = document.getElementById('tg-saver-toast');
   if (existingWrapper) existingWrapper.remove();
   if (existingToast) existingToast.remove();
   killTimer();
 
-  // Reset state
   ToastState.requestId = requestId;
   ToastState.isCancelled = false;
   ToastState.isPaused = false;
 
-  // Use cached settings (already loaded synchronously)
   const timerDuration = cachedContentSettings?.timerDuration || 4;
   const toastStyle = cachedContentSettings?.toastStyle || 'normal';
   const themeLight = cachedContentSettings?.themeLight || false;
@@ -268,8 +270,6 @@ function showTagSelectionToast(customTags, requestId) {
   toast.id = 'tg-saver-toast';
   toast.className = 'tg-saver-toast tg-saver-with-tags' + (isMinimalist ? ' tg-saver-minimalist' : '') + lightClass;
   toast.dataset.requestId = requestId;
-
-  console.log('[TG Saver] Rendering toast with style:', toastStyle);
 
   // Build tags HTML
   let tagsHtml = '';
@@ -287,7 +287,6 @@ function showTagSelectionToast(customTags, requestId) {
   }
 
   if (isMinimalist) {
-    // Create wrapper for minimalist mode to handle close button outside
     const wrapper = document.createElement('div');
     wrapper.className = 'tg-saver-minimalist-wrapper' + lightClass;
     wrapper.id = 'tg-saver-toast-wrapper';
@@ -306,8 +305,6 @@ function showTagSelectionToast(customTags, requestId) {
 
     wrapper.appendChild(toast);
     wrapper.dataset.requestId = requestId;
-
-    // Use wrapper instead of toast for minimalist
     document.body.appendChild(wrapper);
   } else {
     toast.innerHTML = `
@@ -333,7 +330,7 @@ function showTagSelectionToast(customTags, requestId) {
     document.body.appendChild(toast);
   }
 
-  // Cancel button (only in normal mode)
+  // Cancel button (normal mode only)
   const cancelBtn = toast.querySelector('.tg-saver-cancel-btn');
   if (cancelBtn) {
     cancelBtn.addEventListener('click', (e) => {
@@ -343,14 +340,12 @@ function showTagSelectionToast(customTags, requestId) {
     });
   }
 
-
-  // Tag buttons - MANUAL CLICK - always sends
+  // Tag buttons click — uses shared morphToSending
   toast.querySelectorAll('.tg-saver-tag-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
 
-      // Hide tooltip on click
       const tooltip = document.getElementById('tg-saver-tag-tooltip');
       if (tooltip) tooltip.remove();
 
@@ -358,152 +353,16 @@ function showTagSelectionToast(customTags, requestId) {
       const selectedTag = index >= 0 ? customTags[index] : null;
 
       killTimer();
-
-      // Check if minimalist mode - need to handle wrapper
-      const wrapper = document.getElementById('tg-saver-toast-wrapper');
-
-      if (wrapper) {
-        // Minimalist mode - morph to "Sending" state, keep wrapper for success animation
-        const wrapperToast = wrapper.querySelector('.tg-saver-toast');
-        const currentWidth = wrapperToast ? wrapperToast.offsetWidth : 168;
-        const targetWidth = 168;
-
-        // Fade out tags
-        const tagsContainer = wrapper.querySelector('.tg-saver-tags-container');
-        if (tagsContainer) {
-          tagsContainer.style.opacity = '0';
-        }
-
-        setTimeout(() => {
-          if (wrapperToast) {
-            // Set starting width via CSS variable BEFORE removing classes
-            wrapperToast.style.setProperty('--tg-toast-width', currentWidth + 'px');
-            wrapperToast.classList.add('tg-saver-animating-width');
-
-            // Now remove minimalist classes
-            wrapperToast.classList.remove('tg-saver-with-tags', 'tg-saver-minimalist');
-            wrapperToast.classList.add('tg-saver-visible');
-
-            // Replace with "Sending" content
-            wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
-
-            // Force reflow to apply starting width
-            wrapperToast.offsetWidth;
-
-            // Animate to target width
-            requestAnimationFrame(() => {
-              wrapperToast.style.setProperty('--tg-toast-width', targetWidth + 'px');
-
-              // Remove animating class after transition completes
-              setTimeout(() => {
-                wrapperToast.classList.remove('tg-saver-animating-width');
-              }, 300);
-            });
-          }
-          doSend(requestId, selectedTag);
-        }, 150);
-      } else {
-        // Normal mode - morph animation
-        // Fix current height for smooth morph to min-height
-        const currentHeight = toast.offsetHeight;
-        toast.style.height = currentHeight + 'px';
-
-        // Fade out content
-        const content = toast.querySelector('.tg-saver-toast-content');
-        if (content) {
-          content.style.opacity = '0';
-        }
-
-        // Shrink to min-height (52px)
-        requestAnimationFrame(() => {
-          toast.style.height = '52px';
-
-          // Wait for animation, then change content
-          setTimeout(() => {
-            toast.innerHTML = `<span class="tg-saver-text">Sending</span>`;
-            toast.classList.remove('tg-saver-with-tags');
-            toast.style.height = '';
-
-            // Fade in new content
-            requestAnimationFrame(() => {
-              const icon = toast.querySelector('.tg-saver-icon');
-              const text = toast.querySelector('.tg-saver-text');
-              if (icon) icon.classList.add('tg-saver-visible-content');
-              if (text) text.classList.add('tg-saver-visible-content');
-            });
-
-            doSend(requestId, selectedTag);
-          }, 200);
-        });
-      }
+      morphToSending(requestId, selectedTag);
     });
   });
 
-  // Add hover tooltip for minimalist mode (using event delegation on toast)
+  // Hover tooltips for minimalist mode
   if (isMinimalist) {
-    toast.addEventListener('mouseover', (e) => {
-      const btn = e.target.closest('.tg-saver-tag-btn');
-      if (!btn) return;
-
-      // Get tag name or "no tags" for the no-tag button
-      const tagName = btn.getAttribute('data-tag-name') ||
-        (btn.classList.contains('tg-saver-no-tag-btn') ? 'no tags' : null);
-      if (!tagName) return;
-
-      let tooltip = document.getElementById('tg-saver-tag-tooltip');
-      if (!tooltip) {
-        tooltip = document.createElement('div');
-        tooltip.id = 'tg-saver-tag-tooltip';
-        tooltip.style.cssText = `
-          position: fixed;
-          z-index: 2147483647;
-          font-family: 'MartianMono', monospace;
-          font-size: 14px;
-          font-weight: 400;
-          color: white;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
-          white-space: nowrap;
-          pointer-events: none;
-          padding: 0;
-          margin: 0;
-          line-height: 1;
-          letter-spacing: -0.02em;
-          text-align: right;
-          opacity: 0;
-          transition: opacity 0.12s ease-out;
-        `;
-        document.body.appendChild(tooltip);
-      }
-
-      tooltip.textContent = tagName;
-      const toastRect = toast.getBoundingClientRect();
-      const btnRect = btn.getBoundingClientRect();
-
-      // Position to the left of the toast with 10px gap, vertically centered with the button
-      tooltip.style.top = (btnRect.top + btnRect.height / 2) + 'px';
-      tooltip.style.right = (window.innerWidth - toastRect.left + 10) + 'px';
-      tooltip.style.transform = 'translateY(-50%)';
-
-      // Fade in with requestAnimationFrame for smooth animation
-      requestAnimationFrame(() => {
-        tooltip.style.opacity = '1';
-      });
-    });
-
-    toast.addEventListener('mouseout', (e) => {
-      const btn = e.target.closest('.tg-saver-tag-btn');
-      const relatedBtn = e.relatedTarget ? e.relatedTarget.closest('.tg-saver-tag-btn') : null;
-
-      if (btn && btn !== relatedBtn) {
-        const tooltip = document.getElementById('tg-saver-tag-tooltip');
-        if (tooltip) {
-          tooltip.style.opacity = '0';
-        }
-      }
-    });
+    setupMinimalistTooltips(toast);
   }
 
-  // HOVER - set pause flag (use wrapper for minimalist, toast for normal)
+  // Hover pause/resume
   const hoverTarget = isMinimalist ? document.getElementById('tg-saver-toast-wrapper') : toast;
   if (hoverTarget) {
     hoverTarget.addEventListener('mouseenter', () => {
@@ -533,124 +392,90 @@ function showTagSelectionToast(customTags, requestId) {
     }
   });
 
-  // Start countdown
   startCountdown(requestId);
 }
+
+// ─── Minimalist Tooltips ────────────────────────────────────────────────────
+
+function setupMinimalistTooltips(toast) {
+  toast.addEventListener('mouseover', (e) => {
+    const btn = e.target.closest('.tg-saver-tag-btn');
+    if (!btn) return;
+
+    const tagName = btn.getAttribute('data-tag-name') ||
+      (btn.classList.contains('tg-saver-no-tag-btn') ? 'no tags' : null);
+    if (!tagName) return;
+
+    let tooltip = document.getElementById('tg-saver-tag-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'tg-saver-tag-tooltip';
+      tooltip.style.cssText = `
+        position: fixed;
+        z-index: 2147483647;
+        font-family: 'MartianMono', monospace;
+        font-size: 14px;
+        font-weight: 400;
+        color: white;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
+        white-space: nowrap;
+        pointer-events: none;
+        padding: 0;
+        margin: 0;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        text-align: right;
+        opacity: 0;
+        transition: opacity 0.12s ease-out;
+      `;
+      document.body.appendChild(tooltip);
+    }
+
+    tooltip.textContent = tagName;
+    const toastRect = toast.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+
+    tooltip.style.top = (btnRect.top + btnRect.height / 2) + 'px';
+    tooltip.style.right = (window.innerWidth - toastRect.left + 10) + 'px';
+    tooltip.style.transform = 'translateY(-50%)';
+
+    requestAnimationFrame(() => { tooltip.style.opacity = '1'; });
+  });
+
+  toast.addEventListener('mouseout', (e) => {
+    const btn = e.target.closest('.tg-saver-tag-btn');
+    const relatedBtn = e.relatedTarget ? e.relatedTarget.closest('.tg-saver-tag-btn') : null;
+
+    if (btn && btn !== relatedBtn) {
+      const tooltip = document.getElementById('tg-saver-tag-tooltip');
+      if (tooltip) tooltip.style.opacity = '0';
+    }
+  });
+}
+
+// ─── Countdown Timer ────────────────────────────────────────────────────────
 
 function startCountdown(requestId) {
   const TICK = 50;
 
   ToastState.intervalId = setInterval(() => {
-    // PAUSED = do nothing, don't decrement
-    if (ToastState.isPaused) {
-      return;
-    }
+    if (ToastState.isPaused) return;
+    if (ToastState.isCancelled) { killTimer(); return; }
 
-    // Cancelled = stop
-    if (ToastState.isCancelled) {
-      killTimer();
-      return;
-    }
-
-    // Decrement
     ToastState.timeLeft -= TICK;
 
-    // Time's up
     if (ToastState.timeLeft <= 0) {
       killTimer();
-
-      // Final check - if somehow paused at last moment
-      if (ToastState.isPaused) {
-        return;
-      }
-
-      // Show gray "sending" state with smooth morph
-      const wrapper = document.getElementById('tg-saver-toast-wrapper');
-      const toast = document.getElementById('tg-saver-toast');
-
-      if (wrapper) {
-        // Minimalist mode - morph to "Sending" state, keep wrapper for success animation
-        const wrapperToast = wrapper.querySelector('.tg-saver-toast');
-        const currentWidth = wrapperToast ? wrapperToast.offsetWidth : 168;
-        const targetWidth = 168;
-
-        // Fade out tags
-        const tagsContainer = wrapper.querySelector('.tg-saver-tags-container');
-        if (tagsContainer) {
-          tagsContainer.style.opacity = '0';
-        }
-
-        setTimeout(() => {
-          if (wrapperToast) {
-            // Set starting width via CSS variable BEFORE removing classes
-            wrapperToast.style.setProperty('--tg-toast-width', currentWidth + 'px');
-            wrapperToast.classList.add('tg-saver-animating-width');
-
-            // Now remove minimalist classes
-            wrapperToast.classList.remove('tg-saver-with-tags', 'tg-saver-minimalist');
-            wrapperToast.classList.add('tg-saver-visible');
-
-            // Replace with "Sending" content
-            wrapperToast.innerHTML = `<span class="tg-saver-text tg-saver-visible-content">Sending</span>`;
-
-            // Force reflow to apply starting width
-            wrapperToast.offsetWidth;
-
-            // Animate to target width
-            requestAnimationFrame(() => {
-              wrapperToast.style.setProperty('--tg-toast-width', targetWidth + 'px');
-
-              // Remove animating class after transition completes
-              setTimeout(() => {
-                wrapperToast.classList.remove('tg-saver-animating-width');
-              }, 300);
-            });
-          }
-          doSend(requestId, null);
-        }, 150);
-      } else if (toast) {
-        // Normal mode - morph animation
-        // Fix current height for smooth morph to min-height
-        const currentHeight = toast.offsetHeight;
-        toast.style.height = currentHeight + 'px';
-
-        // Fade out content
-        const content = toast.querySelector('.tg-saver-toast-content');
-        if (content) {
-          content.style.opacity = '0';
-        }
-
-        // Shrink to min-height (52px)
-        requestAnimationFrame(() => {
-          toast.style.height = '52px';
-
-          // Wait for animation, then change content
-          setTimeout(() => {
-            toast.innerHTML = `<span class="tg-saver-text">Sending</span>`;
-            toast.classList.remove('tg-saver-with-tags');
-            toast.style.height = '';
-
-            // Fade in new content
-            requestAnimationFrame(() => {
-              const icon = toast.querySelector('.tg-saver-icon');
-              const text = toast.querySelector('.tg-saver-text');
-              if (icon) icon.classList.add('tg-saver-visible-content');
-              if (text) text.classList.add('tg-saver-visible-content');
-            });
-
-            doSend(requestId, null);
-          }, 200);
-        });
-      }
+      if (ToastState.isPaused) return;
+      morphToSending(requestId, null);
     }
   }, TICK);
 }
 
-function doSend(requestId, selectedTag) {
-  if (ToastState.isCancelled) {
-    return;
-  }
+// ─── Send & Cancel ──────────────────────────────────────────────────────────
 
+function doSend(requestId, selectedTag) {
+  if (ToastState.isCancelled) return;
   killTimer();
 
   chrome.runtime.sendMessage({
@@ -664,11 +489,9 @@ function cancelSend() {
   ToastState.isCancelled = true;
   killTimer();
 
-  // Remove tooltip if exists
   const tooltip = document.getElementById('tg-saver-tag-tooltip');
   if (tooltip) tooltip.remove();
 
-  // Remove wrapper if minimalist mode, otherwise toast
   const wrapper = document.getElementById('tg-saver-toast-wrapper');
   const toast = document.getElementById('tg-saver-toast');
 
@@ -695,16 +518,14 @@ function killTimer() {
   }
 }
 
-// ============ SELECTION ICON ============
+// ─── Selection Icon ─────────────────────────────────────────────────────────
 
 let selectionIcon = null;
 let showSelectionIcon = true;
 let savedSelectionText = '';
 
 chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
-  if (response) {
-    showSelectionIcon = response.showSelectionIcon;
-  }
+  if (response) showSelectionIcon = response.showSelectionIcon;
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -725,22 +546,15 @@ function createSelectionIcon() {
 
   selectionIcon = document.createElement('div');
   selectionIcon.id = 'tg-saver-selection-icon';
-  selectionIcon.innerHTML = `
-    <img src="${iconUrl}" style="width: 100%; height: 100%; display: block;">
-  `;
+  selectionIcon.innerHTML = `<img src="${iconUrl}" style="width: 100%; height: 100%; display: block;">`;
   selectionIcon.title = 'Send to Telegram';
 
   selectionIcon.addEventListener('mousedown', (e) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (savedSelectionText) {
-      chrome.runtime.sendMessage({
-        action: 'sendQuoteFromSelection',
-        text: savedSelectionText
-      });
+      chrome.runtime.sendMessage({ action: 'sendQuoteFromSelection', text: savedSelectionText });
     }
-
     hideSelectionIcon();
   });
 
@@ -750,28 +564,20 @@ function createSelectionIcon() {
 
 function showSelectionIconAt(x, y, text) {
   if (!showSelectionIcon) return;
-
   savedSelectionText = text;
   const icon = createSelectionIcon();
-
   icon.style.left = `${x - 4}px`;
   icon.style.top = `${y - 26}px`;
-
-  requestAnimationFrame(() => {
-    icon.classList.add('tg-saver-selection-visible');
-  });
+  requestAnimationFrame(() => { icon.classList.add('tg-saver-selection-visible'); });
 }
 
 function hideSelectionIcon() {
-  if (selectionIcon) {
-    selectionIcon.classList.remove('tg-saver-selection-visible');
-  }
+  if (selectionIcon) selectionIcon.classList.remove('tg-saver-selection-visible');
 }
 
 document.addEventListener('mouseup', (e) => {
   if (e.target.closest('#tg-saver-selection-icon')) return;
 
-  // Use a tiny timeout to let the selection settle
   setTimeout(() => {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -781,11 +587,7 @@ document.addEventListener('mouseup', (e) => {
       const rect = range.getBoundingClientRect();
 
       if (rect.width > 0 && rect.height > 0) {
-        showSelectionIconAt(
-          rect.right + window.scrollX,
-          rect.top + window.scrollY,
-          selectedText
-        );
+        showSelectionIconAt(rect.right + window.scrollX, rect.top + window.scrollY, selectedText);
       } else {
         hideSelectionIcon();
       }
@@ -796,14 +598,10 @@ document.addEventListener('mouseup', (e) => {
 });
 
 document.addEventListener('mousedown', (e) => {
-  if (!e.target.closest('#tg-saver-selection-icon')) {
-    hideSelectionIcon();
-  }
+  if (!e.target.closest('#tg-saver-selection-icon')) hideSelectionIcon();
 });
 
-document.addEventListener('scroll', () => {
-  hideSelectionIcon();
-}, true);
+document.addEventListener('scroll', () => { hideSelectionIcon(); }, true);
 
 // ESC key to cancel send
 document.addEventListener('keydown', (e) => {
