@@ -76,10 +76,11 @@ function makeFileSheetHtml(color, ext, name) {
   const extHtml = ext ? `<span class="doc-sheet-ext">.${svgEscape(ext)}</span>` : '';
   const nameHtml = name ? `<span class="doc-sheet-name">${svgEscape(name)}</span>` : '';
   return `<div class="doc-sheet-wrap">
-    <div class="doc-sheet" style="background:${color};--sheet-color:${color}">
+    <div class="doc-sheet" style="background:${color}">
       ${extHtml}
       ${nameHtml}
     </div>
+    <div class="doc-corner-wrap" style="--sheet-color:${color}"></div>
   </div>`;
 }
 const TG_ICON_SVG = `<svg width="12" height="10" viewBox="0 0 12.3848 10.2636" fill="none" style="flex-shrink:0"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.85139 4.41839L7.50196 1.55371C10.669 0.23644 11.327 0.00763 11.756 0.00008C11.8503-0.00158 12.0612 0.02179 12.1979 0.13266C12.3133 0.22627 12.345 0.35276 12.3602 0.44148C12.3754 0.53021 12.3943 0.73244 12.3793 0.89044C12.2076 2.69363 11.465 7.06966 11.0872 9.0893C10.9274 9.94392 10.6128 10.2305 10.3079 10.2585C9.64564 10.3194 9.14274 9.8208 8.50131 9.40036L5.95631 7.69083C4.83037 6.94889 5.56027 6.54108 6.20195 5.87463C6.36987 5.70015 9.28776 3.04613 9.34421 2.80537C9.35105 2.77526 9.35782 2.66305 9.29115 2.60375C9.22449 2.54445 9.12602 2.56497 9.05502 2.58087C8.95437 2.60372 7.35095 3.66352 4.24478 5.7603C3.78965 6.07284 3.37739 6.22512 3.00806 6.21714C2.60087 6.20834 1.81763 5.98692 1.23536 5.79763C0.521177 5.56549-0.0464449 5.44274 0.00300277 5.04849C0.0287301 4.84315 0.311526 4.63315 0.851367 4.41844Z" fill="white" fill-opacity="0.3"/></svg>`;
