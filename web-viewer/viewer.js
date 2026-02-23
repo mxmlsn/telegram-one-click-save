@@ -3291,11 +3291,17 @@ async function runAiBackgroundProcessing() {
   for (let i = 0; i < pending.length; i += BATCH) {
     const batch = pending.slice(i, i + BATCH);
     await Promise.all(batch.map(item => new Promise(resolve => {
+      // For albums: find the first image/gif fileId to send to AI (not document/pdf)
+      const albumImageEntry = (item.albumMedia || []).find(m =>
+        m.fileId && (m.mediaType === 'image' || m.mediaType === 'gif' || !m.mediaType)
+      );
+      const aiFileId = albumImageEntry ? albumImageEntry.fileId : item.fileId;
+      const aiType = albumImageEntry ? 'image' : item.type;
       chrome.runtime.sendMessage({
         type: 'AI_ANALYZE',
         item: {
-          type: item.type,
-          fileId: item.fileId,
+          type: aiType,
+          fileId: aiFileId,
           sourceUrl: item.sourceUrl,
           content: item.content,
           tagName: item.tag,
