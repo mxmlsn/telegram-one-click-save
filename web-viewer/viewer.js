@@ -2636,8 +2636,34 @@ async function _showLightboxItem() {
   video.classList.toggle('hidden', !isVideo);
 
   if (isVideo) {
-    video.src = item.url;
+    // Telegram Bot API doesn't support range requests needed for <video> streaming.
+    // Fetch via CORS proxy and create a blob URL instead.
+    video.src = '';
     video.loop = true;
+    try {
+      const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
+      const proxyRes = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service: 'telegram',
+          token: STATE.botToken,
+          path: item.url.replace(/^https:\/\/api\.telegram\.org\/file\/bot[^/]+/, ''),
+          method: 'GET',
+          binary: true,
+          contentType: 'video/mp4'
+        })
+      });
+      if (proxyRes.ok) {
+        const buf = await proxyRes.arrayBuffer();
+        const blob = new Blob([buf], { type: 'video/mp4' });
+        video.src = URL.createObjectURL(blob);
+      } else {
+        video.src = item.url;
+      }
+    } catch {
+      video.src = item.url;
+    }
     video.play().catch(() => {});
     img.src = '';
   } else if (item.video && !item.url && item.thumb) {
@@ -2774,13 +2800,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (gallery.length === 0) return;
       // For the clicked item, if it's a video, resolve it now
       const clicked = gallery[idx];
-      console.log('[album-gallery click]', { clicked, botToken: !!STATE.botToken });
       if (clicked.video && clicked.fileId && !clicked.url) {
         const resolved = await resolveFileId(STATE.botToken, clicked.fileId);
-        console.log('[album-gallery resolved]', resolved);
         if (resolved) clicked.url = resolved;
       }
-      console.log('[album-gallery open]', { url: clicked.url, isVideo: clicked.video });
       openLightbox(clicked.url, '', { gallery, galleryIndex: idx });
       return;
     }
