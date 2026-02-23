@@ -76,7 +76,7 @@ function makeFileSheetHtml(color, ext, name) {
   const extHtml = ext ? `<span class="doc-sheet-ext">.${svgEscape(ext)}</span>` : '';
   const nameHtml = name ? `<span class="doc-sheet-name">${svgEscape(name)}</span>` : '';
   return `<div class="doc-sheet-wrap">
-    <div class="doc-sheet" style="background:${color}">
+    <div class="doc-sheet" style="background:${color};--sheet-color:${color}">
       ${extHtml}
       ${nameHtml}
     </div>
