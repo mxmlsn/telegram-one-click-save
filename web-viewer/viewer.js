@@ -1470,7 +1470,7 @@ function renderCard(item) {
     const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
     if (isTgDirectVideo) {
       const isLargeFile = (aiData.fileSize || 0) > 20 * 1024 * 1024;
-      const isSmallVideo = !isLargeFile && (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 3 * 1024 * 1024;
+      const isSmallVideo = !isLargeFile && (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 5 * 1024 * 1024;
       console.log('[SmallVideo] render id=%s fileSize=%d isSmall=%s fid=...%s',
         item.id?.slice(0, 8), aiData.fileSize || 0, isSmallVideo,
         (item.videoFileId || item.fileId || '').slice(-20));
@@ -1894,7 +1894,7 @@ function renderCard(item) {
     if (isSingleVideo) {
       const thumbUrl = imgUrl || '';
       const vfId = item.videoFileId || item.fileId;
-      const isSmallSingle = (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 3 * 1024 * 1024;
+      const isSmallSingle = (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 5 * 1024 * 1024;
       const smallSingleClass = isSmallSingle ? ' tgvideo-autoplay' : '';
       const smallSingleEl = isSmallSingle ? `<video class="tgvideo-inline" muted loop playsinline preload="none"></video>` : '';
       console.log('[SmallVideo] render-single id=%s fileSize=%d isSmall=%s fid=...%s',
@@ -2438,8 +2438,39 @@ function renderAll(items) {
 
   // Auto-load video notes
   autoloadVideoNotes();
-  // Auto-load small TG videos (≤3MB muted loop)
+  // Auto-load small TG videos (≤5MB muted loop)
   autoloadSmallVideos();
+}
+
+// ─── Visibility-based play/pause for all autoplaying videos ─────────────────
+// Single IntersectionObserver handles both video notes and small TG videos.
+// rootMargin=200px starts playback before element scrolls into view — no visible seam.
+const _videoVisibilityObserver = new IntersectionObserver((entries) => {
+  for (const ioEntry of entries) {
+    const el = ioEntry.target;
+    const video = el._autoplayVideo;
+    if (!video || !video.src) continue;
+
+    if (ioEntry.isIntersecting) {
+      if (video.paused && video.muted) {
+        video.play().then(() => {
+          console.log('[Visibility] play (visible) tag=%s', el._autoplayTag);
+        }).catch(() => {});
+      }
+    } else {
+      if (!video.paused && video.muted) {
+        video.pause();
+        console.log('[Visibility] pause (offscreen) tag=%s', el._autoplayTag);
+      }
+    }
+  }
+}, { rootMargin: '200px', threshold: 0.1 });
+
+// Register an element+video pair with the visibility observer
+function _observeAutoplayVideo(el, video, tag) {
+  el._autoplayVideo = video;
+  el._autoplayTag = tag;
+  _videoVisibilityObserver.observe(el);
 }
 
 // ─── Video note autoload (survives DOM re-renders) ──────────────────────────
@@ -2469,6 +2500,9 @@ function autoloadVideoNotes() {
     video.src = url;
     video.muted = true;
     circle._vnLoaded = true;
+    // Register with visibility observer — plays only when on screen
+    _observeAutoplayVideo(circle, video, 'vn:' + entry.fileId.slice(-12));
+    // Try initial play (observer will manage pause/resume on scroll)
     video.play().then(() => {
       if (playIcon) playIcon.style.display = 'none';
     }).catch(() => {
@@ -2523,7 +2557,7 @@ function autoloadVideoNotes() {
   }
 }
 
-// ─── Small TG video autoplay (≤3MB, muted loop in grid) ─────────────────────
+// ─── Small TG video autoplay (≤5MB, muted loop in grid) ─────────────────────
 // Reuses _vnUrlCache for resolved file URLs
 const _svAutoplayActive = new WeakSet(); // track which cards are already autoplaying
 
@@ -2553,12 +2587,14 @@ function autoloadSmallVideos() {
   console.log('[SmallVideo] will autoload %d small videos', entries.length);
 
   const playVideo = (entry, url) => {
-    const { video, playIcon, card, thumb } = entry;
+    const { video, playIcon, card } = entry;
     _svAutoplayActive.add(card);
     video.preload = 'auto';
     video.src = url;
     video.muted = true;
     console.log('[SmallVideo] set src for fid=...%s', entry.fileId.slice(-20));
+    // Register with visibility observer — plays only when on screen
+    _observeAutoplayVideo(card, video, 'sv:' + entry.fileId.slice(-12));
     video.play().then(() => {
       console.log('[SmallVideo] playing fid=...%s', entry.fileId.slice(-20));
       card.classList.add('tgvideo-playing');
