@@ -1479,10 +1479,15 @@ function renderCard(item) {
       const tgThumbUrl = imgUrl || '';
       const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
       // Small video inline element (muted autoplay loop, like video notes)
+      const _userMuted = isSmallVideo && _getMutedVideoIds().has(playbackFileId);
       const smallVideoEl = isSmallVideo
         ? `<video class="tgvideo-inline" muted loop playsinline preload="none"></video>`
+          + `<button class="tgvideo-toggle-btn" data-action="tgvideo-toggle" data-file-id="${escapeHtml(playbackFileId)}" title="Pause autoplay">`
+          + `<svg class="tgvideo-icon-pause" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`
+          + `<svg class="tgvideo-icon-play" viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`
+          + `</button>`
         : '';
-      const smallVideoClass = isSmallVideo ? ' tgvideo-autoplay' : '';
+      const smallVideoClass = isSmallVideo ? (' tgvideo-autoplay' + (_userMuted ? ' tgvideo-user-paused' : '')) : '';
       // Large file badge
       let tgVideoBadge = '';
       if (isLargeFile) {
@@ -1895,8 +1900,15 @@ function renderCard(item) {
       const thumbUrl = imgUrl || '';
       const vfId = item.videoFileId || item.fileId;
       const isSmallSingle = (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 5 * 1024 * 1024;
-      const smallSingleClass = isSmallSingle ? ' tgvideo-autoplay' : '';
-      const smallSingleEl = isSmallSingle ? `<video class="tgvideo-inline" muted loop playsinline preload="none"></video>` : '';
+      const _userMutedSingle = isSmallSingle && _getMutedVideoIds().has(vfId);
+      const smallSingleClass = isSmallSingle ? (' tgvideo-autoplay' + (_userMutedSingle ? ' tgvideo-user-paused' : '')) : '';
+      const smallSingleEl = isSmallSingle
+        ? `<video class="tgvideo-inline" muted loop playsinline preload="none"></video>`
+          + `<button class="tgvideo-toggle-btn" data-action="tgvideo-toggle" data-file-id="${escapeHtml(vfId)}" title="Pause autoplay">`
+          + `<svg class="tgvideo-icon-pause" viewBox="0 0 24 24" fill="white"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`
+          + `<svg class="tgvideo-icon-play" viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`
+          + `</button>`
+        : '';
       console.log('[SmallVideo] render-single id=%s fileSize=%d isSmall=%s fid=...%s',
         item.id?.slice(0, 8), aiData.fileSize || 0, isSmallSingle, vfId?.slice(-20));
       const playIconSvg = `<svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg>`;
@@ -2442,6 +2454,25 @@ function renderAll(items) {
   autoloadSmallVideos();
 }
 
+// ─── Muted-by-user persistence (localStorage) ───────────────────────────────
+const _MUTED_VIDEOS_KEY = 'tgvideo_muted_ids';
+function _getMutedVideoIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(_MUTED_VIDEOS_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function _setVideoMuted(fileId) {
+  const set = _getMutedVideoIds();
+  set.add(fileId);
+  localStorage.setItem(_MUTED_VIDEOS_KEY, JSON.stringify([...set]));
+  console.log('[SmallVideo] muted by user fid=...%s, total=%d', fileId.slice(-20), set.size);
+}
+function _setVideoUnmuted(fileId) {
+  const set = _getMutedVideoIds();
+  set.delete(fileId);
+  localStorage.setItem(_MUTED_VIDEOS_KEY, JSON.stringify([...set]));
+  console.log('[SmallVideo] unmuted by user fid=...%s, total=%d', fileId.slice(-20), set.size);
+}
+
 // ─── Visibility-based play/pause for all autoplaying videos ─────────────────
 // Single IntersectionObserver handles both video notes and small TG videos.
 // rootMargin=200px starts playback before element scrolls into view — no visible seam.
@@ -2452,6 +2483,8 @@ const _videoVisibilityObserver = new IntersectionObserver((entries) => {
     if (!video || !video.src) continue;
 
     if (ioEntry.isIntersecting) {
+      // Skip user-paused videos
+      if (el.classList?.contains('tgvideo-user-paused')) continue;
       if (video.paused && video.muted) {
         video.play().then(() => {
           console.log('[Visibility] play (visible) tag=%s', el._autoplayTag);
@@ -2568,8 +2601,9 @@ function autoloadSmallVideos() {
   if (!cards.length) return;
   console.log('[SmallVideo] autoloadSmallVideos: found %d tgvideo-autoplay cards', cards.length);
 
+  const mutedIds = _getMutedVideoIds();
   const entries = [...cards]
-    .filter(c => !_svAutoplayActive.has(c))
+    .filter(c => !_svAutoplayActive.has(c) && !c.classList.contains('tgvideo-user-paused'))
     .map(c => {
       const fileId = c.dataset.fileId
         || c.querySelector('[data-file-id]')?.dataset.fileId;
@@ -2578,7 +2612,7 @@ function autoloadSmallVideos() {
       const thumb = c.querySelector('.card-img');
       return { card: c, fileId, video, playIcon, thumb };
     })
-    .filter(e => e.fileId && e.video);
+    .filter(e => e.fileId && e.video && !mutedIds.has(e.fileId));
 
   if (!entries.length) {
     console.log('[SmallVideo] no new entries to autoload');
@@ -3183,8 +3217,37 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // "tgvideo-toggle" — pause/resume autoplay on small inline video
+    if (action === 'tgvideo-toggle') {
+      e.stopPropagation();
+      const fileId = actionEl.dataset.fileId;
+      const card = actionEl.closest('.tgvideo-autoplay');
+      if (!card || !fileId) return;
+      const video = card.querySelector('.tgvideo-inline');
+      const isPaused = card.classList.contains('tgvideo-user-paused');
+      console.log('[SmallVideo] toggle fileId=...%s wasPaused=%s', fileId.slice(-20), isPaused);
+
+      if (isPaused) {
+        // Resume autoplay
+        _setVideoUnmuted(fileId);
+        card.classList.remove('tgvideo-user-paused');
+        if (video && video.src) {
+          video.muted = true;
+          video.play().then(() => {
+            card.classList.add('tgvideo-playing');
+          }).catch(() => {});
+        }
+      } else {
+        // Pause and remember
+        _setVideoMuted(fileId);
+        card.classList.add('tgvideo-user-paused');
+        if (video) video.pause();
+      }
+      return;
+    }
+
     // "video-play" — play TG video in lightbox
-    // For small autoplaying videos (≤3MB): pause inline, open lightbox with sound
+    // For small autoplaying videos (≤5MB): pause inline, open lightbox with sound
     if (action === 'video-play') {
       e.stopPropagation();
       const fileId = actionEl.dataset.fileId || actionEl.closest('[data-file-id]')?.dataset.fileId;

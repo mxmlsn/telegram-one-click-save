@@ -823,6 +823,46 @@
     .tgvideo-playing .video-glow {
       opacity: 0 !important;
     }
+    /* Pause/play toggle button (bottom-right corner on hover) */
+    .tgvideo-toggle-btn {
+      position: absolute;
+      bottom: 8px; right: 8px;
+      z-index: 3;
+      width: 32px; height: 32px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      pointer-events: auto;
+    }
+    .tgvideo-toggle-btn svg { width: 14px; height: 14px; }
+    .tgvideo-playing:hover .tgvideo-toggle-btn,
+    .tgvideo-user-paused .tgvideo-toggle-btn {
+      opacity: 1;
+    }
+    /* Icon visibility: playing → show pause, paused → show play */
+    .tgvideo-icon-play { display: none; }
+    .tgvideo-icon-pause { display: block; }
+    .tgvideo-user-paused .tgvideo-icon-pause { display: none; }
+    .tgvideo-user-paused .tgvideo-icon-play { display: block; }
+    /* User-paused state: show thumbnail + play icon, hide video */
+    .tgvideo-user-paused .tgvideo-inline {
+      opacity: 0 !important;
+      pointer-events: none;
+    }
+    .tgvideo-user-paused .card-img {
+      opacity: 1;
+    }
+    .tgvideo-user-paused .tgpost-play-icon {
+      display: none !important;
+    }
     /* Full-width PDF preview in tgpost */
     /* PDF section inside tgpost — reuses pdf-blur-wrap and pdf-title from card-pdf */
     .tgpost-pdf-section {
