@@ -68,9 +68,13 @@ async function handleUpdate(update, env, ctx) {
           }
         }
 
-        // For large files (>20MB): forward to storage channel for direct download link
+        // Forward to storage channel:
+        // - large files (>20MB) — Telegram API can't serve them directly
+        // - unknown document types (not video/image/pdf) — no inline preview, need download link
         const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
-        if (isLargeFile && env.STORAGE_CHANNEL_ID) {
+        const isUnknownDoc = (parsed.type === 'document' || parsed.mediaType === 'document')
+          && !(parsed.mediaType === 'video' || parsed.mediaType === 'image' || parsed.mediaType === 'pdf');
+        if ((isLargeFile || isUnknownDoc) && env.STORAGE_CHANNEL_ID) {
           await forwardToStorageChannel(message, chatId, notionPageId, parsed, env);
         }
 
@@ -265,11 +269,12 @@ function parseMessage(message, env) {
     return result;
   }
 
-  // Document (PDF, image-as-file, or other)
+  // Document (PDF, image-as-file, video-as-file, or other)
   if (message.document) {
     const mime = message.document.mime_type || '';
     const isImageDoc = mime.startsWith('image/');
-    const docType = mime === 'application/pdf' ? 'pdf' : (isImageDoc ? 'image' : 'document');
+    const isVideoDoc = mime.startsWith('video/');
+    const docType = mime === 'application/pdf' ? 'pdf' : (isImageDoc ? 'image' : (isVideoDoc ? 'video' : 'document'));
     result.fileId = message.document.file_id;
     result.fileName = message.document.file_name || '';
     if (message.document.file_size) result.fileSize = message.document.file_size;
@@ -308,7 +313,9 @@ function parseMessage(message, env) {
       result.contentHasHtml = captionEntities.length > 0;
     } else {
       result.type = docType;
-      result.content += caption || message.document.file_name || '';
+      // For non-video documents: store filename as content (used for display)
+      // For video documents: leave content empty (filename is in ai_data.fileName)
+      result.content += isVideoDoc ? (caption || '') : (caption || message.document.file_name || '');
     }
     return result;
   }
