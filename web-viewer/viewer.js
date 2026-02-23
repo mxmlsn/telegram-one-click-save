@@ -71,19 +71,17 @@ function getFileIconColor(ext) {
 function svgEscape(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-// Corner SVG from Figma — folded top-right corner
-// Dark triangle uses currentColor (inherits accent) with brightness filter; light triangle is white 55% opacity
-// Corner SVG from Figma. Dark triangle: black 35% opacity (darkens the accent color underneath).
-// White triangle: white 55% opacity (highlights the fold).
-const DOC_CORNER_SVG = `<svg class="doc-corner" preserveAspectRatio="none" viewBox="0 0 30.6918 35.1533" fill="none" xmlns="http://www.w3.org/2000/svg"><path opacity="0.9" d="M0 0.00012207L30.6918 35.1533H3.57466C1.60043 35.1533 0 33.5528 0 31.5786V0.00012207Z" fill="white" fill-opacity="0.55"/><path d="M0 0L30.6918 35.1531V3.57479C30.6918 1.60057 29.0914 0.000138601 27.1172 0.000129195L0 0Z" fill="black" fill-opacity="0.3"/></svg>`;
-
 // Build the HTML for a new-style file sheet card (rect + ext + name + corner)
-function makeFileSheetHtml(color, ext, name) {
+// bgColor = card background color so the dark triangle of the corner matches it
+function makeFileSheetHtml(color, ext, name, bgColor) {
+  const bg = bgColor || '#0d1a24';
+  // Corner SVG from Figma: white fold triangle (55% opacity) + bg-colored triangle (hides the corner area)
+  const cornerSvg = `<svg class="doc-corner" preserveAspectRatio="none" viewBox="0 0 30.6918 35.1533" fill="none" xmlns="http://www.w3.org/2000/svg"><path opacity="0.9" d="M0 0.00012207L30.6918 35.1533H3.57466C1.60043 35.1533 0 33.5528 0 31.5786V0.00012207Z" fill="white" fill-opacity="0.55"/><path d="M0 0L30.6918 35.1531V3.57479C30.6918 1.60057 29.0914 0.000138601 27.1172 0.000129195L0 0Z" fill="${svgEscape(bg)}"/></svg>`;
   const extHtml = ext ? `<span class="doc-sheet-ext">.${svgEscape(ext)}</span>` : '';
   const nameHtml = name ? `<span class="doc-sheet-name">${svgEscape(name)}</span>` : '';
   return `<div class="doc-sheet-wrap">
     <div class="doc-sheet" style="background:${color}">
-      ${DOC_CORNER_SVG}
+      ${cornerSvg}
       ${extHtml}
       ${nameHtml}
     </div>
