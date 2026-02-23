@@ -373,7 +373,7 @@ async function resolveRemainingImages(items, fileCache) {
   );
   const svgItemsAll2 = [...new Set([...svgStandalone2, ...svgAlbumParents2])];
   if (svgItemsAll2.length > 0) {
-    Promise.all(svgItemsAll2.map(async it => {
+    await Promise.all(svgItemsAll2.map(async it => {
       if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
         const blobUrl = await proxySvgFile(it._resolvedImg);
         if (blobUrl) {
@@ -390,7 +390,8 @@ async function resolveRemainingImages(items, fileCache) {
         }
       }
       return it;
-    })).then(converted => patchCardImages(converted));
+    }));
+    patchCardImages(svgItemsAll2);
   }
 }
 
@@ -787,14 +788,15 @@ async function resolveImagesBatch(items, tgToken, cache) {
     })).then(converted => patchCardImages(converted));
   }
 
-  // SVG proxy: Telegram may serve SVGs with wrong content-type, so fetch through proxy
+  // SVG proxy: Telegram may serve SVGs with wrong content-type, so fetch through proxy.
+  // Awaited (not fire-and-forget) so album cards render with correct blob URLs on first paint.
   const svgStandalone = items.filter(it => /\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg);
   const svgAlbumParents = items.filter(it =>
     it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
   );
   const svgItemsAll = [...new Set([...svgStandalone, ...svgAlbumParents])];
   if (svgItemsAll.length > 0) {
-    Promise.all(svgItemsAll.map(async it => {
+    await Promise.all(svgItemsAll.map(async it => {
       // Convert standalone SVG
       if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
         const blobUrl = await proxySvgFile(it._resolvedImg);
@@ -816,8 +818,7 @@ async function resolveImagesBatch(items, tgToken, cache) {
           }
         }
       }
-      return it;
-    })).then(converted => patchCardImages(converted));
+    }));
   }
 
   return map;
@@ -2305,7 +2306,10 @@ function renderCard(item) {
       ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
       : '';
     const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
-    return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
+    const isSvgCard = imgUrl.split('?')[0].split('#')[0].toLowerCase().endsWith('.svg')
+      || /\.svg$/i.test(aiData.fileName || '');
+    const svgClass = isSvgCard ? ' card-svg' : '';
+    return `<div class="card card-image${svgClass}" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
       ${pendingDot}
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
       <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>

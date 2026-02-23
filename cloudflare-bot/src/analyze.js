@@ -150,7 +150,8 @@ export async function analyzeAndPatch(parsed, notionPageId, env) {
 
   const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
   const isGifType = parsed.type === 'gif' || parsed.mediaType === 'gif';
-  const fileIdForAI = ((isVideo || isLargeFile || isGifType) && parsed.thumbnailFileId)
+  const isSvgFile = /\.svg$/i.test(parsed.fileName || '');
+  const fileIdForAI = ((isVideo || isLargeFile || isGifType || isSvgFile) && parsed.thumbnailFileId)
     ? parsed.thumbnailFileId : parsed.fileId;
 
   // PDF analysis
