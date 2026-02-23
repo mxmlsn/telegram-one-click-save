@@ -2602,7 +2602,7 @@ function openLightbox(imgUrl, sourceUrl, opts) {
   const dlBtn = document.getElementById('lightbox-download');
 
   // Gallery: if opts.gallery provided, store it; otherwise single item
-  if (opts && opts.gallery && opts.gallery.length > 1) {
+  if (opts && opts.gallery && opts.gallery.length >= 1) {
     _gallery.items = opts.gallery;
     _gallery.index = opts.galleryIndex || 0;
   } else {
