@@ -1707,14 +1707,17 @@ function renderCard(item) {
     const forwardLabel = aiData.forwardFrom || '';
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
-    // For document posts item.content is the filename — don't show it as message text
-    // Also suppress when item.content matches aiData.fileName (channel-forwarded docs)
-    const isDocumentContent = aiData.mediaType === 'document'
-      || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
-    const textContent = isDocumentContent ? '' : (item.content || '');
-
     // Short-circuit: single image tgpost with no text → render as plain card-image
     const albumMedia = item.albumMedia || [];
+
+    // For document posts item.content is the filename — don't show it as message text
+    // Also suppress when: content matches aiData.fileName (channel-forwarded docs),
+    // or all albumMedia entries are documents (multi-file forward — content = filenames joined)
+    const allAlbumAreDocs = albumMedia.length > 0 && albumMedia.every(m => m.mediaType === 'document' || m.mediaType === 'pdf');
+    const isDocumentContent = aiData.mediaType === 'document'
+      || allAlbumAreDocs
+      || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
+    const textContent = isDocumentContent ? '' : (item.content || '');
     const isSingleImage = !albumMedia.length && imgUrl
       && (!aiData.mediaType || aiData.mediaType === 'image')
       && !textContent.trim();
