@@ -512,29 +512,29 @@ async function analyzeWithAI(item, settings) {
       const fileData = await fileRes.json();
       if (fileData.ok) {
         const filePath = fileData.result.file_path;
-        const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
-        const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
-
-        // Detect mime type from file extension
         const ext = filePath.split('.').pop()?.toLowerCase();
-        const mimeType = ext === 'gif' ? 'image/gif'
-          : ext === 'png' ? 'image/png'
-          : ext === 'webp' ? 'image/webp'
-          : 'image/jpeg';
-
-        if (provider === 'google') {
-          const base64 = await fetchBase64(imgUrl);
-          responseText = await callGemini(prompt, base64, settings, mimeType);
-        } else {
-          // Anthropic accepts image URLs directly
-          const messages = [{
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'url', url: imgUrl } },
-              { type: 'text', text: prompt }
-            ]
-          }];
-          responseText = await callAnthropic(messages, settings);
+        const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
+        // Only send to AI vision if it's actually an image — otherwise fall through to text fallback
+        if (IMAGE_EXTS.includes(ext)) {
+          const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
+          const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+          const mimeType = ext === 'gif' ? 'image/gif'
+            : ext === 'png' ? 'image/png'
+            : ext === 'webp' ? 'image/webp'
+            : 'image/jpeg';
+          if (provider === 'google') {
+            const base64 = await fetchBase64(imgUrl);
+            responseText = await callGemini(prompt, base64, settings, mimeType);
+          } else {
+            const messages = [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'url', url: imgUrl } },
+                { type: 'text', text: prompt }
+              ]
+            }];
+            responseText = await callAnthropic(messages, settings);
+          }
         }
       }
     }
