@@ -1057,8 +1057,10 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
   let responseText = null;
 
   // For video or large files: use thumbnail instead of full file (which may exceed 20MB getFile limit)
+  // For gif (animation): also use thumbnail — the main file is mp4 which AI can't process as image
   const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
-  const fileIdForAI = (isVideo || isLargeFile) && parsed.thumbnailFileId ? parsed.thumbnailFileId : parsed.fileId;
+  const isGifType = parsed.type === 'gif' || parsed.mediaType === 'gif';
+  const fileIdForAI = ((isVideo || isLargeFile || isGifType) && parsed.thumbnailFileId) ? parsed.thumbnailFileId : parsed.fileId;
 
   // PDF files — send as application/pdf to Gemini (supports native PDF)
   if (isPdf && parsed.fileId) {
@@ -1102,22 +1104,28 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
       const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
 
       const ext = filePath.split('.').pop()?.toLowerCase();
-      const mimeType = ext === 'gif' ? 'image/gif'
-        : ext === 'png' ? 'image/png'
-        : ext === 'webp' ? 'image/webp'
-        : 'image/jpeg';
-
-      if (provider === 'google') {
-        const base64 = await fetchBase64(imgUrl);
-        responseText = await callGemini(prompt, base64, env, mimeType);
+      const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
+      // Skip if not a recognizable image format (e.g. mp4 animation without thumbnail)
+      if (!IMAGE_EXTS.includes(ext)) {
+        // can't analyze this file as image — leave responseText null
       } else {
-        responseText = await callAnthropic([{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'url', url: imgUrl } },
-            { type: 'text', text: prompt }
-          ]
-        }], env);
+        const mimeType = ext === 'gif' ? 'image/gif'
+          : ext === 'png' ? 'image/png'
+          : ext === 'webp' ? 'image/webp'
+          : 'image/jpeg';
+
+        if (provider === 'google') {
+          const base64 = await fetchBase64(imgUrl);
+          responseText = await callGemini(prompt, base64, env, mimeType);
+        } else {
+          responseText = await callAnthropic([{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'url', url: imgUrl } },
+              { type: 'text', text: prompt }
+            ]
+          }], env);
+        }
       }
     }
   }
