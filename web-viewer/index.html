@@ -632,7 +632,18 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Folded corner — single white semi-transparent triangle, sits on top of the sheet color */
+    /* Folded corner: ::before = full square white dimmed (the "back" of the fold), ::after = brighter fold triangle */
+    .doc-sheet::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 30%;
+      aspect-ratio: 1;
+      background: rgba(255,255,255,0.15);
+      pointer-events: none;
+      z-index: 1;
+    }
     .doc-sheet::after {
       content: '';
       position: absolute;
@@ -640,10 +651,10 @@
       right: 0;
       width: 30%;
       aspect-ratio: 1;
-      background: rgba(255,255,255,0.25);
-      clip-path: polygon(0 0, 100% 0, 100% 100%);
+      background: rgba(255,255,255,0.45);
+      clip-path: polygon(0 0, 100% 100%, 0 100%);
       pointer-events: none;
-      z-index: 1;
+      z-index: 2;
     }
     /* Texts scale with container width via cqi */
     .doc-sheet-ext {
