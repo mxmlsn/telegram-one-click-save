@@ -2635,6 +2635,41 @@ async function togglePdfTextCollapse(pageId) {
   }
 }
 
+async function renamePdfItem(pageId, newTitle) {
+  const item = STATE.items.find(i => i.id === pageId);
+  if (!item) return;
+
+  const trimmed = newTitle.trim();
+  if (!trimmed) return;
+
+  const prev = item.ai_data.title;
+  item.ai_data.title = trimmed;
+
+  // Re-render card
+  const cardEl = document.querySelector(`.card[data-id="${pageId}"]`);
+  if (cardEl) cardEl.outerHTML = renderCard(item);
+
+  // Persist to Notion
+  try {
+    const res = await notionPatch(pageId, {
+      properties: {
+        'ai_data': { rich_text: [{ text: { content: JSON.stringify(item.ai_data).slice(0, 2000) } }] }
+      }
+    });
+    if (!res.ok) {
+      console.error('[Viewer] Rename failed:', res.status);
+      item.ai_data.title = prev;
+      const revert = document.querySelector(`.card[data-id="${pageId}"]`);
+      if (revert) revert.outerHTML = renderCard(item);
+    }
+  } catch (e) {
+    console.error('[Viewer] Rename error:', e);
+    item.ai_data.title = prev;
+    const revert = document.querySelector(`.card[data-id="${pageId}"]`);
+    if (revert) revert.outerHTML = renderCard(item);
+  }
+}
+
 async function toggleTgpostSection(pageId, section) {
   const item = STATE.items.find(i => i.id === pageId);
   if (!item) return;
@@ -3373,6 +3408,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
+    // Show Rename only for PDF cards
+    const renameBtn = document.getElementById('ctx-rename-btn');
+    if (renameBtn) {
+      const isPdf = card.classList.contains('card-pdf');
+      renameBtn.style.display = isPdf ? '' : 'none';
+      renameBtn.previousElementSibling.style.display = isPdf ? '' : 'none'; // divider above rename
+      renameBtn.nextElementSibling.style.display = isPdf ? '' : 'none'; // divider below rename
+    }
+
     // Position at cursor, clamp to viewport
     ctxMenu.classList.remove('hidden');
     let x = e.clientX, y = e.clientY;
@@ -3404,7 +3448,49 @@ document.addEventListener('DOMContentLoaded', () => {
     const targetId = ctxTargetItemId;
     closeCtxMenu();
 
-    if (action === 'delete') {
+    if (action === 'rename') {
+      const cardEl = document.querySelector(`.card[data-id="${targetId}"]`);
+      if (!cardEl) return;
+      const titleEl = cardEl.querySelector('.pdf-title');
+      if (!titleEl) return;
+
+      const currentText = titleEl.textContent.trim();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'pdf-title-input';
+      input.value = currentText;
+      titleEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      let committed = false;
+      function commitRename() {
+        if (committed) return;
+        committed = true;
+        const newTitle = input.value.trim();
+        if (newTitle && newTitle !== currentText) {
+          renamePdfItem(targetId, newTitle);
+        } else {
+          const div = document.createElement('div');
+          div.className = 'pdf-title';
+          div.textContent = currentText;
+          input.replaceWith(div);
+        }
+      }
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') {
+          committed = true;
+          const div = document.createElement('div');
+          div.className = 'pdf-title';
+          div.textContent = currentText;
+          input.replaceWith(div);
+        }
+      });
+      input.addEventListener('blur', commitRename, { once: true });
+
+    } else if (action === 'delete') {
       await deleteItem(targetId);
     } else if (action === 'set-type') {
       await changeItemType(targetId, btn.dataset.typeValue, null);

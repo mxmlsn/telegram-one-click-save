@@ -1279,6 +1279,27 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .pdf-title-input {
+      display: block;
+      width: calc(100% - 36px);
+      margin: 0 18px 16px;
+      margin-top: -10px;
+      padding: 2px 4px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 4px;
+      color: rgba(255,255,255,0.9);
+      font-family: 'Times New Roman', Times, Georgia, serif;
+      font-size: 28px;
+      line-height: 1.15;
+      outline: none;
+      position: relative;
+      z-index: 2;
+    }
+    .pdf-title-input:focus {
+      border-color: rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.1);
+    }
     /* PDF card with text + author (extends base card-pdf) */
     .card-pdf .pdf-title + .tgpost-body { padding-top: 0; }
     .card-pdf .pdf-title:has(+ .tgpost-body) { padding-bottom: 6px; }
@@ -2741,6 +2762,8 @@
     <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="product">+ Product</button>
     <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="pdf">+ PDF</button>
     <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="">Clear secondary</button>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item" id="ctx-rename-btn" data-ctx-action="rename">Rename</button>
     <div class="ctx-divider"></div>
     <button class="ctx-item ctx-item-danger" data-ctx-action="delete">Delete</button>
   </div>
