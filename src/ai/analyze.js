@@ -103,9 +103,8 @@ export async function analyzeWithAI(item, settings) {
       const isSvg = /\.svg$/i.test(item.existingAiData?.fileName || '');
       const gifThumbFileId = item.type === 'gif' && item.existingAiData?.thumbnailFileId
         ? item.existingAiData.thumbnailFileId : null;
-      const svgThumbFileId = isSvg && item.existingAiData?.thumbnailFileId
-        ? item.existingAiData.thumbnailFileId : null;
-      const fileIdToFetch = gifThumbFileId || svgThumbFileId || item.fileId;
+      // SVG: never use TG thumbnail (it's inaccurate), fetch actual SVG for text analysis
+      const fileIdToFetch = gifThumbFileId || item.fileId;
 
       const fileRes = await fetch(
         `https://api.telegram.org/bot${settings.botToken}/getFile?file_id=${fileIdToFetch}`
@@ -115,9 +114,25 @@ export async function analyzeWithAI(item, settings) {
         const filePath = fileData.result.file_path;
         const ext = filePath.split('.').pop()?.toLowerCase();
         const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
-        const isThumbFallback = (gifThumbFileId || svgThumbFileId) && fileIdToFetch !== item.fileId;
+        const isThumbFallback = gifThumbFileId && fileIdToFetch !== item.fileId;
 
-        if (IMAGE_EXTS.includes(ext) || isThumbFallback) {
+        if (ext === 'svg') {
+          // SVG: fetch source code and send as text to AI
+          const svgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
+          try {
+            const svgRes = await fetch(svgUrl);
+            if (svgRes.ok) {
+              const svgText = await svgRes.text();
+              if (svgText.length > 50 && svgText.length < 50000) {
+                const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+                const svgPrompt = `${prompt}\n\nSVG source code:\n${svgText.slice(0, 10000)}`;
+                responseText = await callAITextOnly(svgPrompt, settings);
+              }
+            }
+          } catch (e) {
+            console.warn('[TG Saver] SVG text analysis failed:', e);
+          }
+        } else if (IMAGE_EXTS.includes(ext) || isThumbFallback) {
           const imgUrl = `https://api.telegram.org/file/bot${settings.botToken}/${filePath}`;
           const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
           responseText = await callAIWithImage(prompt, imgUrl, settings);

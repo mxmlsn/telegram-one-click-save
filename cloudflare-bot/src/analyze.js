@@ -151,7 +151,8 @@ export async function analyzeAndPatch(parsed, notionPageId, env) {
   const isLargeFile = parsed.fileSize && parsed.fileSize > 20 * 1024 * 1024;
   const isGifType = parsed.type === 'gif' || parsed.mediaType === 'gif';
   const isSvgFile = /\.svg$/i.test(parsed.fileName || '');
-  const fileIdForAI = ((isVideo || isLargeFile || isGifType || isSvgFile) && parsed.thumbnailFileId)
+  // SVG: never use TG thumbnail (it's inaccurate), always fetch actual SVG for text analysis
+  const fileIdForAI = ((isVideo || isLargeFile || isGifType) && !isSvgFile && parsed.thumbnailFileId)
     ? parsed.thumbnailFileId : parsed.fileId;
 
   // PDF analysis
