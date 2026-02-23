@@ -620,9 +620,7 @@
       max-width: 180px;
       container-type: inline-size;
     }
-    /* The colored rectangle that looks like a file sheet.
-       clip-path cuts off the top-right corner (70% across, 0 top → 100% across, 30% down).
-       All percentages relative to the element itself. */
+    /* The colored rectangle that looks like a file sheet */
     .doc-sheet {
       position: relative;
       border-radius: 11% 0 11% 11%;
@@ -633,9 +631,21 @@
       min-height: 0;
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
-      clip-path: polygon(0% 0%, 70% 0%, 100% 30%, 100% 100%, 0% 100%);
     }
-    /* White fold triangle — fills exactly the cut-off corner area */
+    /* Folded corner via pseudo-elements — always clipped by overflow:hidden */
+    /* ::before fills the whole corner square with bg color */
+    .doc-sheet::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 30%;
+      aspect-ratio: 1;
+      background: var(--card-bg, #0d1a24);
+      pointer-events: none;
+      z-index: 1;
+    }
+    /* ::after draws the white fold triangle on top */
     .doc-sheet::after {
       content: '';
       position: absolute;
@@ -643,8 +653,8 @@
       right: 0;
       width: 30%;
       aspect-ratio: 1;
-      background: rgba(255,255,255,0.4);
-      clip-path: polygon(0% 100%, 100% 0%, 100% 100%);
+      background: rgba(255,255,255,0.55);
+      clip-path: polygon(0 0, 100% 100%, 0 100%);
       pointer-events: none;
       z-index: 2;
     }
