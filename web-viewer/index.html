@@ -633,6 +633,7 @@
       overflow: hidden;
     }
     /* Folded corner via pseudo-elements — always clipped by overflow:hidden */
+    /* ::before fills the whole corner square with bg color */
     .doc-sheet::before {
       content: '';
       position: absolute;
@@ -641,10 +642,10 @@
       width: 30%;
       aspect-ratio: 1;
       background: var(--card-bg, #0d1a24);
-      clip-path: polygon(100% 0, 0 0, 100% 100%);
       pointer-events: none;
       z-index: 1;
     }
+    /* ::after draws the white fold triangle on top */
     .doc-sheet::after {
       content: '';
       position: absolute;
@@ -655,12 +656,12 @@
       background: rgba(255,255,255,0.55);
       clip-path: polygon(0 0, 100% 100%, 0 100%);
       pointer-events: none;
-      z-index: 1;
+      z-index: 2;
     }
     /* Texts scale with container width via cqi */
     .doc-sheet-ext {
       font-family: 'Anybody', sans-serif;
-      font-size: 28cqi;
+      font-size: 22cqi;
       font-weight: 400;
       color: rgba(255,255,255,0.95);
       line-height: 1;
