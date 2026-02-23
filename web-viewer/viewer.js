@@ -3981,6 +3981,8 @@ function setupDragDrop() {
   document.addEventListener('dragenter', e => {
     if (!e.dataTransfer?.types.includes('Files')) return;
     e.preventDefault();
+    // If note editor is open, don't show drop overlay — let editor handle the drop
+    if (!document.getElementById('note-editor').classList.contains('hidden')) return;
     dragCounter++;
     if (dragCounter === 1) overlay.classList.remove('hidden');
   });
@@ -4041,6 +4043,14 @@ function setupDragDrop() {
 }
 
 async function handleQuickSaveFiles(files) {
+  // Show tag toast first, wait for selection, then upload with tag
+  const tags = STATE.customTags.filter(t => t.name && t.name.trim());
+  let selectedTagName = null;
+
+  if (tags.length > 0) {
+    selectedTagName = await showTagSelectionInViewer();
+  }
+
   const total = files.length;
   showToast(`Uploading ${total} file${total > 1 ? 's' : ''}…`);
 
@@ -4052,6 +4062,7 @@ async function handleQuickSaveFiles(files) {
       const notionPageId = await createNotionPage({
         type: result.type,
         fileId: result.fileId,
+        tagName: selectedTagName,
       });
 
       let imgUrl = null;
@@ -4062,7 +4073,7 @@ async function handleQuickSaveFiles(files) {
 
       const item = {
         id: notionPageId, url: 'viewer upload', type: result.type,
-        tag: '', content: '', fileId: result.fileId, sourceUrl: '',
+        tag: selectedTagName || '', content: '', fileId: result.fileId, sourceUrl: '',
         date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: {}, fileIds: [],
@@ -4070,60 +4081,62 @@ async function handleQuickSaveFiles(files) {
       };
       addCardToGrid(item);
       showToast(`Uploaded ${i + 1}/${total}: ${file.name}`);
-
-      if (STATE.customTags.length > 0 && notionPageId) {
-        showTagSelectionInViewer(notionPageId, item);
-      }
     } catch (err) {
       console.error('[Upload] Failed:', file.name, err);
       showToast(`Failed: ${file.name} — ${err.message}`);
     }
   }
+
+  // Trigger AI analysis for newly uploaded items
+  if (STATE.aiEnabled && STATE.aiAutoInViewer) {
+    runAiBackgroundProcessing();
+  }
 }
 
 // ─── Viewer Tag Toast ───────────────────────────────────────────────────────
 
-function showTagSelectionInViewer(notionPageId, item) {
-  const tags = STATE.customTags.filter(t => t.name && t.name.trim());
-  if (!tags.length) return;
+// Returns a Promise that resolves with selected tag name or null
+function showTagSelectionInViewer() {
+  return new Promise(resolve => {
+    const tags = STATE.customTags.filter(t => t.name && t.name.trim());
+    if (!tags.length) { resolve(null); return; }
 
-  const existing = document.querySelector('.viewer-tag-toast');
-  if (existing) existing.remove();
+    const existing = document.querySelector('.viewer-tag-toast');
+    if (existing) existing.remove();
 
-  const toast = document.createElement('div');
-  toast.className = 'viewer-tag-toast';
+    const toast = document.createElement('div');
+    toast.className = 'viewer-tag-toast';
+    let resolved = false;
 
-  tags.forEach(tag => {
-    const btn = document.createElement('button');
-    btn.className = 'viewer-tag-btn';
-    btn.innerHTML = `<span class="note-tag-dot" style="background:${tag.color}"></span>${escapeHtml(tag.name)}`;
-    btn.addEventListener('click', () => {
-      applyTagToItem(notionPageId, item, tag.name);
+    tags.forEach(tag => {
+      const btn = document.createElement('button');
+      btn.className = 'viewer-tag-btn';
+      btn.innerHTML = `<span class="note-tag-dot" style="background:${tag.color}"></span>${escapeHtml(tag.name)}`;
+      btn.addEventListener('click', () => {
+        if (resolved) return;
+        resolved = true;
+        toast.remove();
+        resolve(tag.name);
+      });
+      toast.appendChild(btn);
+    });
+
+    const skipBtn = document.createElement('button');
+    skipBtn.className = 'viewer-tag-skip';
+    skipBtn.textContent = 'skip';
+    skipBtn.addEventListener('click', () => {
+      if (resolved) return;
+      resolved = true;
       toast.remove();
+      resolve(null);
     });
-    toast.appendChild(btn);
+    toast.appendChild(skipBtn);
+
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      if (!resolved) { resolved = true; toast.remove(); resolve(null); }
+    }, 8000);
   });
-
-  const skipBtn = document.createElement('button');
-  skipBtn.className = 'viewer-tag-skip';
-  skipBtn.textContent = 'skip';
-  skipBtn.addEventListener('click', () => toast.remove());
-  toast.appendChild(skipBtn);
-
-  document.body.appendChild(toast);
-  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
-}
-
-async function applyTagToItem(notionPageId, item, tagName) {
-  item.tag = tagName;
-  try {
-    await notionPatch(notionPageId, {
-      properties: { 'Tag': { select: { name: tagName } } }
-    });
-    showToast(`Tagged: ${tagName}`);
-  } catch (e) {
-    console.warn('[Tag] Patch failed:', e);
-  }
 }
 
 // ─── Note Editor ────────────────────────────────────────────────────────────
@@ -4304,7 +4317,7 @@ async function saveNote() {
       showToast('Note saved');
 
     } else {
-      // Text + files → upload all, then save
+      // Text + files → upload all, then save as tgpost (so text is displayed)
       const uploadResults = [];
       for (const file of files) {
         showToast(`Uploading ${uploadResults.length + 1}/${files.length}…`);
@@ -4319,7 +4332,8 @@ async function saveNote() {
       }
       aiData.mediaType = uploadResults[0]?.type || 'image';
 
-      const itemType = files.length === 1 ? uploadResults[0].type : 'tgpost';
+      // Always use tgpost when there's text + files so content is visible on card
+      const itemType = plainText ? 'tgpost' : (files.length === 1 ? uploadResults[0].type : 'tgpost');
 
       const notionPageId = await createNotionPage({
         type: itemType, content: plainText, fileId: mainFileId,
@@ -4345,6 +4359,11 @@ async function saveNote() {
     }
 
     closeNoteEditor();
+
+    // Trigger AI analysis for newly saved items
+    if (STATE.aiEnabled && STATE.aiAutoInViewer) {
+      runAiBackgroundProcessing();
+    }
   } catch (err) {
     console.error('[NoteEditor] Save failed:', err);
     showToast('Save failed: ' + err.message);
