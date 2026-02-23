@@ -93,6 +93,8 @@ const STATE = {
   notionToken: '',
   notionDbId: '',
   botToken: '',
+  chatId: '',
+  customTags: [],
   aiEnabled: false,
   aiAutoInViewer: false,
   search: '',
@@ -177,6 +179,8 @@ async function init() {
     STATE.notionToken = settings.notionToken;
     STATE.notionDbId = settings.notionDbId;
     STATE.botToken = settings.botToken;
+    STATE.chatId = settings.chatId || '';
+    STATE.customTags = settings.customTags || [];
     STATE.aiEnabled = !!(settings.aiEnabled && settings.aiApiKey);
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
     startApp();
@@ -197,6 +201,7 @@ const FIRST_BATCH_SIZE = 16;
 
 async function startApp() {
   document.getElementById('search-pill').classList.remove('hidden');
+  document.getElementById('add-note-btn').classList.remove('hidden');
   document.getElementById('toolbar').classList.remove('hidden');
   document.getElementById('display-bar').classList.remove('hidden');
   document.getElementById('grid-wrap').classList.remove('hidden');
@@ -205,6 +210,8 @@ async function startApp() {
   await restoreDisplaySettings();
   setupToolbarEvents();
   setupDisplayBar();
+  setupDragDrop();
+  setupNoteEditor();
 
   try {
     // 1. Fetch all items from Notion
@@ -586,6 +593,129 @@ async function resolveFileId(tgToken, fileId) {
   } catch (e) { console.log('[resolve] ERROR fid=%s %s', fileId.slice(-20), e.message); return null; }
 }
 
+// ─── File Upload Infrastructure ─────────────────────────────────────────────
+
+async function compressImageIfNeeded(blob) {
+  const MAX_SIZE = 10 * 1024 * 1024;
+  if (blob.size <= MAX_SIZE) return blob;
+
+  const img = new Image();
+  const imgUrl = URL.createObjectURL(blob);
+  await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = imgUrl; });
+
+  let quality = 0.9;
+  let compressedBlob = blob;
+  while (compressedBlob.size > MAX_SIZE && quality > 0.1) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width; canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    compressedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+    quality -= 0.1;
+  }
+  if (compressedBlob.size > MAX_SIZE) {
+    let scale = 0.9;
+    while (compressedBlob.size > MAX_SIZE && scale > 0.3) {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(img.width * scale); canvas.height = Math.floor(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      compressedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+      scale -= 0.1;
+    }
+  }
+  URL.revokeObjectURL(imgUrl);
+  return compressedBlob;
+}
+
+async function uploadFileToTelegram(file, botToken, chatId) {
+  const MAX_FILE_SIZE = 50 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) throw new Error('File too large (max 50MB)');
+
+  const mime = file.type || '';
+  const formData = new FormData();
+  formData.append('chat_id', chatId);
+  formData.append('disable_notification', 'true');
+
+  if (mime === 'image/gif') {
+    formData.append('animation', file, file.name || 'animation.gif');
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAnimation`, { method: 'POST', body: formData });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAnimation failed'); }
+    const data = await res.json();
+    const thumb = data.result?.animation?.thumbnail || data.result?.animation?.thumb;
+    return { fileId: thumb?.file_id || null, type: 'gif' };
+  }
+
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(mime)) {
+    const compressed = await compressImageIfNeeded(file);
+    formData.append('photo', compressed, file.name || 'photo.jpg');
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: formData });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendPhoto failed'); }
+    const data = await res.json();
+    const photos = data.result?.photo;
+    return { fileId: photos?.length > 0 ? photos[photos.length - 1].file_id : null, type: 'image' };
+  }
+
+  // SVG and everything else → sendDocument
+  const docType = mime === 'image/svg+xml' ? 'image' : 'document';
+  formData.append('document', file, file.name || 'file');
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendDocument failed'); }
+  const data = await res.json();
+  return { fileId: data.result?.document?.file_id || null, type: docType };
+}
+
+async function createNotionPage({ type, content, fileId, tagName, sourceUrl, aiData }) {
+  const domain = sourceUrl
+    ? sourceUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
+    : 'viewer upload';
+
+  const properties = {
+    'URL': { title: [{ text: { content: domain } }] },
+    'Type': { select: { name: type } },
+    'Date': { date: { start: new Date().toISOString() } }
+  };
+  if (sourceUrl) properties['Source URL'] = { url: sourceUrl };
+  if (tagName) properties['Tag'] = { select: { name: tagName } };
+  if (content) properties['Content'] = { rich_text: [{ text: { content: content.slice(0, 2000) } }] };
+  if (fileId) properties['File ID'] = { rich_text: [{ text: { content: fileId } }] };
+  if (aiData && Object.keys(aiData).length) {
+    properties['ai_data'] = { rich_text: [{ text: { content: JSON.stringify(aiData).slice(0, 2000) } }] };
+  }
+
+  const res = await bgFetch('https://api.notion.com/v1/pages', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${STATE.notionToken}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ parent: { database_id: STATE.notionDbId }, properties })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error('Notion save failed: ' + (err.message || res.status));
+  }
+  const page = await res.json();
+  return page.id || null;
+}
+
+function addCardToGrid(item) {
+  STATE.items.unshift(item);
+  const cardHtml = renderCard(item);
+  const masonry = document.getElementById('masonry');
+  if (!masonry) return;
+
+  const empty = document.getElementById('empty-state');
+  if (empty) empty.classList.add('hidden');
+
+  if (STATE.align === 'masonry') {
+    const cols = masonry.querySelectorAll('.masonry-col');
+    if (cols.length === 0) { applyFilters(); return; }
+    cols[0].insertAdjacentHTML('afterbegin', cardHtml);
+  } else {
+    masonry.insertAdjacentHTML('afterbegin', cardHtml);
+  }
+}
+
 // Fetch SVG file through CORS proxy and return a blob URL
 // Telegram may serve SVGs with wrong content-type, blocking <img> rendering
 async function proxySvgFile(tgFileUrl) {
@@ -951,6 +1081,7 @@ async function openSettingsPanel() {
   document.getElementById('sp-notion-token').value = s.notionToken || '';
   document.getElementById('sp-db-id').value = s.notionDbId || '';
   document.getElementById('sp-tg-token').value = s.botToken || '';
+  document.getElementById('sp-chat-id').value = s.chatId || '';
   document.getElementById('sp-ai-enabled').checked = s.aiEnabled || false;
 
   const provider = s.aiProvider || 'google';
@@ -1010,6 +1141,7 @@ function setupSettingsPanel() {
     const notionToken = document.getElementById('sp-notion-token').value.trim();
     const notionDbId = document.getElementById('sp-db-id').value.trim();
     const botToken = document.getElementById('sp-tg-token').value.trim();
+    const chatId = document.getElementById('sp-chat-id').value.trim();
     const aiEnabled = document.getElementById('sp-ai-enabled').checked;
     const aiProvider = document.getElementById('sp-ai-provider').value;
     const aiApiKey = document.getElementById('sp-ai-key').value.trim();
@@ -1019,7 +1151,7 @@ function setupSettingsPanel() {
 
     await new Promise(resolve =>
       chrome.storage.local.set(
-        { notionToken, notionDbId, botToken, aiEnabled, aiProvider, aiApiKey, aiModel, aiAutoOnSave, aiAutoInViewer },
+        { notionToken, notionDbId, botToken, chatId, aiEnabled, aiProvider, aiApiKey, aiModel, aiAutoOnSave, aiAutoInViewer },
         resolve
       )
     );
@@ -3835,6 +3967,440 @@ async function runAiBackgroundProcessing() {
 
   aiStatus.textContent = `✓ ${done} analyzed`;
   setTimeout(() => { aiStatus.textContent = ''; }, 4000);
+}
+
+// ─── Drag & Drop ────────────────────────────────────────────────────────────
+
+function setupDragDrop() {
+  let dragCounter = 0;
+  const overlay = document.getElementById('drop-overlay');
+  const quickZone = document.getElementById('drop-zone-quick');
+  const noteZone = document.getElementById('drop-zone-note');
+  if (!overlay) return;
+
+  document.addEventListener('dragenter', e => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    dragCounter++;
+    if (dragCounter === 1) overlay.classList.remove('hidden');
+  });
+
+  document.addEventListener('dragover', e => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.addEventListener('dragleave', () => {
+    dragCounter--;
+    if (dragCounter <= 0) {
+      dragCounter = 0;
+      overlay.classList.add('hidden');
+      quickZone.classList.remove('drag-over');
+      noteZone.classList.remove('drag-over');
+    }
+  });
+
+  quickZone.addEventListener('dragenter', e => { e.preventDefault(); quickZone.classList.add('drag-over'); });
+  quickZone.addEventListener('dragleave', () => quickZone.classList.remove('drag-over'));
+  quickZone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  noteZone.addEventListener('dragenter', e => { e.preventDefault(); noteZone.classList.add('drag-over'); });
+  noteZone.addEventListener('dragleave', () => noteZone.classList.remove('drag-over'));
+  noteZone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+
+  // Catch drops outside zones
+  overlay.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    overlay.classList.add('hidden');
+    quickZone.classList.remove('drag-over');
+    noteZone.classList.remove('drag-over');
+  });
+
+  quickZone.addEventListener('drop', async e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter = 0;
+    overlay.classList.add('hidden');
+    quickZone.classList.remove('drag-over');
+    const files = [...e.dataTransfer.files];
+    if (!files.length) return;
+    if (!STATE.chatId || !STATE.botToken) { showToast('Set Chat ID in settings first'); return; }
+    handleQuickSaveFiles(files);
+  });
+
+  noteZone.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter = 0;
+    overlay.classList.add('hidden');
+    noteZone.classList.remove('drag-over');
+    const files = [...e.dataTransfer.files];
+    openNoteEditor(files);
+  });
+}
+
+async function handleQuickSaveFiles(files) {
+  const total = files.length;
+  showToast(`Uploading ${total} file${total > 1 ? 's' : ''}…`);
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
+
+      const notionPageId = await createNotionPage({
+        type: result.type,
+        fileId: result.fileId,
+      });
+
+      let imgUrl = null;
+      if (result.fileId) {
+        imgUrl = await resolveFileId(STATE.botToken, result.fileId);
+        if (imgUrl) STATE.imageMap[result.fileId] = imgUrl;
+      }
+
+      const item = {
+        id: notionPageId, url: 'viewer upload', type: result.type,
+        tag: '', content: '', fileId: result.fileId, sourceUrl: '',
+        date: new Date().toISOString(),
+        ai_type: null, ai_type_secondary: null, ai_description: '',
+        ai_analyzed: false, ai_data: {}, fileIds: [],
+        _resolvedImg: imgUrl, videoFileId: '', pdfFileId: '', audioFileId: '',
+      };
+      addCardToGrid(item);
+      showToast(`Uploaded ${i + 1}/${total}: ${file.name}`);
+
+      if (STATE.customTags.length > 0 && notionPageId) {
+        showTagSelectionInViewer(notionPageId, item);
+      }
+    } catch (err) {
+      console.error('[Upload] Failed:', file.name, err);
+      showToast(`Failed: ${file.name} — ${err.message}`);
+    }
+  }
+}
+
+// ─── Viewer Tag Toast ───────────────────────────────────────────────────────
+
+function showTagSelectionInViewer(notionPageId, item) {
+  const tags = STATE.customTags.filter(t => t.name && t.name.trim());
+  if (!tags.length) return;
+
+  const existing = document.querySelector('.viewer-tag-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'viewer-tag-toast';
+
+  tags.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.className = 'viewer-tag-btn';
+    btn.innerHTML = `<span class="note-tag-dot" style="background:${tag.color}"></span>${escapeHtml(tag.name)}`;
+    btn.addEventListener('click', () => {
+      applyTagToItem(notionPageId, item, tag.name);
+      toast.remove();
+    });
+    toast.appendChild(btn);
+  });
+
+  const skipBtn = document.createElement('button');
+  skipBtn.className = 'viewer-tag-skip';
+  skipBtn.textContent = 'skip';
+  skipBtn.addEventListener('click', () => toast.remove());
+  toast.appendChild(skipBtn);
+
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
+}
+
+async function applyTagToItem(notionPageId, item, tagName) {
+  item.tag = tagName;
+  try {
+    await notionPatch(notionPageId, {
+      properties: { 'Tag': { select: { name: tagName } } }
+    });
+    showToast(`Tagged: ${tagName}`);
+  } catch (e) {
+    console.warn('[Tag] Patch failed:', e);
+  }
+}
+
+// ─── Note Editor ────────────────────────────────────────────────────────────
+
+let _noteEditorFiles = [];
+let _noteEditorSelectedTag = null;
+let _linkTooltipEl = null;
+
+function setupNoteEditor() {
+  const addBtn = document.getElementById('add-note-btn');
+  const editor = document.getElementById('note-editor');
+  const closeBtn = document.getElementById('note-editor-close');
+  const saveBtn = document.getElementById('note-editor-save');
+  const textArea = document.getElementById('note-editor-text');
+  if (!addBtn || !editor) return;
+
+  addBtn.addEventListener('click', () => openNoteEditor([]));
+  closeBtn.addEventListener('click', closeNoteEditor);
+  saveBtn.addEventListener('click', saveNote);
+
+  // Drag files into editor
+  editor.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; });
+  editor.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    [...e.dataTransfer.files].forEach(f => addFileToNoteEditor(f));
+  });
+
+  // Hyperlink: Cmd+V with text selection → wrap in <a>
+  textArea.addEventListener('paste', e => {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+
+    const pastedText = (e.clipboardData || window.clipboardData).getData('text/plain');
+    if (!pastedText) return;
+    try { new URL(pastedText); } catch { return; }
+
+    e.preventDefault();
+    const range = sel.getRangeAt(0);
+    const selectedText = range.toString();
+    const link = document.createElement('a');
+    link.href = pastedText;
+    link.textContent = selectedText;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    range.deleteContents();
+    range.insertNode(link);
+    range.setStartAfter(link);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+
+  // Link tooltip on hover
+  textArea.addEventListener('mouseover', e => {
+    if (e.target.tagName === 'A') showLinkTooltip(e.target);
+  });
+  textArea.addEventListener('mouseout', e => {
+    if (e.target.tagName === 'A') {
+      setTimeout(() => {
+        if (_linkTooltipEl && !_linkTooltipEl.matches(':hover')) hideLinkTooltip();
+      }, 100);
+    }
+  });
+}
+
+function openNoteEditor(files = []) {
+  const editor = document.getElementById('note-editor');
+  const textArea = document.getElementById('note-editor-text');
+  const attachments = document.getElementById('note-editor-attachments');
+
+  _noteEditorFiles = [];
+  _noteEditorSelectedTag = null;
+  textArea.innerHTML = '';
+  attachments.innerHTML = '';
+
+  populateNoteEditorTags();
+  files.forEach(f => addFileToNoteEditor(f));
+
+  editor.classList.remove('hidden');
+  textArea.focus();
+}
+
+function closeNoteEditor() {
+  document.getElementById('note-editor')?.classList.add('hidden');
+  _noteEditorFiles = [];
+  _noteEditorSelectedTag = null;
+}
+
+function addFileToNoteEditor(file) {
+  _noteEditorFiles.push(file);
+  const attachments = document.getElementById('note-editor-attachments');
+  const idx = _noteEditorFiles.length - 1;
+
+  if (file.type.startsWith('image/')) {
+    const thumb = document.createElement('div');
+    thumb.className = 'note-attach-thumb';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    const rmBtn = document.createElement('button');
+    rmBtn.className = 'note-attach-remove';
+    rmBtn.textContent = '\u00d7';
+    rmBtn.addEventListener('click', () => { _noteEditorFiles[idx] = null; thumb.remove(); });
+    thumb.appendChild(img);
+    thumb.appendChild(rmBtn);
+    attachments.appendChild(thumb);
+  } else {
+    const chip = document.createElement('div');
+    chip.className = 'note-attach-file';
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = file.name || 'file';
+    nameSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    const rmBtn = document.createElement('button');
+    rmBtn.textContent = '\u00d7';
+    rmBtn.style.cssText = 'background:none;border:none;color:#555;font-size:14px;cursor:pointer;margin-left:4px;flex-shrink:0';
+    rmBtn.addEventListener('click', () => { _noteEditorFiles[idx] = null; chip.remove(); });
+    chip.appendChild(nameSpan);
+    chip.appendChild(rmBtn);
+    attachments.appendChild(chip);
+  }
+}
+
+function populateNoteEditorTags() {
+  const container = document.getElementById('note-editor-tags');
+  container.innerHTML = '';
+  const tags = STATE.customTags.filter(t => t.name && t.name.trim());
+
+  tags.forEach(tag => {
+    const btn = document.createElement('button');
+    btn.className = 'note-tag-btn';
+    btn.innerHTML = `<span class="note-tag-dot" style="background:${tag.color}"></span>${escapeHtml(tag.name)}`;
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.note-tag-btn').forEach(b => b.classList.remove('selected'));
+      if (_noteEditorSelectedTag === tag.name) {
+        _noteEditorSelectedTag = null;
+      } else {
+        _noteEditorSelectedTag = tag.name;
+        btn.classList.add('selected');
+      }
+    });
+    container.appendChild(btn);
+  });
+}
+
+async function saveNote() {
+  const textArea = document.getElementById('note-editor-text');
+  const plainText = textArea.innerText.trim();
+  const files = _noteEditorFiles.filter(f => f !== null);
+
+  if (!plainText && !files.length) { showToast('Nothing to save'); return; }
+  if (!STATE.chatId || !STATE.botToken) { showToast('Set Chat ID in settings first'); return; }
+
+  const saveBtn = document.getElementById('note-editor-save');
+  saveBtn.textContent = 'Saving…';
+  saveBtn.disabled = true;
+
+  try {
+    if (files.length === 0) {
+      // Text only → quote
+      await fetch(`https://api.telegram.org/bot${STATE.botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: STATE.chatId, text: plainText, disable_notification: true })
+      });
+
+      const notionPageId = await createNotionPage({
+        type: 'quote', content: plainText, tagName: _noteEditorSelectedTag,
+      });
+
+      addCardToGrid({
+        id: notionPageId, url: 'viewer note', type: 'quote',
+        tag: _noteEditorSelectedTag || '', content: plainText,
+        fileId: '', sourceUrl: '', date: new Date().toISOString(),
+        ai_type: null, ai_type_secondary: null, ai_description: '',
+        ai_analyzed: false, ai_data: {}, fileIds: [], _resolvedImg: null,
+        videoFileId: '', pdfFileId: '', audioFileId: '',
+      });
+      showToast('Note saved');
+
+    } else {
+      // Text + files → upload all, then save
+      const uploadResults = [];
+      for (const file of files) {
+        showToast(`Uploading ${uploadResults.length + 1}/${files.length}…`);
+        const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
+        uploadResults.push(result);
+      }
+
+      const mainFileId = uploadResults[0]?.fileId || '';
+      const aiData = {};
+      if (files.length > 1) {
+        aiData.mediaGroupId = `viewer_${Date.now()}`;
+      }
+      aiData.mediaType = uploadResults[0]?.type || 'image';
+
+      const itemType = files.length === 1 ? uploadResults[0].type : 'tgpost';
+
+      const notionPageId = await createNotionPage({
+        type: itemType, content: plainText, fileId: mainFileId,
+        tagName: _noteEditorSelectedTag, aiData,
+      });
+
+      let imgUrl = null;
+      if (mainFileId) {
+        imgUrl = await resolveFileId(STATE.botToken, mainFileId);
+        if (imgUrl) STATE.imageMap[mainFileId] = imgUrl;
+      }
+
+      addCardToGrid({
+        id: notionPageId, url: 'viewer note', type: itemType,
+        tag: _noteEditorSelectedTag || '', content: plainText,
+        fileId: mainFileId, sourceUrl: '', date: new Date().toISOString(),
+        ai_type: null, ai_type_secondary: null, ai_description: '',
+        ai_analyzed: false, ai_data: aiData,
+        fileIds: uploadResults.map(r => r.fileId), _resolvedImg: imgUrl,
+        videoFileId: '', pdfFileId: '', audioFileId: '',
+      });
+      showToast('Note with files saved');
+    }
+
+    closeNoteEditor();
+  } catch (err) {
+    console.error('[NoteEditor] Save failed:', err);
+    showToast('Save failed: ' + err.message);
+  } finally {
+    saveBtn.textContent = 'Save';
+    saveBtn.disabled = false;
+  }
+}
+
+// ─── Link Tooltip ───────────────────────────────────────────────────────────
+
+function showLinkTooltip(linkEl) {
+  hideLinkTooltip();
+  const url = linkEl.href;
+  const rect = linkEl.getBoundingClientRect();
+
+  const tooltip = document.createElement('div');
+  tooltip.className = 'note-link-tooltip';
+
+  const urlLink = document.createElement('a');
+  urlLink.href = url;
+  urlLink.target = '_blank';
+  urlLink.rel = 'noopener';
+  urlLink.textContent = url.length > 40 ? url.slice(0, 40) + '…' : url;
+  urlLink.style.maxWidth = '180px';
+
+  const editBtn = document.createElement('button');
+  editBtn.textContent = 'edit';
+  editBtn.addEventListener('click', () => {
+    const newUrl = prompt('Edit URL:', url);
+    if (newUrl) linkEl.href = newUrl;
+    hideLinkTooltip();
+  });
+
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = 'remove';
+  removeBtn.addEventListener('click', () => {
+    const text = document.createTextNode(linkEl.textContent);
+    linkEl.parentNode.replaceChild(text, linkEl);
+    hideLinkTooltip();
+  });
+
+  tooltip.appendChild(urlLink);
+  tooltip.appendChild(editBtn);
+  tooltip.appendChild(removeBtn);
+
+  tooltip.style.top = (rect.bottom + 6) + 'px';
+  tooltip.style.left = rect.left + 'px';
+
+  tooltip.addEventListener('mouseleave', hideLinkTooltip);
+  document.body.appendChild(tooltip);
+  _linkTooltipEl = tooltip;
+}
+
+function hideLinkTooltip() {
+  if (_linkTooltipEl) { _linkTooltipEl.remove(); _linkTooltipEl = null; }
 }
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
