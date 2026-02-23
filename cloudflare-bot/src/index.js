@@ -1105,15 +1105,15 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
 
       const ext = filePath.split('.').pop()?.toLowerCase();
       const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
-      // Skip if not a recognizable image format (e.g. mp4 animation without thumbnail)
-      if (!IMAGE_EXTS.includes(ext)) {
-        // can't analyze this file as image — leave responseText null
-      } else {
+      const isImageExt = IMAGE_EXTS.includes(ext);
+      // For gif animations stored as mp4 (no image ext): Gemini supports video/mp4 inline
+      const isMp4Anim = isGifType && !isImageExt;
+
+      if (isImageExt) {
         const mimeType = ext === 'gif' ? 'image/gif'
           : ext === 'png' ? 'image/png'
           : ext === 'webp' ? 'image/webp'
           : 'image/jpeg';
-
         if (provider === 'google') {
           const base64 = await fetchBase64(imgUrl);
           responseText = await callGemini(prompt, base64, env, mimeType);
@@ -1126,6 +1126,10 @@ async function analyzeAndPatch(parsed, notionPageId, env) {
             ]
           }], env);
         }
+      } else if (isMp4Anim && provider === 'google') {
+        // Gemini supports video/mp4 — send animation directly for analysis
+        const base64 = await fetchBase64(imgUrl);
+        responseText = await callGemini(prompt, base64, env, 'video/mp4');
       }
     }
   }
