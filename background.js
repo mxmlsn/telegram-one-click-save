@@ -142,13 +142,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   try {
+    console.log('[TG Saver] Context menu:', { srcUrl: info.srcUrl, tabUrl: tab.url, isSvg: isSvgUrl(tab.url), selectionText: !!info.selectionText, linkUrl: info.linkUrl });
     if (isPdfUrl(tab.url)) {
       await sendPdf(tab.url, tab.url, settings, tab.id, selectedTag);
+    } else if (isSvgUrl(tab.url) && !info.selectionText) {
+      // SVG opened as standalone page — always send as image regardless of srcUrl
+      console.log('[TG Saver] SVG standalone page, sending tab.url as image');
+      await sendImage(tab.url, tab.url, settings, tab.id, selectedTag);
     } else if (info.srcUrl) {
       await sendImage(info.srcUrl, tab.url, settings, tab.id, selectedTag);
-    } else if (!info.srcUrl && isSvgUrl(tab.url)) {
-      // SVG opened as standalone page — no srcUrl from Chrome, use tab URL directly
-      await sendImage(tab.url, tab.url, settings, tab.id, selectedTag);
     } else if (info.selectionText) {
       await sendQuote(info.selectionText, tab.url, settings, tab.id, selectedTag);
     } else if (info.linkUrl) {
