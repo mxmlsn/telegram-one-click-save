@@ -614,16 +614,17 @@
       background: var(--card-bg);
       cursor: pointer;
     }
-    /* The "sheet" container — limits max size */
+    /* The "sheet" container — container query context so children scale with width */
     .doc-sheet-wrap {
       width: 80%;
       max-width: 180px;
+      container-type: inline-size;
     }
     /* The colored rectangle that looks like a file sheet */
     .doc-sheet {
       position: relative;
       border-radius: 20px 0 20px 20px;
-      padding: 14px 14px 14px 14px;
+      padding: 10cqi 10cqi 10cqi 10cqi;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -631,8 +632,7 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Folded corner via pseudo-elements on doc-sheet itself — guaranteed inside overflow:hidden */
-    /* ::before = dark bg triangle (top-right), ::after = white fold highlight */
+    /* Folded corner via pseudo-elements — always clipped by overflow:hidden */
     .doc-sheet::before {
       content: '';
       position: absolute;
@@ -657,17 +657,20 @@
       pointer-events: none;
       z-index: 1;
     }
+    /* Texts scale with container width via cqi */
     .doc-sheet-ext {
       font-family: 'Anybody', sans-serif;
-      font-size: 52px;
+      font-size: 28cqi;
       font-weight: 400;
       color: rgba(255,255,255,0.95);
       line-height: 1;
       font-variation-settings: 'wdth' 100;
+      position: relative;
+      z-index: 2;
     }
     .doc-sheet-name {
       font-family: Arial, sans-serif;
-      font-size: 32px;
+      font-size: 17cqi;
       color: rgba(255,255,255,0.85);
       line-height: 1.3;
       overflow: hidden;
@@ -676,8 +679,10 @@
       line-clamp: 2;
       -webkit-box-orient: vertical;
       word-break: break-all;
+      position: relative;
+      z-index: 2;
     }
-    /* tgpost inline document */
+    /* tgpost inline document — just set a smaller wrap width, fonts auto-scale */
     .tgpost-document {
       display: flex;
       align-items: center;
@@ -686,25 +691,13 @@
       cursor: pointer;
     }
     .tgpost-document .doc-sheet-wrap {
-      width: 52px;
-      max-width: 52px;
+      width: 60px;
+      max-width: 60px;
     }
-    .tgpost-document .doc-sheet-ext {
-      font-size: 20px;
-    }
-    .tgpost-document .doc-sheet-name {
-      font-size: 14px;
-    }
-    /* album document item */
+    /* album document item — same, just smaller wrap */
     .album-doc-icon .doc-sheet-wrap {
-      width: 44px;
-      max-width: 44px;
-    }
-    .album-doc-icon .doc-sheet-ext {
-      font-size: 18px;
-    }
-    .album-doc-icon .doc-sheet-name {
-      font-size: 13px;
+      width: 50px;
+      max-width: 50px;
     }
     /* Standalone TG video card (no text) */
     .card-tgvideo {
