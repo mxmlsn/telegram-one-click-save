@@ -58,6 +58,20 @@ const ToastState = window.__TG_ToastState;
 // ─── Message Listener ───────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // SVG/XML pages have no document.body — skip toast, auto-resolve tag selection
+  if (!document.body) {
+    if (message.action === 'preShowToast' || message.action === 'showTagSelection') {
+      chrome.runtime.sendMessage({
+        action: 'tagSelected',
+        requestId: message.requestId,
+        selectedTag: null
+      });
+      sendResponse({ received: true });
+      return true;
+    }
+    return;
+  }
+
   if (message.action === 'showToast') {
     showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
