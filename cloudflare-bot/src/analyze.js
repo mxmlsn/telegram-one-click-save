@@ -219,6 +219,26 @@ export async function analyzeAndPatch(parsed, notionPageId, env) {
       } else if (isMp4Anim && provider === 'google') {
         const base64 = await fetchBase64(imgUrl);
         responseText = await callGemini(prompt, base64, env, 'video/mp4');
+      } else if (ext === 'svg') {
+        // SVG without thumbnail: send as text to AI for analysis
+        try {
+          const svgRes = await fetch(imgUrl);
+          if (svgRes.ok) {
+            const svgText = await svgRes.text();
+            if (svgText.length > 50 && svgText.length < 50000) {
+              const svgPrompt = `${prompt}\n\nSVG source code:\n${svgText.slice(0, 10000)}`;
+              if (provider === 'google') {
+                responseText = await callGemini(svgPrompt, null, env);
+              } else {
+                responseText = await callAnthropic(
+                  [{ role: 'user', content: svgPrompt }], env
+                );
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('SVG text analysis failed:', e.message);
+        }
       }
     }
   }
