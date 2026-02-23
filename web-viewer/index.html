@@ -635,16 +635,16 @@
       overflow: hidden;
       clip-path: polygon(0% 0%, 70% 0%, 100% 30%, 100% 100%, 0% 100%);
     }
-    /* White fold triangle sits where the cut corner was */
+    /* White fold triangle — fills exactly the cut-off corner area */
     .doc-sheet::after {
       content: '';
       position: absolute;
       top: 0;
       right: 0;
       width: 30%;
-      aspect-ratio: 0.7 / 1;
+      aspect-ratio: 1;
       background: rgba(255,255,255,0.4);
-      clip-path: polygon(100% 0%, 100% 100%, 0% 100%);
+      clip-path: polygon(0% 100%, 100% 0%, 100% 100%);
       pointer-events: none;
       z-index: 2;
     }
