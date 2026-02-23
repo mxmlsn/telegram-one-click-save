@@ -1288,7 +1288,9 @@ function renderCard(item) {
     const ext = item.content.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
     if (ext === 'gif') {
       imgUrl = item.content; // animated GIF URL takes priority
-    } else if (!imgUrl && ['jpg', 'jpeg', 'png', 'webp', 'svg'].includes(ext)) {
+    } else if (ext === 'svg') {
+      imgUrl = item.content; // SVG original takes priority (like GIF)
+    } else if (!imgUrl && ['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
       imgUrl = item.content; // fallback for other formats only if no TG image
     }
   }
@@ -1749,7 +1751,9 @@ function renderCard(item) {
         ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(imgDomain)}</button>`
         : '';
       const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
-      return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
+      const isSvgCard = imgUrl.split('?')[0].split('#')[0].toLowerCase().endsWith('.svg');
+      const svgClass = isSvgCard ? ' card-svg' : '';
+      return `<div class="card card-image${svgClass}" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
         ${pendingDot}
         <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
         <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>

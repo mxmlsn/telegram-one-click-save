@@ -146,6 +146,26 @@ export async function sendDocument(blob, caption, settings, originalUrl) {
   return response.json();
 }
 
+// Send document silently (no notification) — for sending original file alongside preview
+export async function sendDocumentSilent(blob, filename, settings) {
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', settings.chatId);
+    formData.append('document', blob, filename);
+    formData.append('disable_notification', 'true');
+
+    const response = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendDocument`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
+
 // Send animation (GIF with inline preview)
 export async function sendAnimation(blob, caption, settings) {
   const formData = new FormData();

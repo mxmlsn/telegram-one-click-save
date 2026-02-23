@@ -14,9 +14,21 @@ export function isPdfUrl(url) {
   return cleanUrl.endsWith('.pdf');
 }
 
+// Check if URL points to an SVG image
+export function isSvgUrl(url) {
+  if (!url) return false;
+  const cleanUrl = url.split('?')[0].split('#')[0].toLowerCase();
+  return cleanUrl.endsWith('.svg');
+}
+
 // Check if a blob is a GIF by MIME type
 export function isGifBlob(blob) {
   return blob && blob.type === 'image/gif';
+}
+
+// Check if a blob is an SVG by MIME type
+export function isSvgBlob(blob) {
+  return blob && blob.type === 'image/svg+xml';
 }
 
 // Detect media under cursor via content script injection
@@ -76,7 +88,7 @@ export function detectMediaScript(isInstagram) {
 }
 
 // Fetch image blob with screenshot fallback.
-// Validates content-type to avoid sending SVG/HTML to Telegram (IMAGE_PROCESS_FAILED).
+// Validates content-type to avoid sending HTML error pages to Telegram.
 export async function fetchImageBlob(imageUrl, tabId) {
   try {
     const response = await fetch(imageUrl);
@@ -85,8 +97,8 @@ export async function fetchImageBlob(imageUrl, tabId) {
     const blob = await response.blob();
     const type = blob.type || response.headers.get('content-type') || '';
 
-    // Telegram sendPhoto can't process SVG, HTML error pages, or XML
-    if (type.includes('svg') || type.includes('html') || type.includes('xml')) {
+    // Telegram sendPhoto can't process HTML error pages or XML
+    if (type.includes('html') || (type.includes('xml') && !type.includes('svg'))) {
       throw new Error('Unsupported image format: ' + type);
     }
 

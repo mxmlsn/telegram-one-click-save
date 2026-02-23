@@ -1,11 +1,11 @@
 // Unified send orchestration
 // Each function takes selectedTag as a parameter (already resolved by context menu handler)
 
-import { sendPhoto, sendPhotoSilent, sendDocument, sendAnimation, sendTextMessage } from '../api/telegram.js';
+import { sendPhoto, sendPhotoSilent, sendDocument, sendDocumentSilent, sendAnimation, sendTextMessage } from '../api/telegram.js';
 import { saveToNotion, patchNotionWithAI } from '../api/notion.js';
 import { analyzeWithAI } from '../ai/analyze.js';
 import { buildCaption } from './caption.js';
-import { isGifUrl, isGifBlob, isPdfUrl, fetchImageBlob, detectMediaScript } from './media.js';
+import { isGifUrl, isGifBlob, isSvgUrl, isSvgBlob, isPdfUrl, fetchImageBlob, detectMediaScript } from './media.js';
 
 // Helper: show toast on tab
 async function showToast(tabId, state, message) {
@@ -38,12 +38,21 @@ export async function sendImage(imageUrl, pageUrl, settings, tabId, selectedTag)
   const { blob, isScreenshot } = await fetchImageBlob(imageUrl, tabId);
 
   const isGif = !isScreenshot && (isGifUrl(imageUrl) || isGifBlob(blob));
+  const isSvg = !isScreenshot && (isSvgUrl(imageUrl) || isSvgBlob(blob));
+
   const caption = buildCaption(pageUrl, isGif ? settings.tagGif : settings.tagImage, '', settings, selectedTag);
 
   let fileId = null;
   if (isGif) {
     const result = await sendAnimation(blob, caption, settings);
     fileId = result?.fileId || null;
+  } else if (isSvg) {
+    // SVG: rasterize to PNG for TG preview, send original SVG as document
+    const pngBlob = await rasterizeSvg(blob, tabId);
+    const result = await sendPhoto(pngBlob, caption, settings);
+    fileId = result?.fileId || null;
+    // Send original SVG file silently (best-effort)
+    sendDocumentSilent(blob, 'image.svg', settings);
   } else if (settings.imageCompression || isScreenshot) {
     const result = await sendPhoto(blob, caption, settings);
     fileId = result?.fileId || null;
@@ -52,14 +61,35 @@ export async function sendImage(imageUrl, pageUrl, settings, tabId, selectedTag)
   }
 
   const notionData = { type: isGif ? 'gif' : 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name };
-  if (isGif) notionData.content = imageUrl; // Store original URL for viewer
+  if (isGif || isSvg) notionData.content = imageUrl; // Store original URL for viewer
   const notionPageId = await saveToNotion(notionData, settings);
 
   const aiItem = { type: isGif ? 'gif' : 'image', sourceUrl: pageUrl, fileId };
-  if (isGif) aiItem.originalImageUrl = imageUrl;
+  if (isGif || isSvg) aiItem.originalImageUrl = imageUrl;
   fireAI(aiItem, settings, notionPageId);
 
   if (tabId) await showToast(tabId, 'success', 'Success');
+}
+
+// Rasterize SVG blob to PNG via OffscreenCanvas (works in service workers)
+async function rasterizeSvg(svgBlob, tabId) {
+  try {
+    const bitmap = await createImageBitmap(svgBlob);
+    if (bitmap.width === 0 || bitmap.height === 0) throw new Error('SVG has no dimensions');
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+    const pngBlob = await canvas.convertToBlob({ type: 'image/png' });
+    if (pngBlob.size < 1024) throw new Error('Rasterized PNG too small');
+    return pngBlob;
+  } catch (e) {
+    console.warn('[TG Saver] SVG rasterization failed, using screenshot:', e);
+    if (tabId) {
+      const dataUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+      return await fetch(dataUrl).then(r => r.blob());
+    }
+    throw e;
+  }
 }
 
 // ─── Send Quote ─────────────────────────────────────────────────────────────
