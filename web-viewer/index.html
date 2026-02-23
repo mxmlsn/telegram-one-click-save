@@ -646,10 +646,13 @@
       width: 100%;
       height: 100%;
     }
-    /* card-document full (no thumb): SVG contains all text, fills card */
+    /* card-document full (no thumb): SVG fills most of the square card.
+       Icon viewBox 80.85×101.37, aspect ~0.798.
+       width:60% of the square card ≈ 75% of card height × 0.8 aspect. */
     .card-document .doc-file-icon {
-      width: 57%;
+      width: 60%;
       height: auto;
+      aspect-ratio: 80.85 / 101.37;
     }
     .doc-file-ext {
       position: absolute;

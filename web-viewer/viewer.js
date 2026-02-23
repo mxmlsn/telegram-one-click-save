@@ -72,18 +72,19 @@ function svgEscape(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 function makeFileIconSvg(color, ext, title) {
-  // When ext+title provided, render them as SVG text (scales perfectly with the icon)
+  // ext: top-left inside the shape; title: bottom-left inside the shape
+  // viewBox stays 80.85×101.37 — both texts are clipped/fit within the shape
   const extText = ext
     ? `<text x="8.5" y="21" font-family="Anybody, sans-serif" font-size="12.9" font-weight="400" fill="white">.${svgEscape(ext)}</text>`
     : '';
-  const titleLines = title ? splitSvgTitle(title, 9) : [];
-  const titleY0 = 108;
-  const titleLineH = 11.2;
-  const titleText = titleLines.slice(0, 3).map((line, i) =>
-    `<text x="8.5" y="${titleY0 + i * titleLineH}" font-family="Arial, sans-serif" font-size="8.61" font-weight="400" fill="white" fill-opacity="0.6">${svgEscape(line)}</text>`
-  ).join('');
-  const totalH = title ? 140 : 101.37;
-  return `<svg class="doc-file-body" width="81" height="${Math.round(totalH)}" viewBox="0 0 80.85 ${totalH}" fill="none"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="${color}"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/>${extText}${titleText}</svg>`;
+  // Title lines anchored to the bottom of the shape (baseline of last line = ~93)
+  const titleLines = title ? splitSvgTitle(title, 10) : [];
+  const lineH = 10.5;
+  const bottomY = 93;
+  const titleText = titleLines.slice(0, 3).reverse().map((line, i) =>
+    `<text x="8.5" y="${bottomY - i * lineH}" font-family="Arial, sans-serif" font-size="8.61" font-weight="400" fill="white" fill-opacity="0.6">${svgEscape(line)}</text>`
+  ).reverse().join('');
+  return `<svg class="doc-file-body" viewBox="0 0 80.85 101.37" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="${color}"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/>${extText}${titleText}</svg>`;
 }
 // Split title into lines of ~maxChars each at word boundaries
 function splitSvgTitle(title, maxChars) {
