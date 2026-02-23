@@ -632,7 +632,7 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Folded corner: ::before = full square white dimmed (the "back" of the fold), ::after = brighter fold triangle */
+    /* Folded corner: ::before = full square bg color (hides top-right), ::after = white fold triangle */
     .doc-sheet::before {
       content: '';
       position: absolute;
@@ -640,7 +640,7 @@
       right: 0;
       width: 30%;
       aspect-ratio: 1;
-      background: rgba(255,255,255,0.15);
+      background: var(--card-bg, #0d1a24);
       pointer-events: none;
       z-index: 1;
     }
