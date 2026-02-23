@@ -71,37 +71,20 @@ function getFileIconColor(ext) {
 function svgEscape(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-function makeFileIconSvg(color, ext, title) {
-  // ext: top-left inside the shape; title: bottom-left inside the shape
-  // viewBox stays 80.85×101.37 — both texts are clipped/fit within the shape
-  const extText = ext
-    ? `<text x="8.5" y="21" font-family="Anybody, sans-serif" font-size="12.9" font-weight="400" fill="white">.${svgEscape(ext)}</text>`
-    : '';
-  // Title lines anchored to the bottom of the shape (baseline of last line = ~93)
-  const titleLines = title ? splitSvgTitle(title, 10) : [];
-  const lineH = 10.5;
-  const bottomY = 93;
-  const titleText = titleLines.slice(0, 3).reverse().map((line, i) =>
-    `<text x="8.5" y="${bottomY - i * lineH}" font-family="Arial, sans-serif" font-size="8.61" font-weight="400" fill="white" fill-opacity="0.6">${svgEscape(line)}</text>`
-  ).reverse().join('');
-  return `<svg class="doc-file-body" viewBox="0 0 80.85 101.37" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 8.6C0 3.85 3.85 0 8.6 0H53.1L80.85 31.77V92.76C80.85 97.52 77 101.37 72.24 101.37H8.6C3.86 101.37 0 97.52 0 92.76V8.6Z" fill="${color}"/><path opacity="0.9" d="M53.1 0L80.85 31.77H56.35C54.6 31.77 53.15 30.32 53.15 28.54V0Z" fill="white" fill-opacity="0.55"/>${extText}${titleText}</svg>`;
-}
-// Split title into lines of ~maxChars each at word boundaries
-function splitSvgTitle(title, maxChars) {
-  const words = title.split(' ');
-  const lines = [];
-  let current = '';
-  for (const word of words) {
-    if (!current) { current = word; continue; }
-    if ((current + ' ' + word).length <= maxChars) {
-      current += ' ' + word;
-    } else {
-      lines.push(current);
-      current = word;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
+// Corner SVG — simulates a folded top-right corner on a file sheet
+const DOC_CORNER_SVG = `<svg class="doc-corner" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L28 28 L28 0 Z" fill="rgba(0,0,0,0.25)"/></svg>`;
+
+// Build the HTML for a new-style file sheet card (rect + ext + name + corner)
+function makeFileSheetHtml(color, ext, name) {
+  const extHtml = ext ? `<span class="doc-sheet-ext">.${svgEscape(ext)}</span>` : '';
+  const nameHtml = name ? `<span class="doc-sheet-name">${svgEscape(name)}</span>` : '';
+  return `<div class="doc-sheet-wrap">
+    <div class="doc-sheet" style="background:${color}">
+      ${DOC_CORNER_SVG}
+      ${extHtml}
+      ${nameHtml}
+    </div>
+  </div>`;
 }
 const TG_ICON_SVG = `<svg width="12" height="10" viewBox="0 0 12.3848 10.2636" fill="none" style="flex-shrink:0"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.85139 4.41839L7.50196 1.55371C10.669 0.23644 11.327 0.00763 11.756 0.00008C11.8503-0.00158 12.0612 0.02179 12.1979 0.13266C12.3133 0.22627 12.345 0.35276 12.3602 0.44148C12.3754 0.53021 12.3943 0.73244 12.3793 0.89044C12.2076 2.69363 11.465 7.06966 11.0872 9.0893C10.9274 9.94392 10.6128 10.2305 10.3079 10.2585C9.64564 10.3194 9.14274 9.8208 8.50131 9.40036L5.95631 7.69083C4.83037 6.94889 5.56027 6.54108 6.20195 5.87463C6.36987 5.70015 9.28776 3.04613 9.34421 2.80537C9.35105 2.77526 9.35782 2.66305 9.29115 2.60375C9.22449 2.54445 9.12602 2.56497 9.05502 2.58087C8.95437 2.60372 7.35095 3.66352 4.24478 5.7603C3.78965 6.07284 3.37739 6.22512 3.00806 6.21714C2.60087 6.20834 1.81763 5.98692 1.23536 5.79763C0.521177 5.56549-0.0464449 5.44274 0.00300277 5.04849C0.0287301 4.84315 0.311526 4.63315 0.851367 4.41844Z" fill="white" fill-opacity="0.3"/></svg>`;
 
@@ -1703,7 +1686,6 @@ function renderCard(item) {
   if (effectiveType === 'document') {
     const docFileName = aiData.fileName || item.content || 'file';
     const docExt = docFileName.includes('.') ? docFileName.split('.').pop() : '';
-    const docExtUpper = docExt.toUpperCase();
     const docBaseName = docExt ? docFileName.slice(0, -(docExt.length + 1)) : docFileName;
     const iconColor = getFileIconColor(docExt);
     const storageUrl = aiData.storageUrl || '';
@@ -1711,24 +1693,11 @@ function renderCard(item) {
     const docOpenUrl = storageUrl || docSourceUrl;
     const docAction = docOpenUrl ? 'open' : (item.fileId ? 'open-file' : '');
     const docActionUrl = docOpenUrl || '';
-    // For the full card (no thumb): embed ext + title inside SVG so they scale automatically
-    const docFileIconSvg = imgUrl
-      ? makeFileIconSvg(iconColor)
-      : makeFileIconSvg(iconColor, docExt.toLowerCase(), docBaseName);
     const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
-    const thumbHtml = imgUrl
-      ? `<div class="doc-thumb-wrap"><img class="doc-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>`
-      : '';
-    // Tinted dark background based on icon color
-    const bgStyle = imgUrl ? '' : ` style="background:color-mix(in srgb, ${iconColor} 18%, #0d1a24)"`;
-    return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}${bgStyle}>
+    const fileSheetHtml = makeFileSheetHtml(iconColor, docExt.toLowerCase(), docBaseName);
+    return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
       ${pendingDot}
-      ${thumbHtml}
-      <div class="doc-file-icon${imgUrl ? ' doc-file-icon-small' : ''}">
-        ${docFileIconSvg}
-        ${imgUrl && docExtUpper ? `<span class="doc-file-ext">.${docExt.toLowerCase()}</span>` : ''}
-      </div>
-      ${imgUrl ? `<div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>` : ''}
+      ${fileSheetHtml}
     </div>`;
   }
 
@@ -1909,12 +1878,11 @@ function renderCard(item) {
         if (m.mediaType === 'document') {
           const docFname = m.fileName || m.fileContent || '';
           const docExt = docFname.includes('.') ? docFname.split('.').pop() : '';
-          const docExtUpper = docExt.toUpperCase();
+          const docBaseName = docExt ? docFname.slice(0, -(docExt.length + 1)) : docFname;
           const docColor = getFileIconColor(docExt);
-          const docSvg = makeFileIconSvg(docColor);
           const docStorageUrl = m.storageUrl || aiData.storageUrl || '';
           const docAction = docStorageUrl ? `data-action="open" data-url="${escapeHtml(docStorageUrl)}"` : (m.fileId ? `data-action="open-file" data-file-id="${escapeHtml(m.fileId)}"` : '');
-          return `<div class="tgpost-album-item is-document" ${docAction}><div class="tgpost-album-img tgpost-album-doc"><div class="album-doc-icon">${docSvg}${docExtUpper ? `<span class="doc-file-ext album-doc-ext">.${escapeHtml(docExtUpper)}</span>` : ''}</div>${docFname ? `<div class="album-doc-name">${escapeHtml(docFname)}</div>` : ''}</div></div>`;
+          return `<div class="tgpost-album-item is-document" ${docAction}><div class="tgpost-album-img tgpost-album-doc"><div class="album-doc-icon">${makeFileSheetHtml(docColor, docExt.toLowerCase(), docBaseName)}</div></div></div>`;
         }
         if (resolvedUrl) {
           const isHeicAlbum = /\.heic$/i.test(m.fileName || '');
@@ -1996,18 +1964,13 @@ function renderCard(item) {
     } else if (aiData.mediaType === 'document' && !imgUrl) {
       const docFileName = aiData.fileName || item.content || 'file';
       const docExt = docFileName.includes('.') ? docFileName.split('.').pop() : '';
-      const docExtUpper = docExt.toUpperCase();
+      const docBaseName = docExt ? docFileName.slice(0, -(docExt.length + 1)) : docFileName;
       const docStorageUrl = aiData.storageUrl || '';
       const docOpenUrl2 = docStorageUrl || sourceUrl;
       const docAction = docOpenUrl2 ? `data-action="open" data-url="${escapeHtml(docOpenUrl2)}"` : (item.fileId ? `data-action="open-file" data-file-id="${escapeHtml(item.fileId)}"` : '');
       const docIconColor = getFileIconColor(docExt);
-      const docFileIconSvg = makeFileIconSvg(docIconColor);
       mediaHtml = `<div class="tgpost-document" ${docAction}>
-        <div class="doc-file-icon">
-          ${docFileIconSvg}
-          ${docExtUpper ? `<span class="doc-file-ext">.${escapeHtml(docExtUpper)}</span>` : ''}
-        </div>
-        <div class="doc-file-name" title="${escapeHtml(docFileName)}">${escapeHtml(docFileName)}</div>
+        ${makeFileSheetHtml(docIconColor, docExt.toLowerCase(), docBaseName)}
       </div>`;
     } else if (tgYtMatch) {
       // YouTube — glow-wrap screenshot (uses imgUrl from TG preview or YT thumbnail)
