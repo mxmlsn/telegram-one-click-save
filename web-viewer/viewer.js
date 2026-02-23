@@ -258,12 +258,14 @@ async function resolveRemainingImages(items, fileCache) {
   }
 
   const toFetchIds = [];
-  // Apply cached URLs first
+  // Apply cached URLs first (validate URL has actual file_path, not just bot prefix)
+  const validTgUrl = u => u && /\/bot[^/]+\/.+\/.+/.test(u);
   for (const fid of allFileIds) {
     const cached = fileCache[fid];
-    if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
+    if (cached && (now - cached.ts < FILE_CACHE_TTL) && validTgUrl(cached.url)) {
       STATE.imageMap[fid] = cached.url;
     } else {
+      if (cached && !validTgUrl(cached.url)) delete fileCache[fid]; // purge bad cache entry
       toFetchIds.push(fid);
     }
   }
@@ -298,6 +300,12 @@ async function resolveRemainingImages(items, fileCache) {
     const albumsToRepatch = items.filter(it =>
       it._resolvedImg && (it.fileIds?.length > 1 || it.albumMedia?.length > 1) && batch.some(fid => it.fileIds.includes(fid))
     );
+    // Proxy SVGs in this batch before patching cards (so <img> gets blob URL, not raw TG URL)
+    const svgInBatch = [...new Set([...resolved, ...albumsToRepatch])].filter(it =>
+      /\.svg$/i.test(it.ai_data?.fileName || '') ||
+      it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
+    );
+    if (svgInBatch.length) await proxySvgItems(svgInBatch, null);
     const toPatch = [...new Set([...resolved, ...albumsToRepatch])];
     if (toPatch.length) patchCardImages(toPatch);
     if (i + BATCH < toFetchIds.length) await new Promise(r => setTimeout(r, 200));
@@ -366,33 +374,8 @@ async function resolveRemainingImages(items, fileCache) {
     })).then(converted => patchCardImages(converted));
   }
 
-  // SVG proxy: same as in resolveImagesBatch
-  const svgStandalone2 = items.filter(it => /\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg);
-  const svgAlbumParents2 = items.filter(it =>
-    it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
-  );
-  const svgItemsAll2 = [...new Set([...svgStandalone2, ...svgAlbumParents2])];
-  if (svgItemsAll2.length > 0) {
-    await Promise.all(svgItemsAll2.map(async it => {
-      if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
-        const blobUrl = await proxySvgFile(it._resolvedImg);
-        if (blobUrl) {
-          it._resolvedImg = blobUrl;
-          STATE.imageMap[it.fileId] = blobUrl;
-        }
-      }
-      if (it.albumMedia) {
-        for (const m of it.albumMedia) {
-          if (/\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId]) {
-            const blobUrl = await proxySvgFile(STATE.imageMap[m.fileId]);
-            if (blobUrl) { STATE.imageMap[m.fileId] = blobUrl; }
-          }
-        }
-      }
-      return it;
-    }));
-    patchCardImages(svgItemsAll2);
-  }
+  // SVG proxy: convert all resolved SVG URLs to blob URLs
+  await proxySvgItems(items, null);
 }
 
 // ─── Notion fetch ─────────────────────────────────────────────────────────────
@@ -598,14 +581,13 @@ async function resolveFileId(tgToken, fileId) {
 // Telegram may serve SVGs with wrong content-type, blocking <img> rendering
 async function proxySvgFile(tgFileUrl) {
   try {
-    // Skip if already converted to blob URL or not a TG file URL
-    if (!tgFileUrl || tgFileUrl.startsWith('blob:') || !tgFileUrl.includes('api.telegram.org/file/')) {
-      console.log('[SVG proxy] skip:', tgFileUrl?.slice(0, 60));
-      return null;
-    }
+    // Skip if already converted to blob URL or not a valid TG file URL with a real path
+    if (!tgFileUrl || tgFileUrl.startsWith('blob:')) return null;
+    // Must be a TG file URL with actual file_path after the bot token segment
+    const match = tgFileUrl.match(/^https:\/\/api\.telegram\.org\/file\/bot[^/]+\/(.+)/);
+    if (!match) return null;
+    const filePath = '/' + match[1];
     const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
-    const filePath = tgFileUrl.replace(/^https:\/\/api\.telegram\.org\/file\/bot[^/]+/, '');
-    console.log('[SVG proxy] fetching:', filePath);
     const res = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -618,16 +600,47 @@ async function proxySvgFile(tgFileUrl) {
         contentType: 'image/svg+xml'
       })
     });
-    if (!res.ok) { console.warn('[SVG proxy] bad status:', res.status); return null; }
+    if (!res.ok) return null;
     const buf = await res.arrayBuffer();
-    console.log('[SVG proxy] got', buf.byteLength, 'bytes');
-    if (buf.byteLength < 50) return null; // too small to be valid SVG
+    if (buf.byteLength < 50) return null;
     const blob = new Blob([buf], { type: 'image/svg+xml' });
     return URL.createObjectURL(blob);
   } catch (e) {
     console.warn('[Viewer] SVG proxy failed:', e);
     return null;
   }
+}
+
+// Proxy all SVG entries (standalone + albumMedia) for a set of items, then re-render
+async function proxySvgItems(items, mapObj) {
+  const svgStandalone = items.filter(it => /\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg);
+  const svgAlbumParents = items.filter(it =>
+    it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
+  );
+  const svgItems = [...new Set([...svgStandalone, ...svgAlbumParents])];
+  if (!svgItems.length) return;
+  await Promise.all(svgItems.map(async it => {
+    if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
+      const blobUrl = await proxySvgFile(it._resolvedImg);
+      if (blobUrl) {
+        it._resolvedImg = blobUrl;
+        if (mapObj) mapObj[it.fileId] = blobUrl;
+        STATE.imageMap[it.fileId] = blobUrl;
+      }
+    }
+    if (it.albumMedia) {
+      for (const m of it.albumMedia) {
+        if (/\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId]) {
+          const blobUrl = await proxySvgFile(STATE.imageMap[m.fileId]);
+          if (blobUrl) {
+            if (mapObj) mapObj[m.fileId] = blobUrl;
+            STATE.imageMap[m.fileId] = blobUrl;
+          }
+        }
+      }
+    }
+  }));
+  patchCardImages(svgItems);
 }
 
 async function maybeConvertHeic(url, fileName) {
@@ -696,11 +709,13 @@ async function resolveImagesBatch(items, tgToken, cache) {
   }
 
   const toFetchIds = [];
+  const validTgUrl = u => u && /\/bot[^/]+\/.+\/.+/.test(u);
   for (const fid of allFileIds) {
     const cached = cache[fid];
-    if (cached && (now - cached.ts < FILE_CACHE_TTL)) {
+    if (cached && (now - cached.ts < FILE_CACHE_TTL) && validTgUrl(cached.url)) {
       map[fid] = cached.url;
     } else {
+      if (cached && !validTgUrl(cached.url)) delete cache[fid];
       toFetchIds.push(fid);
     }
   }
@@ -798,43 +813,7 @@ async function resolveImagesBatch(items, tgToken, cache) {
 
   // SVG proxy: Telegram may serve SVGs with wrong content-type, so fetch through proxy.
   // Awaited (not fire-and-forget) so album cards render with correct blob URLs on first paint.
-  const svgStandalone = items.filter(it => /\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg);
-  const svgAlbumParents = items.filter(it =>
-    it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
-  );
-  const svgItemsAll = [...new Set([...svgStandalone, ...svgAlbumParents])];
-  console.log('[SVG] resolveImagesBatch: standalone=%d, albumParents=%d, total=%d', svgStandalone.length, svgAlbumParents.length, svgItemsAll.length);
-  if (svgItemsAll.length > 0) {
-    await Promise.all(svgItemsAll.map(async it => {
-      // Convert standalone SVG
-      if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
-        console.log('[SVG] standalone proxy for fileId:', it.fileId, 'url:', it._resolvedImg?.slice(0, 80));
-        const blobUrl = await proxySvgFile(it._resolvedImg);
-        if (blobUrl) {
-          it._resolvedImg = blobUrl;
-          map[it.fileId] = blobUrl;
-          STATE.imageMap[it.fileId] = blobUrl;
-        }
-      }
-      // Convert SVG entries inside albumMedia
-      if (it.albumMedia) {
-        console.log('[SVG] album has', it.albumMedia.length, 'entries, SVGs:', it.albumMedia.filter(m => /\.svg$/i.test(m.fileName || '')).length);
-        for (const m of it.albumMedia) {
-          if (/\.svg$/i.test(m.fileName || '')) {
-            console.log('[SVG] album entry fileId:', m.fileId, 'fileName:', m.fileName, 'resolved:', !!STATE.imageMap[m.fileId], 'url:', (STATE.imageMap[m.fileId] || '').slice(0, 80));
-          }
-          if (/\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId]) {
-            const blobUrl = await proxySvgFile(STATE.imageMap[m.fileId]);
-            console.log('[SVG] album proxy result:', m.fileId, blobUrl ? 'OK' : 'FAILED');
-            if (blobUrl) {
-              map[m.fileId] = blobUrl;
-              STATE.imageMap[m.fileId] = blobUrl;
-            }
-          }
-        }
-      }
-    }));
-  }
+  await proxySvgItems(items, map);
 
   return map;
 }
@@ -1991,7 +1970,6 @@ function renderCard(item) {
       } else {
       const albumItems = albumMedia.map(m => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
-        if (/\.svg$/i.test(m.fileName || '')) console.log('[SVG render] album entry:', m.fileId, 'fileName:', m.fileName, 'resolvedUrl:', resolvedUrl?.slice(0, 80), 'isBlob:', resolvedUrl?.startsWith('blob:'));
         if (m.mediaType === 'pdf') {
           const pdfFid = m.pdfFileId || m.fileId;
           const hasThumbnail = m.fileId && m.pdfFileId && m.fileId !== m.pdfFileId;
