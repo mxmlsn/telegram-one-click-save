@@ -632,20 +632,7 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Folded corner via pseudo-elements — always clipped by overflow:hidden */
-    /* ::before fills the whole corner square with bg color */
-    .doc-sheet::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 30%;
-      aspect-ratio: 1;
-      background: var(--card-bg, #0d1a24);
-      pointer-events: none;
-      z-index: 1;
-    }
-    /* ::after draws the white fold triangle on top */
+    /* Folded corner — single white semi-transparent triangle, sits on top of the sheet color */
     .doc-sheet::after {
       content: '';
       position: absolute;
@@ -653,10 +640,10 @@
       right: 0;
       width: 30%;
       aspect-ratio: 1;
-      background: rgba(255,255,255,0.55);
-      clip-path: polygon(0 0, 100% 100%, 0 100%);
+      background: rgba(255,255,255,0.25);
+      clip-path: polygon(0 0, 100% 0, 100% 100%);
       pointer-events: none;
-      z-index: 2;
+      z-index: 1;
     }
     /* Texts scale with container width via cqi */
     .doc-sheet-ext {
