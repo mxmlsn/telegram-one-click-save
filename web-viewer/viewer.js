@@ -1708,9 +1708,10 @@ function renderCard(item) {
     const rawTgLabel = aiData.channelTitle || forwardLabel || domain;
     const tgLabel = (rawTgLabel && rawTgLabel !== 'telegram' && !/^t\.me$/i.test(rawTgLabel)) ? rawTgLabel : '';
     // For document posts item.content is the filename — don't show it as message text
-    const textContent = (aiData.mediaType === 'document')
-      ? ''
-      : (item.content || '');
+    // Also suppress when item.content matches aiData.fileName (channel-forwarded docs)
+    const isDocumentContent = aiData.mediaType === 'document'
+      || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
+    const textContent = isDocumentContent ? '' : (item.content || '');
 
     // Short-circuit: single image tgpost with no text → render as plain card-image
     const albumMedia = item.albumMedia || [];
