@@ -636,12 +636,12 @@
       aspect-ratio: 0.8 / 1;
       overflow: hidden;
     }
-    /* Corner sits OUTSIDE doc-sheet (not clipped), positioned top-right of doc-sheet-wrap */
+    /* Corner sits OUTSIDE doc-sheet (not clipped), 1px overlap to kill subpixel gap */
     .doc-corner-wrap {
       position: absolute;
-      top: 0;
-      right: 0;
-      width: 30%;
+      top: -1px;
+      right: -1px;
+      width: calc(30% + 2px);
       aspect-ratio: 1;
       pointer-events: none;
     }
