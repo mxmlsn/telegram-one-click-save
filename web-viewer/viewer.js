@@ -2137,6 +2137,7 @@ function renderCard(item) {
 
   // ── GIF card ──
   if (item.type === 'gif' && imgUrl) {
+    console.log('[GIF card]', item.id, 'imgUrl:', imgUrl);
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const gifDomain = getDomain(sourceUrl);
     const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
@@ -2146,6 +2147,7 @@ function renderCard(item) {
     const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
     // Telegram stores animations as mp4 — use <video> instead of <img>
     const isMp4Gif = /\.mp4($|\?)/i.test(imgUrl);
+    console.log('[GIF card]', item.id, 'isMp4Gif:', isMp4Gif);
     const mediaEl = isMp4Gif
       ? `<video class="card-img" src="${escapeHtml(imgUrl)}" autoplay loop muted playsinline></video>`
       : `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">`;
