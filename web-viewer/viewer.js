@@ -265,10 +265,11 @@ async function resolveRemainingImages(items, fileCache) {
     if (cached && (now - cached.ts < FILE_CACHE_TTL) && validTgUrl(cached.url)) {
       STATE.imageMap[fid] = cached.url;
     } else {
-      if (cached && !validTgUrl(cached.url)) delete fileCache[fid]; // purge bad cache entry
+      if (cached && !validTgUrl(cached.url)) { console.log('[cache] PURGE bad URL fid=...%s url=%s', fid.slice(-20), cached?.url?.slice(0, 80)); delete fileCache[fid]; }
       toFetchIds.push(fid);
     }
   }
+  console.log('[resolveRemaining] cached=%d toFetch=%d', allFileIds.size - toFetchIds.length, toFetchIds.length);
 
   // Set _resolvedImg from cache
   const cachedItems = [];
@@ -540,6 +541,12 @@ function mergeMediaGroups(items) {
     if (item.albumMedia?.length > 1 && item.type !== 'tgpost') {
       item.type = 'tgpost';
     }
+    // Debug: log SVG albums
+    if (item.albumMedia?.length > 0) {
+      const svgs = item.albumMedia.filter(m => /\.svg$/i.test(m.fileName || ''));
+      if (svgs.length) console.log('[SVG] mergeMediaGroups: album with %d items, %d SVGs, fileIds=%s, svgFids=%s',
+        item.albumMedia.length, svgs.length, item.fileIds?.join(',')?.slice(0, 80), svgs.map(s => s.fileId.slice(-20)).join(','));
+    }
   }
   return result;
 }
@@ -570,23 +577,30 @@ async function resolveFileId(tgToken, fileId) {
   if (!fileId) return null;
   try {
     const res = await fetch(`https://api.telegram.org/bot${tgToken}/getFile?file_id=${fileId}`);
-    if (!res.ok) return null;
+    if (!res.ok) { console.log('[resolve] FAIL status=%d fid=%s', res.status, fileId.slice(-20)); return null; }
     const data = await res.json();
-    if (!data.ok || !data.result?.file_path) return null;
-    return `https://api.telegram.org/file/bot${tgToken}/${data.result.file_path}`;
-  } catch { return null; }
+    if (!data.ok || !data.result?.file_path) { console.log('[resolve] FAIL no file_path fid=%s', fileId.slice(-20)); return null; }
+    const url = `https://api.telegram.org/file/bot${tgToken}/${data.result.file_path}`;
+    console.log('[resolve] OK fid=...%s path=%s', fileId.slice(-20), data.result.file_path);
+    return url;
+  } catch (e) { console.log('[resolve] ERROR fid=%s %s', fileId.slice(-20), e.message); return null; }
 }
 
 // Fetch SVG file through CORS proxy and return a blob URL
 // Telegram may serve SVGs with wrong content-type, blocking <img> rendering
 async function proxySvgFile(tgFileUrl) {
   try {
-    // Skip if already converted to blob URL or not a valid TG file URL with a real path
-    if (!tgFileUrl || tgFileUrl.startsWith('blob:')) return null;
-    // Must be a TG file URL with actual file_path after the bot token segment
+    if (!tgFileUrl || tgFileUrl.startsWith('blob:')) {
+      console.log('[SVG] proxySvgFile SKIP: blob or empty', tgFileUrl?.slice(0, 80));
+      return null;
+    }
     const match = tgFileUrl.match(/^https:\/\/api\.telegram\.org\/file\/bot[^/]+\/(.+)/);
-    if (!match) return null;
+    if (!match) {
+      console.log('[SVG] proxySvgFile SKIP: no file_path in URL', tgFileUrl?.slice(0, 120));
+      return null;
+    }
     const filePath = '/' + match[1];
+    console.log('[SVG] proxySvgFile FETCHING:', filePath);
     const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
     const res = await fetch(proxyUrl, {
       method: 'POST',
@@ -600,13 +614,14 @@ async function proxySvgFile(tgFileUrl) {
         contentType: 'image/svg+xml'
       })
     });
-    if (!res.ok) return null;
+    if (!res.ok) { console.log('[SVG] proxySvgFile FAIL: status', res.status); return null; }
     const buf = await res.arrayBuffer();
+    console.log('[SVG] proxySvgFile OK:', buf.byteLength, 'bytes');
     if (buf.byteLength < 50) return null;
     const blob = new Blob([buf], { type: 'image/svg+xml' });
     return URL.createObjectURL(blob);
   } catch (e) {
-    console.warn('[Viewer] SVG proxy failed:', e);
+    console.warn('[SVG] proxySvgFile ERROR:', e);
     return null;
   }
 }
@@ -618,20 +633,33 @@ async function proxySvgItems(items, mapObj) {
     it.albumMedia?.some(m => /\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
   );
   const svgItems = [...new Set([...svgStandalone, ...svgAlbumParents])];
+  console.log('[SVG] proxySvgItems called: standalone=%d albumParents=%d total=%d', svgStandalone.length, svgAlbumParents.length, svgItems.length);
   if (!svgItems.length) return;
   await Promise.all(svgItems.map(async it => {
+    // standalone
     if (/\.svg$/i.test(it.ai_data?.fileName || '') && it._resolvedImg) {
+      console.log('[SVG] proxySvgItems standalone: fid=%s url=%s', it.fileId, it._resolvedImg?.slice(0, 80));
       const blobUrl = await proxySvgFile(it._resolvedImg);
+      console.log('[SVG] proxySvgItems standalone result:', blobUrl ? 'OK' : 'FAIL');
       if (blobUrl) {
         it._resolvedImg = blobUrl;
         if (mapObj) mapObj[it.fileId] = blobUrl;
         STATE.imageMap[it.fileId] = blobUrl;
       }
     }
+    // albumMedia
     if (it.albumMedia) {
-      for (const m of it.albumMedia) {
-        if (/\.svg$/i.test(m.fileName || '') && STATE.imageMap[m.fileId]) {
-          const blobUrl = await proxySvgFile(STATE.imageMap[m.fileId]);
+      for (let idx = 0; idx < it.albumMedia.length; idx++) {
+        const m = it.albumMedia[idx];
+        const isSvg = /\.svg$/i.test(m.fileName || '');
+        const url = STATE.imageMap[m.fileId] || '';
+        if (isSvg) {
+          console.log('[SVG] proxySvgItems album[%d]: fid=%s fname=%s hasUrl=%s isBlob=%s url=%s',
+            idx, m.fileId, m.fileName, !!url, url.startsWith('blob:'), url.slice(0, 80));
+        }
+        if (isSvg && url && !url.startsWith('blob:')) {
+          const blobUrl = await proxySvgFile(url);
+          console.log('[SVG] proxySvgItems album[%d] result: %s', idx, blobUrl ? 'OK' : 'FAIL');
           if (blobUrl) {
             if (mapObj) mapObj[m.fileId] = blobUrl;
             STATE.imageMap[m.fileId] = blobUrl;
@@ -1968,8 +1996,9 @@ function renderCard(item) {
         }).join('');
         mediaHtml = `<div class="audio-album-list">${miniPlayers}</div>`;
       } else {
-      const albumItems = albumMedia.map(m => {
+      const albumItems = albumMedia.map((m, mi) => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
+        if (/\.svg$/i.test(m.fileName || '')) console.log('[SVG] RENDER album[%d] fid=%s fname=%s url=%s isBlob=%s', mi, m.fileId?.slice(-20), m.fileName, resolvedUrl.slice(0, 80), resolvedUrl.startsWith('blob:'));
         if (m.mediaType === 'pdf') {
           const pdfFid = m.pdfFileId || m.fileId;
           const hasThumbnail = m.fileId && m.pdfFileId && m.fileId !== m.pdfFileId;
