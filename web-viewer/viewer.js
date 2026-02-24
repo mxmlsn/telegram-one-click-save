@@ -4900,7 +4900,7 @@ async function handleQuickSaveFiles(files) {
       console.log('[Upload] fileSize=%d isLarge=%s isUnknownDoc=%s messageId=%s storageChannelId=%s',
         file.size, isLargeFile, isUnknownDoc, result.messageId, STATE.storageChannelId || 'EMPTY');
       if ((isLargeFile || isUnknownDoc) && result.messageId && STATE.chatId) {
-        forwardToStorageChannel(result.messageId, notionPageId, aiData);
+        await forwardToStorageChannel(result.messageId, notionPageId, aiData);
       }
 
       // For PDF/video/audio: display thumbnail, store main fileId for playback/open
@@ -4948,6 +4948,7 @@ async function handleQuickSaveFiles(files) {
     // Multiple files → album (one Notion page per file, shared mediaGroupId)
     const mediaGroupId = `viewer_${Date.now()}`;
     const uploadResults = [];
+    const uploadAiDatas = [];
     const notionPageIds = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -4971,8 +4972,9 @@ async function handleQuickSaveFiles(files) {
 
         // Forward large files (>20MB) or unknown document types to storage channel
         if ((file.size > 20 * 1024 * 1024 || result.type === 'document') && result.messageId && STATE.chatId) {
-          forwardToStorageChannel(result.messageId, notionPageId, aiData);
+          await forwardToStorageChannel(result.messageId, notionPageId, aiData);
         }
+        uploadAiDatas.push(aiData);
       } catch (err) {
         console.error('[Upload] Failed:', file.name, err);
         showToast(`Failed: ${file.name} — ${err.message}`);
@@ -4981,7 +4983,7 @@ async function handleQuickSaveFiles(files) {
 
     if (uploadResults.length > 0) {
       // Build albumMedia for local rendering (use thumbnail for display where available)
-      const albumMedia = uploadResults.map(r => {
+      const albumMedia = uploadResults.map((r, ri) => {
         const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio') && r.thumbnailFileId;
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
@@ -4990,7 +4992,7 @@ async function handleQuickSaveFiles(files) {
           pdfFileId: r.type === 'pdf' ? r.fileId : '',
           audioFileId: r.type === 'audio' ? r.fileId : '',
           fileName: r.fileName || '',
-          storageUrl: '',
+          storageUrl: uploadAiDatas[ri]?.storageUrl || '',
         };
       });
 
@@ -5024,7 +5026,7 @@ async function handleQuickSaveFiles(files) {
         tag: selectedTagName || '', content: '', fileId: mainDisplayId, sourceUrl: '',
         date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
-        ai_analyzed: false, ai_data: { mediaType: uploadResults[0]?.type || 'image', mediaGroupId },
+        ai_analyzed: false, ai_data: { mediaType: uploadResults[0]?.type || 'image', mediaGroupId, storageUrl: uploadAiDatas[0]?.storageUrl || '' },
         fileIds: allFileIds, albumMedia,
         _resolvedImg: mainImgUrl, videoFileId: '', pdfFileId: '', audioFileId: '',
       });
@@ -5294,6 +5296,7 @@ async function saveNote() {
 
       // Create one Notion page per file (same pattern as extension bot)
       const notionPageIds = [];
+      const noteAiDatas = [];
       for (let i = 0; i < uploadResults.length; i++) {
         const r = uploadResults[i];
         const aiData = { mediaType: r.type };
@@ -5316,12 +5319,13 @@ async function saveNote() {
 
         // Forward large files (>20MB) or unknown document types to storage channel
         if ((files[i].size > 20 * 1024 * 1024 || r.type === 'document') && r.messageId && STATE.chatId) {
-          forwardToStorageChannel(r.messageId, notionPageId, aiData);
+          await forwardToStorageChannel(r.messageId, notionPageId, aiData);
         }
+        noteAiDatas.push(aiData);
       }
 
       // Build albumMedia for local rendering (use thumbnail for display where available)
-      const albumMedia = uploadResults.map(r => {
+      const albumMedia = uploadResults.map((r, ri) => {
         const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio') && r.thumbnailFileId;
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
@@ -5330,7 +5334,7 @@ async function saveNote() {
           pdfFileId: r.type === 'pdf' ? r.fileId : '',
           audioFileId: r.type === 'audio' ? r.fileId : '',
           fileName: r.fileName || '',
-          storageUrl: '',
+          storageUrl: noteAiDatas[ri]?.storageUrl || '',
         };
       });
 
@@ -5363,6 +5367,7 @@ async function saveNote() {
         mainAiData.videoFileId = uploadResults[0].videoFileId;
       }
       if (mediaGroupId) mainAiData.mediaGroupId = mediaGroupId;
+      if (noteAiDatas[0]?.storageUrl) mainAiData.storageUrl = noteAiDatas[0].storageUrl;
 
       addCardToGrid({
         id: notionPageIds[0], url: 'viewer note', type: itemType,

@@ -956,6 +956,10 @@
     .tgpost-album-item.is-pdf .blur-preview {
       filter: blur(6px);
       transform: scale(1.05);
+      transition: filter 0.25s ease;
+    }
+    .tgpost-album-item.is-pdf:hover .blur-preview {
+      filter: blur(0px);
     }
     .tgpost-album-item.is-pdf .pdf-badge {
       position: absolute;
