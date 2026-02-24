@@ -3994,6 +3994,39 @@ Rules:
 - author: @handle for xpost. tweet_text: tweet text for xpost.
 - All fields must be present. No markdown.`;
 
+// Fetch a Telegram file as blob — uses CORS proxy in standalone mode
+async function fetchTgFile(filePath) {
+  const directUrl = `https://api.telegram.org/file/bot${STATE.botToken}/${filePath}`;
+  // In extension mode, direct fetch works (service worker context or extension origin)
+  // In standalone mode (polyfill), Telegram file downloads are CORS-blocked
+  const isStandalone = typeof PROXY_URL !== 'undefined';
+  if (isStandalone) {
+    console.log('[AI] Fetching file via CORS proxy: %s', filePath);
+    const mimeType = filePath.endsWith('.png') ? 'image/png'
+      : filePath.endsWith('.gif') ? 'image/gif'
+      : filePath.endsWith('.webp') ? 'image/webp'
+      : 'image/jpeg';
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service: 'telegram',
+        token: STATE.botToken,
+        path: `/file/${filePath}`,
+        method: 'GET',
+        binary: true,
+        contentType: mimeType
+      })
+    });
+    if (!res.ok) throw new Error(`CORS proxy file fetch failed: ${res.status}`);
+    return res.blob();
+  } else {
+    const res = await fetch(directUrl);
+    if (!res.ok) throw new Error(`TG file fetch failed: ${res.status}`);
+    return res.blob();
+  }
+}
+
 async function viewerAnalyzeItem(item, settings) {
   console.log('[AI] viewerAnalyzeItem called, type=%s, fileId=%s, apiKey=%s, provider=%s',
     item.type, item.fileId ? item.fileId.slice(-15) : 'none',
@@ -4017,10 +4050,8 @@ async function viewerAnalyzeItem(item, settings) {
         const ext = fileData.result.file_path.split('.').pop()?.toLowerCase();
         const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         if (IMAGE_EXTS.includes(ext)) {
-          const imgUrl = `https://api.telegram.org/file/bot${STATE.botToken}/${fileData.result.file_path}`;
           console.log('[AI] Fetching image as base64, ext=%s', ext);
-          const imgRes = await fetch(imgUrl);
-          const imgBlob = await imgRes.blob();
+          const imgBlob = await fetchTgFile(fileData.result.file_path);
           const buffer = await imgBlob.arrayBuffer();
           const bytes = new Uint8Array(buffer);
           let binary = '';
