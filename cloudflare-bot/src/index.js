@@ -71,10 +71,11 @@ async function handleTagsEndpoint(request, env) {
       return new Response('Unauthorized', { status: 401, headers: CORS_HEADERS });
     }
 
-    // GET — read current tags config
+    // GET — read current tags config + env info for viewer
     if (request.method === 'GET') {
-      const config = await getTagsConfig(env);
-      return new Response(JSON.stringify(config || {}), {
+      const config = await getTagsConfig(env) || {};
+      if (env.STORAGE_CHANNEL_ID) config.storageChannelId = env.STORAGE_CHANNEL_ID;
+      return new Response(JSON.stringify(config), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
       });
     }

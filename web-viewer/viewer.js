@@ -105,6 +105,7 @@ const STATE = {
   notionDbId: '',
   botToken: '',
   chatId: '',
+  storageChannelId: '',
   customTags: [],
   aiEnabled: false,
   aiAutoInViewer: false,
@@ -202,6 +203,7 @@ async function init() {
         if (Array.isArray(tagsConfig.customTags) && tagsConfig.customTags.length > 0) {
           remoteTags = tagsConfig.customTags;
         }
+        if (tagsConfig.storageChannelId) STATE.storageChannelId = tagsConfig.storageChannelId;
       }
     } catch (e) { console.warn('[Init] Failed to fetch tags from bot:', e.message); }
     STATE.customTags = remoteTags || DEFAULT_CUSTOM_TAGS;
@@ -819,9 +821,8 @@ async function createNotionPage({ type, content, fileId, tagName, sourceUrl, aiD
 // Forward large file (>20MB) to storage channel via copyMessage, store storageUrl in Notion
 async function forwardToStorageChannel(messageId, notionPageId, aiData) {
   try {
-    const settings = await getSettings();
-    const storageChatId = settings.storageChatId;
-    if (!storageChatId) { console.log('[Storage] No storageChatId, skipping'); return; }
+    const storageChatId = STATE.storageChannelId;
+    if (!storageChatId) { console.log('[Storage] No storageChannelId configured, skipping'); return; }
 
     const res = await fetch(`https://api.telegram.org/bot${STATE.botToken}/copyMessage`, {
       method: 'POST',
@@ -4765,32 +4766,35 @@ async function handleQuickSaveFiles(files) {
         forwardToStorageChannel(result.messageId, notionPageId, aiData);
       }
 
-      // Resolve thumbnail fileId for display
+      // For PDF/video/audio: display thumbnail, store main fileId for playback/open
+      // For images/SVG/gif/document: display main fileId
+      const isPdf = result.type === 'pdf';
+      const isVideo = result.type === 'video';
+      const isAudio = result.type === 'audio';
+      const displayFileId = (isPdf || isVideo || isAudio) && result.thumbnailFileId
+        ? result.thumbnailFileId : result.fileId;
+
       let imgUrl = null;
-      if (result.fileId) {
-        imgUrl = await resolveFileId(STATE.botToken, result.fileId);
+      if (displayFileId) {
+        imgUrl = await resolveFileId(STATE.botToken, displayFileId);
         // SVG: Telegram serves with wrong content-type → proxy to get blob URL
         if (imgUrl && /\.svg$/i.test(result.fileName || '')) {
           const blobUrl = await proxySvgFile(imgUrl);
           if (blobUrl) imgUrl = blobUrl;
         }
-        if (imgUrl) STATE.imageMap[result.fileId] = imgUrl;
-      }
-      // Also resolve video/animation fileId if different
-      if (result.videoFileId && result.videoFileId !== result.fileId) {
-        STATE.imageMap[result.videoFileId] = imgUrl || '';
+        if (imgUrl) STATE.imageMap[displayFileId] = imgUrl;
       }
 
       addCardToGrid({
         id: notionPageId, url: 'viewer upload', type: result.type,
-        tag: selectedTagName || '', content: '', fileId: result.fileId, sourceUrl: '',
+        tag: selectedTagName || '', content: '', fileId: displayFileId, sourceUrl: '',
         date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: aiData, fileIds: [],
         _resolvedImg: imgUrl,
         videoFileId: result.videoFileId || '',
-        pdfFileId: result.type === 'pdf' ? notionFileId : '',
-        audioFileId: result.type === 'audio' ? result.fileId : '',
+        pdfFileId: isPdf ? notionFileId : '',
+        audioFileId: isAudio ? result.fileId : '',
       });
       showToast(`Uploaded: ${file.name}`);
     } catch (err) {
@@ -4833,21 +4837,25 @@ async function handleQuickSaveFiles(files) {
     }
 
     if (uploadResults.length > 0) {
-      // Build albumMedia for local rendering
-      const albumMedia = uploadResults.map(r => ({
-        fileId: r.fileId,
-        mediaType: r.type,
-        videoFileId: r.videoFileId || '',
-        pdfFileId: r.type === 'pdf' ? r.fileId : '',
-        audioFileId: r.type === 'audio' ? r.fileId : '',
-        fileName: r.fileName || '',
-        storageUrl: '',
-      }));
+      // Build albumMedia for local rendering (use thumbnail for display where available)
+      const albumMedia = uploadResults.map(r => {
+        const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio') && r.thumbnailFileId;
+        return {
+          fileId: needsThumb ? r.thumbnailFileId : r.fileId,
+          mediaType: r.type,
+          videoFileId: r.videoFileId || '',
+          pdfFileId: r.type === 'pdf' ? r.fileId : '',
+          audioFileId: r.type === 'audio' ? r.fileId : '',
+          fileName: r.fileName || '',
+          storageUrl: '',
+        };
+      });
 
-      // Resolve all fileIds (thumbnails + video/animation IDs)
+      // Resolve all fileIds (display thumbnails + playback IDs)
       const allFileIds = new Set();
       uploadResults.forEach(r => {
         if (r.fileId) allFileIds.add(r.fileId);
+        if (r.thumbnailFileId) allFileIds.add(r.thumbnailFileId);
         if (r.videoFileId) allFileIds.add(r.videoFileId);
         if (r.animationFileId) allFileIds.add(r.animationFileId);
       });
@@ -4864,12 +4872,13 @@ async function handleQuickSaveFiles(files) {
         }
       }));
 
-      const mainFileId = uploadResults[0]?.fileId || '';
-      const mainImgUrl = STATE.imageMap[mainFileId] || null;
+      const r0 = uploadResults[0];
+      const mainDisplayId = albumMedia[0]?.fileId || r0?.fileId || '';
+      const mainImgUrl = STATE.imageMap[mainDisplayId] || null;
 
       addCardToGrid({
         id: notionPageIds[0], url: 'viewer upload', type: 'tgpost',
-        tag: selectedTagName || '', content: '', fileId: mainFileId, sourceUrl: '',
+        tag: selectedTagName || '', content: '', fileId: mainDisplayId, sourceUrl: '',
         date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: { mediaType: uploadResults[0]?.type || 'image', mediaGroupId },
@@ -5163,21 +5172,25 @@ async function saveNote() {
         notionPageIds.push(notionPageId);
       }
 
-      // Build albumMedia for local rendering (same structure as mergeMediaGroups)
-      const albumMedia = uploadResults.map(r => ({
-        fileId: r.fileId,
-        mediaType: r.type,
-        videoFileId: r.videoFileId || '',
-        pdfFileId: r.type === 'pdf' ? r.fileId : '',
-        audioFileId: r.type === 'audio' ? r.fileId : '',
-        fileName: r.fileName || '',
-        storageUrl: '',
-      }));
+      // Build albumMedia for local rendering (use thumbnail for display where available)
+      const albumMedia = uploadResults.map(r => {
+        const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio') && r.thumbnailFileId;
+        return {
+          fileId: needsThumb ? r.thumbnailFileId : r.fileId,
+          mediaType: r.type,
+          videoFileId: r.videoFileId || '',
+          pdfFileId: r.type === 'pdf' ? r.fileId : '',
+          audioFileId: r.type === 'audio' ? r.fileId : '',
+          fileName: r.fileName || '',
+          storageUrl: '',
+        };
+      });
 
-      // Resolve all fileIds (thumbnails + video/animation IDs)
+      // Resolve all fileIds (display thumbnails + playback IDs)
       const allFileIds = new Set();
       uploadResults.forEach(r => {
         if (r.fileId) allFileIds.add(r.fileId);
+        if (r.thumbnailFileId) allFileIds.add(r.thumbnailFileId);
         if (r.videoFileId) allFileIds.add(r.videoFileId);
         if (r.animationFileId) allFileIds.add(r.animationFileId);
       });
@@ -5194,8 +5207,9 @@ async function saveNote() {
         }
       }));
 
-      const mainFileId = uploadResults[0]?.fileId || '';
-      const mainImgUrl = STATE.imageMap[mainFileId] || null;
+      const r0note = uploadResults[0];
+      const mainDisplayId = albumMedia[0]?.fileId || r0note?.fileId || '';
+      const mainImgUrl = STATE.imageMap[mainDisplayId] || null;
       const mainAiData = { mediaType: uploadResults[0]?.type || 'image' };
       if (mainAiData.mediaType === 'video' && uploadResults[0]?.videoFileId) {
         mainAiData.videoFileId = uploadResults[0].videoFileId;
