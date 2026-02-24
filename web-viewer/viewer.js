@@ -210,8 +210,9 @@ async function init() {
     // AI is enabled if apiKey exists (aiEnabled toggle is optional — having a key implies intent)
     STATE.aiEnabled = !!settings.aiApiKey;
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
-    console.log('[Init] chatId=%s, customTags=%d (remote=%s), aiEnabled=%s, aiAutoInViewer=%s',
+    console.log('[Init] chatId=%s, storageChannelId=%s, customTags=%d (remote=%s), aiEnabled=%s, aiAutoInViewer=%s',
       STATE.chatId ? 'set' : 'empty',
+      STATE.storageChannelId || 'EMPTY',
       STATE.customTags.length,
       !!remoteTags,
       STATE.aiEnabled,
@@ -4762,7 +4763,10 @@ async function handleQuickSaveFiles(files) {
       });
 
       // Forward large files (>20MB) to storage channel for later access
-      if (file.size > 20 * 1024 * 1024 && result.messageId && STATE.chatId) {
+      const isLargeFile = file.size > 20 * 1024 * 1024;
+      console.log('[Upload] fileSize=%d isLarge=%s messageId=%s storageChannelId=%s',
+        file.size, isLargeFile, result.messageId, STATE.storageChannelId || 'EMPTY');
+      if (isLargeFile && result.messageId && STATE.chatId) {
         forwardToStorageChannel(result.messageId, notionPageId, aiData);
       }
 
@@ -4773,6 +4777,11 @@ async function handleQuickSaveFiles(files) {
       const isAudio = result.type === 'audio';
       const displayFileId = (isPdf || isVideo || isAudio) && result.thumbnailFileId
         ? result.thumbnailFileId : result.fileId;
+      console.log('[Upload] display: type=%s isPdf=%s isVideo=%s isAudio=%s thumbFileId=%s displayFileId=%s mainFileId=%s',
+        result.type, isPdf, isVideo, isAudio,
+        result.thumbnailFileId?.slice(-20) || 'null',
+        displayFileId?.slice(-20) || 'null',
+        result.fileId?.slice(-20) || 'null');
 
       let imgUrl = null;
       if (displayFileId) {
