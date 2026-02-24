@@ -256,49 +256,16 @@ async function startApp() {
 
     // 5. Resolve remaining images in background, patch cards as they come
     const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId || i.fileIds?.length > 1);
-    if (restItems.length > 0) {
-      await resolveRemainingImages(restItems, fileCache);
-    } else {
-      saveFileCache(fileCache);
-    }
+    const imagesDonePromise = restItems.length > 0
+      ? resolveRemainingImages(restItems, fileCache)
+      : Promise.resolve(saveFileCache(fileCache));
 
     // 6. Repair corrupted ai_data (from previous truncation bug) — write salvaged data back to Notion
-    const repairedItems = STATE.items.filter(it => it.ai_data?._repaired);
-    const corruptedItems = STATE.items.filter(it => it.ai_data?._corrupted);
-    if (repairedItems.length || corruptedItems.length) {
-      console.log('[Repair] %d salvaged, %d unsalvageable items', repairedItems.length, corruptedItems.length);
-      // Write salvaged data back to Notion (fix permanently)
-      for (const item of repairedItems) {
-        try {
-          const cleaned = { ...item.ai_data };
-          delete cleaned._repaired;
-          await notionPatch(item.id, { properties: {
-            'ai_data': { rich_text: [{ text: { content: JSON.stringify(cleaned) } }] },
-            'ai_analyzed': { checkbox: false }  // re-analyze with fixed code
-          }});
-          item.ai_data = cleaned;
-          item.ai_analyzed = false;
-        } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
-      }
-      // Reset unsalvageable items
-      for (const item of corruptedItems) {
-        try {
-          await notionPatch(item.id, { properties: {
-            'ai_data': { rich_text: [{ text: { content: '{}' } }] },
-            'ai_analyzed': { checkbox: false }
-          }});
-          item.ai_data = {};
-          item.ai_analyzed = false;
-        } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
-      }
-      if (repairedItems.length || corruptedItems.length) {
-        showToast(`Repaired ${repairedItems.length + corruptedItems.length} items with corrupted data`);
-      }
-    }
+    repairCorruptedAiData();
 
-    // 7. AI analysis — runs AFTER all images resolved to avoid race with card re-rendering
+    // 7. AI analysis — wait for images to finish, then analyze
     if (STATE.aiEnabled && STATE.aiAutoInViewer) {
-      runAiBackgroundProcessing();
+      imagesDonePromise.then(() => runAiBackgroundProcessing());
     }
   } catch (e) {
     document.getElementById('ai-status').textContent = 'Error: ' + e.message;
@@ -4300,6 +4267,39 @@ async function patchNotionWithAI(pageId, aiResult, existingAiData) {
   } catch (e) {
     console.warn('[AI] Notion patch error:', e);
   }
+}
+
+// ─── Repair corrupted ai_data (one-time, from JSON truncation bug) ────────────
+async function repairCorruptedAiData() {
+  const repairedItems = STATE.items.filter(it => it.ai_data?._repaired);
+  const corruptedItems = STATE.items.filter(it => it.ai_data?._corrupted);
+  if (!repairedItems.length && !corruptedItems.length) return;
+  console.log('[Repair] %d salvaged, %d unsalvageable items', repairedItems.length, corruptedItems.length);
+
+  for (const item of repairedItems) {
+    try {
+      const cleaned = { ...item.ai_data };
+      delete cleaned._repaired;
+      await notionPatch(item.id, { properties: {
+        'ai_data': { rich_text: [{ text: { content: JSON.stringify(cleaned) } }] },
+        'ai_analyzed': { checkbox: false }
+      }});
+      item.ai_data = cleaned;
+      item.ai_analyzed = false;
+    } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
+  }
+  for (const item of corruptedItems) {
+    try {
+      await notionPatch(item.id, { properties: {
+        'ai_data': { rich_text: [{ text: { content: '{}' } }] },
+        'ai_analyzed': { checkbox: false }
+      }});
+      item.ai_data = {};
+      item.ai_analyzed = false;
+    } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
+  }
+  const total = repairedItems.length + corruptedItems.length;
+  showToast(`Repaired ${total} items with corrupted data. Reload to see fixed layout.`);
 }
 
 // ─── AI background processing ─────────────────────────────────────────────────
