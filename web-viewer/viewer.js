@@ -663,9 +663,12 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAnimation`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAnimation failed'); }
     const data = await res.json();
-    const thumb = data.result?.animation?.thumbnail || data.result?.animation?.thumb;
-    console.log('[Upload] sendAnimation OK fileId=%s', thumb?.file_id ? thumb.file_id.slice(-20) : 'null');
-    return { fileId: thumb?.file_id || null, type: 'gif' };
+    const anim = data.result?.animation;
+    const animFileId = anim?.file_id || null;
+    const thumbFileId = anim?.thumbnail?.file_id || anim?.thumb?.file_id || null;
+    console.log('[Upload] sendAnimation OK animFileId=%s thumbFileId=%s', animFileId?.slice(-20), thumbFileId?.slice(-20));
+    // Store animation file_id (for Notion/playback), thumbnail for display
+    return { fileId: thumbFileId || animFileId, animationFileId: animFileId, type: 'gif' };
   }
 
   if (['image/jpeg', 'image/png', 'image/webp'].includes(mime)) {
@@ -678,6 +681,30 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     const photoFileId = photos?.length > 0 ? photos[photos.length - 1].file_id : null;
     console.log('[Upload] sendPhoto OK fileId=%s', photoFileId ? photoFileId.slice(-20) : 'null');
     return { fileId: photoFileId, type: 'image' };
+  }
+
+  // Video files → sendVideo (mp4, mov, avi, mkv, webm)
+  if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name || '')) {
+    formData.append('video', file, file.name || 'video.mp4');
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendVideo failed'); }
+    const data = await res.json();
+    const vid = data.result?.video;
+    const videoFileId = vid?.file_id || null;
+    const thumbFileId = vid?.thumbnail?.file_id || vid?.thumb?.file_id || null;
+    console.log('[Upload] sendVideo OK videoFileId=%s thumbFileId=%s', videoFileId?.slice(-20), thumbFileId?.slice(-20));
+    return { fileId: thumbFileId || videoFileId, videoFileId: videoFileId, type: 'video' };
+  }
+
+  // Audio files → sendAudio (mp3, wav, flac, m4a, ogg)
+  if (mime.startsWith('audio/') || /\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(file.name || '')) {
+    formData.append('audio', file, file.name || 'audio.mp3');
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAudio`, { method: 'POST', body: formData });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAudio failed'); }
+    const data = await res.json();
+    const audioFileId = data.result?.audio?.file_id || null;
+    console.log('[Upload] sendAudio OK fileId=%s', audioFileId?.slice(-20));
+    return { fileId: audioFileId, type: 'audio' };
   }
 
   // SVG and everything else → sendDocument
@@ -4334,16 +4361,24 @@ async function handleQuickSaveFiles(files) {
       const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
       const aiData = { mediaType: result.type };
       if (file.name) aiData.fileName = file.name;
+      if (file.size) aiData.fileSize = file.size;
 
+      // For Notion, store the main playback file ID
+      const notionFileId = result.videoFileId || result.animationFileId || result.fileId;
       const notionPageId = await createNotionPage({
-        type: result.type, fileId: result.fileId,
+        type: result.type, fileId: notionFileId,
         tagName: selectedTagName, aiData,
       });
 
+      // Resolve thumbnail fileId for display
       let imgUrl = null;
       if (result.fileId) {
         imgUrl = await resolveFileId(STATE.botToken, result.fileId);
         if (imgUrl) STATE.imageMap[result.fileId] = imgUrl;
+      }
+      // Also resolve video/animation fileId if different
+      if (result.videoFileId && result.videoFileId !== result.fileId) {
+        STATE.imageMap[result.videoFileId] = imgUrl || '';
       }
 
       addCardToGrid({
@@ -4352,7 +4387,10 @@ async function handleQuickSaveFiles(files) {
         date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: aiData, fileIds: [],
-        _resolvedImg: imgUrl, videoFileId: '', pdfFileId: '', audioFileId: '',
+        _resolvedImg: imgUrl,
+        videoFileId: result.videoFileId || '',
+        pdfFileId: '',
+        audioFileId: result.type === 'audio' ? result.fileId : '',
       });
       showToast(`Uploaded: ${file.name}`);
     } catch (err) {
@@ -4375,9 +4413,10 @@ async function handleQuickSaveFiles(files) {
 
         const aiData = { mediaType: result.type, mediaGroupId };
         if (file.name) aiData.fileName = file.name;
+        const notionFileId = result.videoFileId || result.animationFileId || result.fileId;
 
         const notionPageId = await createNotionPage({
-          type: 'tgpost', fileId: result.fileId,
+          type: 'tgpost', fileId: notionFileId,
           tagName: selectedTagName, aiData,
         });
         notionPageIds.push(notionPageId);
@@ -4392,16 +4431,21 @@ async function handleQuickSaveFiles(files) {
       const albumMedia = uploadResults.map(r => ({
         fileId: r.fileId,
         mediaType: r.type,
-        videoFileId: r.type === 'video' ? r.fileId : '',
+        videoFileId: r.videoFileId || '',
         pdfFileId: r.type === 'pdf' ? r.fileId : '',
-        audioFileId: '',
+        audioFileId: r.type === 'audio' ? r.fileId : '',
         fileName: r.fileName || '',
         storageUrl: '',
       }));
 
-      // Resolve all fileIds
-      const allFileIds = uploadResults.map(r => r.fileId).filter(Boolean);
-      await Promise.all(allFileIds.map(async fid => {
+      // Resolve all fileIds (thumbnails + video/animation IDs)
+      const allFileIds = new Set();
+      uploadResults.forEach(r => {
+        if (r.fileId) allFileIds.add(r.fileId);
+        if (r.videoFileId) allFileIds.add(r.videoFileId);
+        if (r.animationFileId) allFileIds.add(r.animationFileId);
+      });
+      await Promise.all([...allFileIds].map(async fid => {
         const url = await resolveFileId(STATE.botToken, fid);
         if (url) STATE.imageMap[fid] = url;
       }));
@@ -4423,6 +4467,7 @@ async function handleQuickSaveFiles(files) {
   }
 
   // Trigger AI analysis for newly uploaded items
+  console.log('[QuickSave] AI check: aiEnabled=%s, aiAutoInViewer=%s', STATE.aiEnabled, STATE.aiAutoInViewer);
   if (STATE.aiEnabled && STATE.aiAutoInViewer) {
     runAiBackgroundProcessing();
   }
@@ -4688,10 +4733,11 @@ async function saveNote() {
         const aiData = { mediaType: r.type };
         if (mediaGroupId) aiData.mediaGroupId = mediaGroupId;
         if (r.fileName) aiData.fileName = r.fileName;
+        const notionFileId = r.videoFileId || r.animationFileId || r.fileId;
         const notionPageId = await createNotionPage({
           type: itemType,
           content: i === 0 ? plainText : '', // caption only on first page
-          fileId: r.fileId,
+          fileId: notionFileId,
           tagName: _noteEditorSelectedTag,
           aiData,
         });
@@ -4702,24 +4748,31 @@ async function saveNote() {
       const albumMedia = uploadResults.map(r => ({
         fileId: r.fileId,
         mediaType: r.type,
-        videoFileId: r.type === 'video' ? r.fileId : '',
+        videoFileId: r.videoFileId || '',
         pdfFileId: r.type === 'pdf' ? r.fileId : '',
-        audioFileId: '',
+        audioFileId: r.type === 'audio' ? r.fileId : '',
         fileName: r.fileName || '',
         storageUrl: '',
       }));
 
-      // Resolve all fileIds
-      const allFileIds = uploadResults.map(r => r.fileId).filter(Boolean);
-      const resolvePromises = allFileIds.map(async fid => {
+      // Resolve all fileIds (thumbnails + video/animation IDs)
+      const allFileIds = new Set();
+      uploadResults.forEach(r => {
+        if (r.fileId) allFileIds.add(r.fileId);
+        if (r.videoFileId) allFileIds.add(r.videoFileId);
+        if (r.animationFileId) allFileIds.add(r.animationFileId);
+      });
+      await Promise.all([...allFileIds].map(async fid => {
         const url = await resolveFileId(STATE.botToken, fid);
         if (url) STATE.imageMap[fid] = url;
-      });
-      await Promise.all(resolvePromises);
+      }));
 
       const mainFileId = uploadResults[0]?.fileId || '';
       const mainImgUrl = STATE.imageMap[mainFileId] || null;
       const mainAiData = { mediaType: uploadResults[0]?.type || 'image' };
+      if (mainAiData.mediaType === 'video' && uploadResults[0]?.videoFileId) {
+        mainAiData.videoFileId = uploadResults[0].videoFileId;
+      }
       if (mediaGroupId) mainAiData.mediaGroupId = mediaGroupId;
 
       addCardToGrid({
@@ -4728,10 +4781,12 @@ async function saveNote() {
         fileId: mainFileId, sourceUrl: '', date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: mainAiData,
-        fileIds: allFileIds,
+        fileIds: [...allFileIds],
         albumMedia: files.length > 1 ? albumMedia : undefined,
         _resolvedImg: mainImgUrl,
-        videoFileId: '', pdfFileId: '', audioFileId: '',
+        videoFileId: uploadResults[0]?.videoFileId || '',
+        pdfFileId: '',
+        audioFileId: uploadResults[0]?.type === 'audio' ? uploadResults[0].fileId : '',
       });
       showToast('Note with files saved');
     }
@@ -4739,6 +4794,7 @@ async function saveNote() {
     closeNoteEditor();
 
     // Trigger AI analysis for newly saved items
+    console.log('[NoteEditor] AI check: aiEnabled=%s, aiAutoInViewer=%s', STATE.aiEnabled, STATE.aiAutoInViewer);
     if (STATE.aiEnabled && STATE.aiAutoInViewer) {
       runAiBackgroundProcessing();
     }
