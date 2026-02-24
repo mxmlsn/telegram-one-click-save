@@ -1244,6 +1244,19 @@ function setupSettingsPanel() {
   });
 
   document.getElementById('sp-disconnect-btn')?.addEventListener('click', disconnect);
+
+  document.getElementById('sp-repair-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('sp-repair-btn');
+    btn.disabled = true;
+    btn.textContent = 'Repairing…';
+    try {
+      await runFullRepair();
+    } catch (e) {
+      console.error('[Repair] Error:', e);
+      btn.textContent = 'Error';
+      setTimeout(() => { btn.textContent = 'Repair data'; btn.disabled = false; }, 3000);
+    }
+  });
 }
 
 function closeSettingsPanel() {
@@ -4300,6 +4313,64 @@ async function repairCorruptedAiData() {
   }
   const total = repairedItems.length + corruptedItems.length;
   showToast(`Repaired ${total} items with corrupted data. Reload to see fixed layout.`);
+}
+
+// ─── Full repair (manual, from settings) ──────────────────────────────────────
+async function runFullRepair() {
+  const btn = document.getElementById('sp-repair-btn');
+  const status = (msg) => { if (btn) btn.textContent = msg; };
+
+  // 1. Re-fetch all pages from Notion
+  status('Fetching pages…');
+  const pages = await fetchNotion();
+  const items = pages.map(parseItem);
+
+  // 2. Find corrupted ai_data
+  const repaired = items.filter(it => it.ai_data?._repaired);
+  const corrupted = items.filter(it => it.ai_data?._corrupted);
+  let fixed = 0;
+
+  // 3. Write salvaged data back to Notion
+  if (repaired.length) {
+    status(`Repairing ${repaired.length} items…`);
+    for (const item of repaired) {
+      try {
+        const cleaned = { ...item.ai_data };
+        delete cleaned._repaired;
+        await notionPatch(item.id, { properties: {
+          'ai_data': { rich_text: [{ text: { content: JSON.stringify(cleaned) } }] },
+          'ai_analyzed': { checkbox: false }
+        }});
+        fixed++;
+      } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
+    }
+  }
+
+  // 4. Reset unsalvageable items
+  if (corrupted.length) {
+    status(`Resetting ${corrupted.length} items…`);
+    for (const item of corrupted) {
+      try {
+        await notionPatch(item.id, { properties: {
+          'ai_data': { rich_text: [{ text: { content: '{}' } }] },
+          'ai_analyzed': { checkbox: false }
+        }});
+        fixed++;
+      } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
+    }
+  }
+
+  // 5. Clear file cache to force fresh URL resolution
+  status('Clearing cache…');
+  localStorage.removeItem('tg_file_cache');
+
+  // 6. Done
+  const msg = fixed > 0
+    ? `Repaired ${fixed} items. Reloading…`
+    : 'No corrupted items found. Clearing cache & reloading…';
+  status(msg);
+  showToast(msg);
+  setTimeout(() => location.reload(), 1500);
 }
 
 // ─── AI background processing ─────────────────────────────────────────────────
