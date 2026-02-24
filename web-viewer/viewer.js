@@ -706,6 +706,34 @@ async function generatePdfThumbnail(pdfFile) {
   return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
 }
 
+// Generate a JPEG thumbnail from the first frame of a video
+function generateVideoThumbnail(videoFile) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    const url = URL.createObjectURL(videoFile);
+    video.src = url;
+    const cleanup = () => URL.revokeObjectURL(url);
+    video.addEventListener('loadeddata', () => {
+      video.currentTime = 0.1; // seek to 0.1s to get first real frame
+    });
+    video.addEventListener('seeked', () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        const scale = Math.min(maxDim / video.videoWidth, maxDim / video.videoHeight, 1);
+        canvas.width = Math.floor(video.videoWidth * scale);
+        canvas.height = Math.floor(video.videoHeight * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => { cleanup(); resolve(blob); }, 'image/jpeg', 0.85);
+      } catch { cleanup(); resolve(null); }
+    });
+    video.addEventListener('error', () => { cleanup(); resolve(null); });
+    setTimeout(() => { cleanup(); resolve(null); }, 5000); // timeout safety
+  });
+}
+
 async function uploadFileToTelegram(file, botToken, chatId) {
   console.log('[Upload] file=%s size=%d type=%s', file.name, file.size, file.type);
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -756,6 +784,14 @@ async function uploadFileToTelegram(file, botToken, chatId) {
   if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name || '')) {
     formData.append('video', file, file.name || 'video.mp4');
     formData.append('supports_streaming', 'true');
+    // Generate thumbnail from first frame (ensures preview even for large videos)
+    try {
+      const thumbBlob = await generateVideoThumbnail(file);
+      if (thumbBlob) {
+        formData.append('thumbnail', thumbBlob, 'thumb.jpg');
+        console.log('[Upload] Video thumbnail generated, size=%d', thumbBlob.size);
+      }
+    } catch (e) { console.warn('[Upload] Video thumbnail generation failed:', e.message); }
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendVideo failed'); }
     const data = await res.json();
@@ -2208,12 +2244,11 @@ function renderCard(item) {
     const albumMedia = item.albumMedia || [];
 
     // For standalone document posts item.content is the filename — don't show as message text
-    // For albums: only suppress if content literally matches the filename (not a real caption)
-    const allAlbumAreDocs = albumMedia.length > 0 && albumMedia.every(m => m.mediaType === 'document' || m.mediaType === 'pdf');
+    // But real user captions should always be shown
     const isStandaloneDoc = !albumMedia.length && aiData.mediaType === 'document';
-    const isDocumentContent = isStandaloneDoc
-      || allAlbumAreDocs
-      || (aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim());
+    const contentMatchesFileName = aiData.fileName && item.content && item.content.trim() === aiData.fileName.trim();
+    const isDocumentContent = (isStandaloneDoc && contentMatchesFileName)
+      || contentMatchesFileName;
     const textContent = isDocumentContent ? '' : (item.content || '');
     const isSingleImage = !albumMedia.length && imgUrl
       && (!aiData.mediaType || aiData.mediaType === 'image')
@@ -3439,7 +3474,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
-    if (action === 'open' && url) {
+    if (action === 'open' && url && /^https?:\/\//i.test(url)) {
       e.stopPropagation();
       window.open(url, '_blank');
       return;
@@ -4456,6 +4491,7 @@ async function viewerAnalyzeItem(item, settings) {
     const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const parsed = JSON.parse(cleaned);
     if (isDirectImage && parsed.content_type !== 'product') parsed.content_type = null;
+    if (isPdf) parsed.content_type = 'pdf'; // PDF is always PDF, AI can't override
     console.log('[AI] Parsed result: type=%s, desc=%s', parsed.content_type, (parsed.description || '').slice(0, 60));
     return parsed;
   } catch (e) {
