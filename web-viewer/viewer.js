@@ -334,8 +334,6 @@ async function resolveRemainingImages(items, fileCache) {
       if (urls[idx]) {
         STATE.imageMap[fid] = urls[idx];
         fileCache[fid] = { url: urls[idx], ts: now };
-      } else {
-        console.warn('[resolveRemaining] FAILED to resolve fid=...%s', fid.slice(-20));
       }
     });
     // Patch cards that now have their main fileId resolved
@@ -528,8 +526,14 @@ function mergeMediaGroups(items) {
       // Determine media type: ai_data.mediaType is authoritative, fall back to item.type
       const mType = item.ai_data?.mediaType
         || (['video', 'image', 'gif', 'pdf', 'audio', 'voice', 'video_note', 'document'].includes(item.type) ? item.type : 'image');
+      // For display: use item.fileId (already thumbnail-swapped by parseItem).
+      // But if the swap didn't happen (no thumbnail), fileId is the raw file (video/doc)
+      // which can't be displayed as <img>. In that case, clear it for the renderer.
+      let displayFid = item.fileId;
+      if (mType === 'video' && displayFid && displayFid === item.videoFileId) displayFid = ''; // no thumbnail → no img
+      if (mType === 'document') displayFid = ''; // documents are never displayable as images
       const mediaEntry = {
-        fileId: item.fileId,
+        fileId: displayFid,
         mediaType: mType,
         videoFileId: item.videoFileId || '',
         pdfFileId: item.pdfFileId || '',
@@ -545,9 +549,12 @@ function mergeMediaGroups(items) {
       };
       if (!groups[gid]) {
         groups[gid] = item;
+        // If first item has no displayable thumbnail, update item.fileId
+        // so resolveRemainingImages doesn't try to resolve a non-image file
+        if (!displayFid && item.fileId) item.fileId = '';
         // Always add media entry (even without fileId — PDF/video can still show badge)
         item.albumMedia = [mediaEntry];
-        item.fileIds = item.fileId ? [item.fileId] : [];
+        item.fileIds = displayFid ? [displayFid] : [];
         item._groupPageIds = [item.id]; // track all Notion page IDs in this album
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) item.fileIds.push(mediaEntry.coverFileId);
@@ -562,8 +569,8 @@ function mergeMediaGroups(items) {
         // Merge into existing group item — always add media entry
         groups[gid].albumMedia.push(mediaEntry);
         groups[gid]._groupPageIds.push(item.id); // track merged page ID
-        if (item.fileId) {
-          groups[gid].fileIds.push(item.fileId);
+        if (displayFid) {
+          groups[gid].fileIds.push(displayFid);
         }
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) groups[gid].fileIds.push(mediaEntry.coverFileId);
@@ -600,14 +607,6 @@ function mergeMediaGroups(items) {
       }
     } else {
       result.push(item);
-    }
-  }
-  // Log album composition for debugging
-  for (const item of Object.values(groups)) {
-    if (item.albumMedia?.length > 0) {
-      console.log('[MergeGroups] album id=%s media=%d fileIds=%s',
-        item.id?.slice(0, 8), item.albumMedia.length,
-        item.albumMedia.map((m, i) => `[${i}:${m.mediaType} fid=...${m.fileId?.slice(-12) || 'NONE'}]`).join(' '));
     }
   }
   // Promote merged groups to tgpost so album rendering always triggers
@@ -2448,9 +2447,6 @@ function renderCard(item) {
       } else {
       const albumItems = albumMedia.map((m, mi) => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
-        console.log('[AlbumRender] [%d] type=%s fid=...%s resolved=%s videoFid=...%s pdfFid=...%s fname=%s',
-          mi, m.mediaType, m.fileId?.slice(-20) || 'NONE', !!resolvedUrl,
-          m.videoFileId?.slice(-20) || '', m.pdfFileId?.slice(-20) || '', m.fileName || '');
         if (/\.svg$/i.test(m.fileName || '')) console.log('[SVG] RENDER album[%d] fid=%s fname=%s url=%s isBlob=%s', mi, m.fileId?.slice(-20), m.fileName, resolvedUrl.slice(0, 80), resolvedUrl.startsWith('blob:'));
         if (m.mediaType === 'pdf') {
           const pdfFid = m.pdfFileId || m.fileId;
