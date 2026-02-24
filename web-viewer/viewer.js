@@ -691,17 +691,25 @@ async function uploadFileToTelegram(file, botToken, chatId) {
   formData.append('disable_notification', 'true');
   formData.append('caption', '[stash-viewer]'); // marker so bot skips duplicate processing
 
+  // Result object — all upload paths populate fields matching bot's parser.js output
+  const r = { fileId: null, type: 'document', thumbnailFileId: null,
+    videoFileId: null, animationFileId: null,
+    audioTitle: '', audioPerformer: '', audioDuration: 0,
+    messageId: null, fileName: file.name || '' };
+
   if (mime === 'image/gif') {
     formData.append('animation', file, file.name || 'animation.gif');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAnimation`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAnimation failed'); }
     const data = await res.json();
     const anim = data.result?.animation;
-    const animFileId = anim?.file_id || null;
-    const thumbFileId = anim?.thumbnail?.file_id || anim?.thumb?.file_id || null;
-    console.log('[Upload] sendAnimation OK animFileId=%s thumbFileId=%s', animFileId?.slice(-20), thumbFileId?.slice(-20));
-    // Store animation file_id (for Notion/playback), thumbnail for display
-    return { fileId: thumbFileId || animFileId, animationFileId: animFileId, type: 'gif' };
+    r.animationFileId = anim?.file_id || null;
+    r.thumbnailFileId = anim?.thumbnail?.file_id || anim?.thumb?.file_id || null;
+    r.fileId = r.thumbnailFileId || r.animationFileId;
+    r.type = 'gif';
+    r.messageId = data.result?.message_id || null;
+    console.log('[Upload] sendAnimation OK animFileId=%s thumbFileId=%s', r.animationFileId?.slice(-20), r.thumbnailFileId?.slice(-20));
+    return r;
   }
 
   if (['image/jpeg', 'image/png', 'image/webp'].includes(mime)) {
@@ -711,44 +719,65 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendPhoto failed'); }
     const data = await res.json();
     const photos = data.result?.photo;
-    const photoFileId = photos?.length > 0 ? photos[photos.length - 1].file_id : null;
-    console.log('[Upload] sendPhoto OK fileId=%s', photoFileId ? photoFileId.slice(-20) : 'null');
-    return { fileId: photoFileId, type: 'image' };
+    r.fileId = photos?.length > 0 ? photos[photos.length - 1].file_id : null;
+    r.type = 'image';
+    r.messageId = data.result?.message_id || null;
+    console.log('[Upload] sendPhoto OK fileId=%s', r.fileId ? r.fileId.slice(-20) : 'null');
+    return r;
   }
 
-  // Video files → sendVideo (mp4, mov, avi, mkv, webm)
+  // Video files → sendVideo
   if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name || '')) {
     formData.append('video', file, file.name || 'video.mp4');
+    formData.append('supports_streaming', 'true');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendVideo failed'); }
     const data = await res.json();
     const vid = data.result?.video;
-    const videoFileId = vid?.file_id || null;
-    const thumbFileId = vid?.thumbnail?.file_id || vid?.thumb?.file_id || null;
-    console.log('[Upload] sendVideo OK videoFileId=%s thumbFileId=%s', videoFileId?.slice(-20), thumbFileId?.slice(-20));
-    return { fileId: thumbFileId || videoFileId, videoFileId: videoFileId, type: 'video' };
+    r.videoFileId = vid?.file_id || null;
+    r.thumbnailFileId = vid?.thumbnail?.file_id || vid?.thumb?.file_id || null;
+    r.fileId = r.thumbnailFileId || r.videoFileId;
+    r.type = 'video';
+    r.messageId = data.result?.message_id || null;
+    console.log('[Upload] sendVideo OK videoFileId=%s thumbFileId=%s', r.videoFileId?.slice(-20), r.thumbnailFileId?.slice(-20));
+    return r;
   }
 
-  // Audio files → sendAudio (mp3, wav, flac, m4a, ogg)
+  // Audio files → sendAudio
   if (mime.startsWith('audio/') || /\.(mp3|wav|flac|m4a|ogg|aac)$/i.test(file.name || '')) {
     formData.append('audio', file, file.name || 'audio.mp3');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAudio`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAudio failed'); }
     const data = await res.json();
-    const audioFileId = data.result?.audio?.file_id || null;
-    console.log('[Upload] sendAudio OK fileId=%s', audioFileId?.slice(-20));
-    return { fileId: audioFileId, type: 'audio' };
+    const audio = data.result?.audio;
+    r.fileId = audio?.file_id || null;
+    r.thumbnailFileId = audio?.thumbnail?.file_id || audio?.thumb?.file_id || null;
+    r.audioTitle = audio?.title || '';
+    r.audioPerformer = audio?.performer || '';
+    r.audioDuration = audio?.duration || 0;
+    r.type = 'audio';
+    r.messageId = data.result?.message_id || null;
+    console.log('[Upload] sendAudio OK fileId=%s title=%s performer=%s', r.fileId?.slice(-20), r.audioTitle, r.audioPerformer);
+    return r;
   }
 
-  // SVG and everything else → sendDocument
-  const docType = mime === 'image/svg+xml' ? 'image' : 'document';
+  // SVG, PDF, and everything else → sendDocument
+  const docType = mime === 'image/svg+xml' ? 'image'
+    : mime === 'application/pdf' ? 'pdf'
+    : mime.startsWith('image/') ? 'image'
+    : mime.startsWith('video/') ? 'video'
+    : 'document';
   formData.append('document', file, file.name || 'file');
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendDocument failed'); }
   const data = await res.json();
-  const resultFileId = data.result?.document?.file_id || null;
-  console.log('[Upload] sendDocument OK fileId=%s', resultFileId ? resultFileId.slice(-20) : 'null');
-  return { fileId: resultFileId, type: docType };
+  const doc = data.result?.document;
+  r.fileId = doc?.file_id || null;
+  r.thumbnailFileId = doc?.thumbnail?.file_id || doc?.thumb?.file_id || null;
+  r.type = docType;
+  r.messageId = data.result?.message_id || null;
+  console.log('[Upload] sendDocument OK fileId=%s type=%s thumbId=%s', r.fileId?.slice(-20), docType, r.thumbnailFileId?.slice(-20));
+  return r;
 }
 
 async function createNotionPage({ type, content, fileId, tagName, sourceUrl, aiData }) {
@@ -785,6 +814,48 @@ async function createNotionPage({ type, content, fileId, tagName, sourceUrl, aiD
   const page = await res.json();
   console.log('[Notion] Page created id=%s', page.id?.slice(0, 8));
   return page.id || null;
+}
+
+// Forward large file (>20MB) to storage channel via copyMessage, store storageUrl in Notion
+async function forwardToStorageChannel(messageId, notionPageId, aiData) {
+  try {
+    const settings = await getSettings();
+    const storageChatId = settings.storageChatId;
+    if (!storageChatId) { console.log('[Storage] No storageChatId, skipping'); return; }
+
+    const res = await fetch(`https://api.telegram.org/bot${STATE.botToken}/copyMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: storageChatId,
+        from_chat_id: STATE.chatId,
+        message_id: messageId,
+        disable_notification: true
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) { console.warn('[Storage] copyMessage failed:', data.description); return; }
+
+    const channelId = String(storageChatId).replace(/^@/, '');
+    const storageUrl = `https://t.me/${channelId}/${data.result.message_id}`;
+    aiData.storageUrl = storageUrl;
+    console.log('[Storage] Forwarded, storageUrl=%s', storageUrl);
+
+    // Patch Notion with storageUrl
+    await bgFetch(`https://api.notion.com/v1/pages/${notionPageId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${STATE.notionToken}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ properties: {
+        'ai_data': { rich_text: [{ text: { content: JSON.stringify(aiData).slice(0, 2000) } }] }
+      }})
+    });
+  } catch (e) {
+    console.warn('[Storage] Forward error:', e.message);
+  }
 }
 
 function addCardToGrid(item) {
@@ -4039,6 +4110,19 @@ Rules:
 - author: @handle for xpost. tweet_text: tweet text for xpost.
 - All fields must be present. No markdown.`;
 
+const AI_PROMPT_PDF = `Analyze this PDF document and return ONLY valid JSON, no other text:
+{"content_type":"pdf","content_type_secondary":null,"title":"","description":"detailed description: what the document is about, key topics, structure","materials":[],"color_palette":null,"color_subject":null,"color_top3":[],"text_on_image":"","price":"","author":"","tweet_text":""}
+
+Rules:
+- content_type: always "pdf".
+- content_type_secondary: null unless the PDF is about a product/tool.
+- title: document title from first page heading or cover (under 80 chars).
+- description: 2-4 sentences summarizing the document content.
+- text_on_image: first ~500 characters of visible text.
+- author: document author if visible. Empty otherwise.
+- color_palette/color_subject/color_top3: visual appearance of pages. Null/empty if plain text.
+- All fields must be present. No markdown.`;
+
 // Fetch a Telegram file as blob — uses CORS proxy in standalone mode
 async function fetchTgFile(filePath) {
   const directUrl = `https://api.telegram.org/file/bot${STATE.botToken}/${filePath}`;
@@ -4079,13 +4163,74 @@ async function viewerAnalyzeItem(item, settings) {
   if (!settings.aiApiKey) { console.warn('[AI] No API key, skipping'); return null; }
   const provider = settings.aiProvider || 'google';
   const model = settings.aiModel || (provider === 'google' ? 'gemini-2.0-flash' : 'claude-haiku-4-5-20251001');
+  const isPdf = item.type === 'pdf';
   const isDirectImage = item.type === 'image' || item.type === 'gif' || item.type === 'video';
-  const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+  const prompt = isPdf ? AI_PROMPT_PDF : isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
 
   let responseText = null;
 
-  // Try to get image from Telegram fileId
-  if (item.fileId && STATE.botToken) {
+  // PDF: send full file to AI (not as image)
+  if (isPdf && item.fileId && STATE.botToken) {
+    try {
+      console.log('[AI] PDF analysis, fetching file…');
+      const fileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${item.fileId}`);
+      const fileData = await fileRes.json();
+      if (fileData.ok && fileData.result?.file_path) {
+        const pdfBlob = await fetchTgFile(fileData.result.file_path);
+        const buffer = await pdfBlob.arrayBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        const base64 = btoa(binary);
+        console.log('[AI] PDF base64 ready, size=%dKB, sending to %s/%s', Math.round(base64.length / 1024), provider, model);
+
+        if (provider === 'google') {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
+          const res = await bgFetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [
+              { inline_data: { mime_type: 'application/pdf', data: base64 } },
+              { text: prompt }
+            ] }] })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+          } else {
+            console.warn('[AI] Gemini PDF error:', (await res.text()).slice(0, 300));
+          }
+        } else {
+          const res = await bgFetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': settings.aiApiKey,
+              'anthropic-version': '2023-06-01',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model, max_tokens: 300,
+              messages: [{ role: 'user', content: [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                { type: 'text', text: prompt }
+              ] }]
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            responseText = data.content?.[0]?.text || null;
+          } else {
+            console.warn('[AI] Anthropic PDF error:', (await res.text()).slice(0, 300));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AI] PDF analysis failed:', e.message);
+    }
+  }
+
+  // Try to get image from Telegram fileId (non-PDF)
+  if (!responseText && !isPdf && item.fileId && STATE.botToken) {
     try {
       console.log('[AI] Fetching file info from TG for fileId=...%s', item.fileId.slice(-15));
       const fileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${item.fileId}`);
@@ -4456,9 +4601,14 @@ async function runAiBackgroundProcessing() {
         const aiFileId = albumImageEntry ? albumImageEntry.fileId : item.fileId;
         const aiType = albumImageEntry ? 'image' : item.type;
 
+        // For PDF/video: AI needs the actual file, not the display thumbnail
+        let realFileId = aiFileId;
+        if (item.type === 'pdf' && item.pdfFileId) realFileId = item.pdfFileId;
+        else if (item.type === 'video' && item.videoFileId) realFileId = item.videoFileId;
+
         const aiItem = {
           type: aiType,
-          fileId: aiFileId,
+          fileId: realFileId,
           sourceUrl: item.sourceUrl,
           content: item.content,
           tagName: item.tag,
@@ -4594,23 +4744,33 @@ async function handleQuickSaveFiles(files) {
     const file = files[0];
     try {
       const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
+      // Build ai_data matching bot's buildAiDataFromParsed output
       const aiData = { mediaType: result.type };
-      if (file.name) aiData.fileName = file.name;
+      if (result.fileName) aiData.fileName = result.fileName;
       if (file.size) aiData.fileSize = file.size;
+      if (result.thumbnailFileId) aiData.thumbnailFileId = result.thumbnailFileId;
+      if (result.audioTitle) aiData.audioTitle = result.audioTitle;
+      if (result.audioPerformer) aiData.audioPerformer = result.audioPerformer;
+      if (result.audioDuration) aiData.audioDuration = result.audioDuration;
 
-      // For Notion, store the main playback file ID
+      // For Notion, store the main playback file ID (not thumbnail)
       const notionFileId = result.videoFileId || result.animationFileId || result.fileId;
       const notionPageId = await createNotionPage({
         type: result.type, fileId: notionFileId,
         tagName: selectedTagName, aiData,
       });
 
+      // Forward large files (>20MB) to storage channel for later access
+      if (file.size > 20 * 1024 * 1024 && result.messageId && STATE.chatId) {
+        forwardToStorageChannel(result.messageId, notionPageId, aiData);
+      }
+
       // Resolve thumbnail fileId for display
       let imgUrl = null;
       if (result.fileId) {
         imgUrl = await resolveFileId(STATE.botToken, result.fileId);
         // SVG: Telegram serves with wrong content-type → proxy to get blob URL
-        if (imgUrl && /\.svg$/i.test(file.name || '')) {
+        if (imgUrl && /\.svg$/i.test(result.fileName || '')) {
           const blobUrl = await proxySvgFile(imgUrl);
           if (blobUrl) imgUrl = blobUrl;
         }
@@ -4629,7 +4789,7 @@ async function handleQuickSaveFiles(files) {
         ai_analyzed: false, ai_data: aiData, fileIds: [],
         _resolvedImg: imgUrl,
         videoFileId: result.videoFileId || '',
-        pdfFileId: '',
+        pdfFileId: result.type === 'pdf' ? notionFileId : '',
         audioFileId: result.type === 'audio' ? result.fileId : '',
       });
       showToast(`Uploaded: ${file.name}`);
@@ -4648,11 +4808,11 @@ async function handleQuickSaveFiles(files) {
       try {
         showToast(`Uploading ${i + 1}/${total}: ${file.name}`);
         const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
-        result.fileName = file.name || '';
-        uploadResults.push(result);
 
         const aiData = { mediaType: result.type, mediaGroupId };
-        if (file.name) aiData.fileName = file.name;
+        if (result.fileName) aiData.fileName = result.fileName;
+        if (file.size) aiData.fileSize = file.size;
+        if (result.thumbnailFileId) aiData.thumbnailFileId = result.thumbnailFileId;
         const notionFileId = result.videoFileId || result.animationFileId || result.fileId;
 
         const notionPageId = await createNotionPage({
@@ -4660,6 +4820,12 @@ async function handleQuickSaveFiles(files) {
           tagName: selectedTagName, aiData,
         });
         notionPageIds.push(notionPageId);
+        uploadResults.push(result);
+
+        // Forward large files to storage channel
+        if (file.size > 20 * 1024 * 1024 && result.messageId && STATE.chatId) {
+          forwardToStorageChannel(result.messageId, notionPageId, aiData);
+        }
       } catch (err) {
         console.error('[Upload] Failed:', file.name, err);
         showToast(`Failed: ${file.name} — ${err.message}`);
@@ -4981,6 +5147,11 @@ async function saveNote() {
         const aiData = { mediaType: r.type };
         if (mediaGroupId) aiData.mediaGroupId = mediaGroupId;
         if (r.fileName) aiData.fileName = r.fileName;
+        if (files[i]?.size) aiData.fileSize = files[i].size;
+        if (r.thumbnailFileId) aiData.thumbnailFileId = r.thumbnailFileId;
+        if (r.audioTitle) aiData.audioTitle = r.audioTitle;
+        if (r.audioPerformer) aiData.audioPerformer = r.audioPerformer;
+        if (r.audioDuration) aiData.audioDuration = r.audioDuration;
         const notionFileId = r.videoFileId || r.animationFileId || r.fileId;
         const notionPageId = await createNotionPage({
           type: itemType,
