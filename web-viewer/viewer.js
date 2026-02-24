@@ -706,31 +706,21 @@ async function generatePdfThumbnail(pdfFile) {
   return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
 }
 
-// Generate a JPEG thumbnail from the first frame of a video
-function generateVideoThumbnail(videoFile) {
+// Extract width, height, duration from a video file via <video> element
+function getVideoMetadata(videoFile) {
   return new Promise((resolve) => {
     const video = document.createElement('video');
-    video.preload = 'auto';
+    video.preload = 'metadata';
     video.muted = true;
     const url = URL.createObjectURL(videoFile);
     video.src = url;
-    const cleanup = () => URL.revokeObjectURL(url);
-    video.addEventListener('loadeddata', () => {
-      video.currentTime = 0.1; // seek to 0.1s to get first real frame
+    video.addEventListener('loadedmetadata', () => {
+      const meta = { width: video.videoWidth, height: video.videoHeight, duration: video.duration };
+      URL.revokeObjectURL(url);
+      resolve(meta);
     });
-    video.addEventListener('seeked', () => {
-      try {
-        const canvas = document.createElement('canvas');
-        const maxDim = 320;
-        const scale = Math.min(maxDim / video.videoWidth, maxDim / video.videoHeight, 1);
-        canvas.width = Math.floor(video.videoWidth * scale);
-        canvas.height = Math.floor(video.videoHeight * scale);
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => { cleanup(); resolve(blob); }, 'image/jpeg', 0.85);
-      } catch { cleanup(); resolve(null); }
-    });
-    video.addEventListener('error', () => { cleanup(); resolve(null); });
-    setTimeout(() => { cleanup(); resolve(null); }, 5000); // timeout safety
+    video.addEventListener('error', () => { URL.revokeObjectURL(url); resolve({}); });
+    setTimeout(() => { URL.revokeObjectURL(url); resolve({}); }, 5000);
   });
 }
 
@@ -784,14 +774,14 @@ async function uploadFileToTelegram(file, botToken, chatId) {
   if (mime.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name || '')) {
     formData.append('video', file, file.name || 'video.mp4');
     formData.append('supports_streaming', 'true');
-    // Generate thumbnail from first frame (ensures preview even for large videos)
+    // Extract video dimensions + duration so Telegram displays correct aspect ratio
     try {
-      const thumbBlob = await generateVideoThumbnail(file);
-      if (thumbBlob) {
-        formData.append('thumbnail', thumbBlob, 'thumb.jpg');
-        console.log('[Upload] Video thumbnail generated, size=%d', thumbBlob.size);
-      }
-    } catch (e) { console.warn('[Upload] Video thumbnail generation failed:', e.message); }
+      const meta = await getVideoMetadata(file);
+      if (meta.width) formData.append('width', String(meta.width));
+      if (meta.height) formData.append('height', String(meta.height));
+      if (meta.duration) formData.append('duration', String(Math.round(meta.duration)));
+      console.log('[Upload] Video metadata: %dx%d, %ds', meta.width, meta.height, Math.round(meta.duration || 0));
+    } catch (e) { console.warn('[Upload] Video metadata extraction failed:', e.message); }
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendVideo failed'); }
     const data = await res.json();
@@ -4686,6 +4676,23 @@ async function runAiBackgroundProcessing() {
         const albumImageEntry = (item.albumMedia || []).find(m =>
           m.fileId && (m.mediaType === 'image' || m.mediaType === 'gif' || !m.mediaType)
         );
+
+        // Albums with only non-image media (PDF, document, video) — skip AI for the album card
+        // Each file has its own Notion page that gets analyzed separately
+        if (item.albumMedia?.length > 0 && !albumImageEntry) {
+          item.ai_analyzed = true;
+          // Mark as analyzed in Notion (just the checkbox, no AI data)
+          try {
+            await bgFetch(`https://api.notion.com/v1/pages/${item.id}`, {
+              method: 'PATCH',
+              headers: { 'Authorization': `Bearer ${STATE.notionToken}`, 'Notion-Version': NOTION_VERSION, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ properties: { 'ai_analyzed': { checkbox: true } } })
+            });
+          } catch {}
+          done++;
+          return;
+        }
+
         const aiFileId = albumImageEntry ? albumImageEntry.fileId : item.fileId;
         const aiType = albumImageEntry ? 'image' : item.type;
 
