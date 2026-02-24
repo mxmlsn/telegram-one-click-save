@@ -492,10 +492,12 @@ function parseItem(page) {
   const isGifType = type === 'gif' || aiData.mediaType === 'gif';
   const hasThumb = !!aiData.thumbnailFileId;
 
-  // For video/PDF/video_note/audio/gif: use thumbnail for display, keep original for playback
+  // For video/PDF/video_note/audio: use thumbnail for display, keep original for playback
+  // For GIF: only swap if >20MB (small GIFs use animation fileId directly — plays as mp4 video)
   // For images/documents: use full file (falls back to thumbnail in resolution pipeline)
   const isDocType = type === 'document';
-  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType || isGifType) && hasThumb;
+  const isLargeGif = isGifType && (aiData.fileSize || 0) > 20 * 1024 * 1024;
+  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType || isLargeGif) && hasThumb;
   const displayFileId = needsThumbSwap ? aiData.thumbnailFileId : rawFileId;
   const videoFileId = ((isVideoType || isVideoNoteType) && hasThumb) ? rawFileId : ((isVideoType || isVideoNoteType) ? rawFileId : '');
   const pdfFileId = (isPdfType && hasThumb) ? rawFileId : (isPdfType ? rawFileId : '');
@@ -537,11 +539,17 @@ function mergeMediaGroups(items) {
       // which can't be displayed as <img>. In that case, clear it for the renderer.
       let displayFid = item.fileId;
       if (mType === 'video' && displayFid && displayFid === item.videoFileId) displayFid = ''; // no thumbnail → no img
+      // GIF: TG always converts to mp4 which <img> can't display. Use thumbnail if available.
+      if (mType === 'gif') {
+        const gifThumbFid = item.ai_data?.thumbnailFileId || '';
+        displayFid = gifThumbFid || ''; // prefer thumbnail; if none, show fallback
+      }
       if (mType === 'document') displayFid = ''; // documents are never displayable as images
       const mediaEntry = {
         fileId: displayFid,
         mediaType: mType,
-        videoFileId: item.videoFileId || '',
+        // For GIF: animation fileId stored in Notion's File ID field (rawFileId before any swap)
+        videoFileId: item.videoFileId || (mType === 'gif' ? (item.fileId || '') : ''),
         pdfFileId: item.pdfFileId || '',
         audioFileId: item.audioFileId || item.ai_data?.audioFileId || '',
         audioTitle: item.ai_data?.audioTitle || '',
@@ -766,6 +774,30 @@ function generateVideoThumbnail(videoFile) {
   });
 }
 
+// Generate a JPEG thumbnail from the first frame of a GIF (ensures preview for large GIFs)
+function generateGifThumbnail(gifFile) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(gifFile);
+    let resolved = false;
+    const done = (blob) => { if (resolved) return; resolved = true; URL.revokeObjectURL(url); resolve(blob); };
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        const scale = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
+        canvas.width = Math.floor(img.naturalWidth * scale);
+        canvas.height = Math.floor(img.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => done(blob), 'image/jpeg', 0.85);
+      } catch { done(null); }
+    };
+    img.onerror = () => done(null);
+    img.src = url;
+    setTimeout(() => { console.warn('[Upload] GIF thumbnail generation timeout'); done(null); }, 10000);
+  });
+}
+
 async function uploadFileToTelegram(file, botToken, chatId) {
   console.log('[Upload] file=%s size=%d type=%s', file.name, file.size, file.type);
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -784,17 +816,29 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     messageId: null, fileName: file.name || '' };
 
   if (mime === 'image/gif') {
+    // Generate thumbnail from first frame (for preview in case TG doesn't provide one)
+    let gifThumbBlob = null;
+    try {
+      gifThumbBlob = await generateGifThumbnail(file);
+      if (gifThumbBlob) {
+        formData.append('thumbnail', gifThumbBlob, 'thumb.jpg');
+        console.log('[Upload] GIF thumbnail generated, size=%d', gifThumbBlob.size);
+      }
+    } catch (e) { console.warn('[Upload] GIF thumbnail generation failed:', e.message); }
     formData.append('animation', file, file.name || 'animation.gif');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAnimation`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAnimation failed'); }
     const data = await res.json();
     const anim = data.result?.animation;
-    r.animationFileId = anim?.file_id || null;
-    r.thumbnailFileId = anim?.thumbnail?.file_id || anim?.thumb?.file_id || null;
+    // TG may treat very large GIFs as documents — check document field as fallback
+    const doc = !anim ? data.result?.document : null;
+    r.animationFileId = anim?.file_id || doc?.file_id || null;
+    r.thumbnailFileId = anim?.thumbnail?.file_id || anim?.thumb?.file_id
+      || doc?.thumbnail?.file_id || doc?.thumb?.file_id || null;
     r.fileId = r.thumbnailFileId || r.animationFileId;
     r.type = 'gif';
     r.messageId = data.result?.message_id || null;
-    console.log('[Upload] sendAnimation OK animFileId=%s thumbFileId=%s', r.animationFileId?.slice(-20), r.thumbnailFileId?.slice(-20));
+    console.log('[Upload] sendAnimation OK animFileId=%s thumbFileId=%s docFallback=%s', r.animationFileId?.slice(-20), r.thumbnailFileId?.slice(-20), !!doc);
     return r;
   }
 
@@ -2745,16 +2789,18 @@ function renderCard(item) {
         </div>
       </div>`;
     }
-    // Telegram stores animations as mp4 — use <video> instead of <img>.
-    // All TG gif items come from animation.file_id and are always mp4.
-    // Only treat as static gif if the URL itself is a .gif (external animated gif).
-    const isMp4Gif = !/\.gif($|\?)/i.test(imgUrl);
-    const mediaEl = isMp4Gif
-      ? `<video class="card-img" src="${escapeHtml(imgUrl)}" autoplay loop muted playsinline></video>`
-      : `<img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">`;
-    // For mp4 gifs: open via video lightbox; for true .gif: image lightbox
-    const lbAction = isMp4Gif ? 'gif-mp4-lightbox' : 'lightbox';
-    return `<div class="card card-image card-gif" data-id="${item.id}" data-action="${lbAction}" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}" data-file-id="${escapeHtml(item.fileId || '')}">
+    // Determine the best display source:
+    // 1. If imgUrl is an mp4 (viewer-uploaded animation fileId resolved) → <video autoplay loop>
+    // 2. If item.content has original .gif URL (bot-saved) → use that as <img> (browsers animate GIFs)
+    // 3. Otherwise imgUrl is a JPEG thumbnail → <img> (static preview, best we can do)
+    const isMp4 = /\.mp4($|\?)/i.test(imgUrl);
+    const originalGifUrl = /\.gif($|\?)/i.test(item.content || '') ? item.content : '';
+    const displayUrl = isMp4 ? imgUrl : (originalGifUrl || imgUrl);
+    const mediaEl = isMp4
+      ? `<video class="card-img" src="${escapeHtml(displayUrl)}" autoplay loop muted playsinline></video>`
+      : `<img class="card-img" src="${escapeHtml(displayUrl)}" loading="lazy" alt="">`;
+    const lbAction = isMp4 ? 'gif-mp4-lightbox' : 'lightbox';
+    return `<div class="card card-image card-gif" data-id="${item.id}" data-action="${lbAction}" data-img="${escapeHtml(displayUrl)}" data-url="${escapeHtml(sourceUrl)}" data-file-id="${escapeHtml(item.fileId || '')}">
       ${pendingDot}
       ${mediaEl}
       <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
@@ -5022,7 +5068,7 @@ async function handleQuickSaveFiles(files) {
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
           mediaType: r.type,
-          videoFileId: r.videoFileId || '',
+          videoFileId: r.videoFileId || r.animationFileId || '',
           pdfFileId: r.type === 'pdf' ? r.fileId : '',
           audioFileId: r.type === 'audio' ? r.fileId : '',
           fileName: r.fileName || '',
@@ -5364,7 +5410,7 @@ async function saveNote() {
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
           mediaType: r.type,
-          videoFileId: r.videoFileId || '',
+          videoFileId: r.videoFileId || r.animationFileId || '',
           pdfFileId: r.type === 'pdf' ? r.fileId : '',
           audioFileId: r.type === 'audio' ? r.fileId : '',
           fileName: r.fileName || '',
