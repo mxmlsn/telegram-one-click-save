@@ -683,6 +683,29 @@ async function compressImageIfNeeded(blob) {
   return compressedBlob;
 }
 
+// Generate a JPEG thumbnail from the first page of a PDF using pdf.js
+async function generatePdfThumbnail(pdfFile) {
+  if (!window.pdfjsLib) {
+    const mod = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.min.mjs');
+    window.pdfjsLib = mod;
+    mod.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.9.155/pdf.worker.min.mjs';
+  }
+  const arrayBuffer = await pdfFile.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1 });
+  // Scale to max 320px on longest side (Telegram thumbnail limit)
+  const maxDim = 320;
+  const scale = Math.min(maxDim / viewport.width, maxDim / viewport.height, 1);
+  const scaledViewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(scaledViewport.width);
+  canvas.height = Math.floor(scaledViewport.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise;
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+}
+
 async function uploadFileToTelegram(file, botToken, chatId) {
   console.log('[Upload] file=%s size=%d type=%s', file.name, file.size, file.type);
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -771,6 +794,18 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     : mime.startsWith('video/') ? 'video'
     : 'document';
   formData.append('document', file, file.name || 'file');
+
+  // For PDF: generate thumbnail from first page and attach it
+  if (docType === 'pdf') {
+    try {
+      const thumbBlob = await generatePdfThumbnail(file);
+      if (thumbBlob) {
+        formData.append('thumbnail', thumbBlob, 'thumb.jpg');
+        console.log('[Upload] PDF thumbnail generated, size=%d', thumbBlob.size);
+      }
+    } catch (e) { console.warn('[Upload] PDF thumbnail generation failed:', e.message); }
+  }
+
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendDocument failed'); }
   const data = await res.json();
