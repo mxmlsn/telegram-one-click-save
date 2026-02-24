@@ -724,6 +724,33 @@ function getVideoMetadata(videoFile) {
   });
 }
 
+// Generate a JPEG thumbnail from the first frame of a video (ensures preview for heavy videos)
+function generateVideoThumbnail(videoFile) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    const url = URL.createObjectURL(videoFile);
+    let resolved = false;
+    const done = (blob) => { if (resolved) return; resolved = true; URL.revokeObjectURL(url); resolve(blob); };
+    video.addEventListener('loadeddata', () => { video.currentTime = 0.1; });
+    video.addEventListener('seeked', () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        const scale = Math.min(maxDim / video.videoWidth, maxDim / video.videoHeight, 1);
+        canvas.width = Math.floor(video.videoWidth * scale);
+        canvas.height = Math.floor(video.videoHeight * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => done(blob), 'image/jpeg', 0.85);
+      } catch { done(null); }
+    });
+    video.addEventListener('error', () => done(null));
+    video.src = url;
+    setTimeout(() => { console.warn('[Upload] Video thumbnail generation timeout'); done(null); }, 10000);
+  });
+}
+
 async function uploadFileToTelegram(file, botToken, chatId) {
   console.log('[Upload] file=%s size=%d type=%s', file.name, file.size, file.type);
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -782,6 +809,14 @@ async function uploadFileToTelegram(file, botToken, chatId) {
       if (meta.duration) formData.append('duration', String(Math.round(meta.duration)));
       console.log('[Upload] Video metadata: %dx%d, %ds', meta.width, meta.height, Math.round(meta.duration || 0));
     } catch (e) { console.warn('[Upload] Video metadata extraction failed:', e.message); }
+    // Generate thumbnail from first frame (ensures preview even for large videos)
+    try {
+      const thumbBlob = await generateVideoThumbnail(file);
+      if (thumbBlob) {
+        formData.append('thumbnail', thumbBlob, 'thumb.jpg');
+        console.log('[Upload] Video thumbnail generated, size=%d', thumbBlob.size);
+      }
+    } catch (e) { console.warn('[Upload] Video thumbnail generation failed:', e.message); }
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendVideo failed'); }
     const data = await res.json();
@@ -2294,8 +2329,9 @@ function renderCard(item) {
         </div>`;
     }
 
-    // Short-circuit: tgpost with PDF → render as card-pdf with text+author below
-    if (aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
+    // Short-circuit: tgpost with SINGLE PDF → render as card-pdf with text+author below
+    // (albums with multiple items use the album grid renderer below)
+    if (!albumMedia.length && aiData.mediaType === 'pdf' && (item.pdfFileId || item.fileId)) {
       const pdfFid = item.pdfFileId || item.fileId;
       const pdfThumbUrl = imgUrl || '';
       const pdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
