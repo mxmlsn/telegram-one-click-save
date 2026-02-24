@@ -539,10 +539,16 @@ function mergeMediaGroups(items) {
       // which can't be displayed as <img>. In that case, clear it for the renderer.
       let displayFid = item.fileId;
       if (mType === 'video' && displayFid && displayFid === item.videoFileId) displayFid = ''; // no thumbnail → no img
-      // GIF: TG always converts to mp4 which <img> can't display. Use thumbnail if available.
+      // GIF: TG converts animations to mp4 which <img> can't display.
+      // Use thumbnail for display. For viewer-uploaded GIFs, aiData.thumbnailFileId has the JPEG thumb.
+      // For bot-saved GIFs, item.fileId IS already the thumbnail (bot stores thumb as main fileId).
+      // For large GIFs without thumbnail, clear displayFid (renderer shows fallback).
       if (mType === 'gif') {
         const gifThumbFid = item.ai_data?.thumbnailFileId || '';
-        displayFid = gifThumbFid || ''; // prefer thumbnail; if none, show fallback
+        if (gifThumbFid) {
+          displayFid = gifThumbFid; // viewer-uploaded: use explicit thumbnail
+        }
+        // else: keep displayFid = item.fileId (bot-saved: fileId is already the thumbnail)
       }
       if (mType === 'document') displayFid = ''; // documents are never displayable as images
       const mediaEntry = {
@@ -2510,11 +2516,17 @@ function renderCard(item) {
         }
         if (m.mediaType === 'video' || m.mediaType === 'gif') {
           const playFileId = m.videoFileId || m.fileId;
-          const storageUrl = m.storageUrl || aiData.storageUrl || '';
-          const fallbackAction = storageUrl ? `data-action="open" data-url="${escapeHtml(storageUrl)}"` : (playFileId ? `data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"` : '');
+          const storageUrl = m.storageUrl || '';
+          // For items with storageUrl (>20MB): always link to channel, even if thumbnail available
+          if (storageUrl) {
+            const thumbHtml = resolvedUrl
+              ? `<img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt="">`
+              : `<div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`;
+            return `<div class="tgpost-album-item is-video" data-action="open" data-url="${escapeHtml(storageUrl)}">${thumbHtml}<div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`;
+          }
           return resolvedUrl
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
-            : `<div class="tgpost-album-item is-video" ${fallbackAction}><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
+            : `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
         }
         if (m.mediaType === 'document') {
           const docFname = m.fileName || m.fileContent || '';
@@ -2777,8 +2789,6 @@ function renderCard(item) {
     // Show as static image with link to TG channel (like large images).
     const gifIsLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
     const gifStorageUrl = aiData.storageUrl || '';
-    console.log('[GIF] render id=%s fileSize=%s isLarge=%s storageUrl=%s imgUrl=%s',
-      item.id?.slice(0, 8), aiData.fileSize, gifIsLarge, gifStorageUrl?.slice(0, 40) || 'NONE', imgUrl?.slice(0, 60) || 'NONE');
     if (gifStorageUrl) {
       const sizeMB = (aiData.fileSize || 0) > 1024 * 1024 ? Math.round((aiData.fileSize || 0) / 1024 / 1024) : 0;
       const sizeLabel = sizeMB ? `GIF · ${sizeMB} MB` : 'GIF';
