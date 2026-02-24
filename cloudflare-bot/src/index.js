@@ -182,6 +182,10 @@ async function handleUpdate(update, env, ctx) {
   const chatId = String(message.chat.id);
   if (chatId !== env.ALLOWED_CHAT_ID) return;
 
+  // Skip messages sent by the web viewer (already saved to Notion by viewer itself)
+  const text = message.text || message.caption || '';
+  if (text.startsWith('[stash-viewer]')) return;
+
   const parsed = parseMessage(message, env);
 
   try {

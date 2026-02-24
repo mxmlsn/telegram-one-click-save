@@ -689,6 +689,7 @@ async function uploadFileToTelegram(file, botToken, chatId) {
   const formData = new FormData();
   formData.append('chat_id', chatId);
   formData.append('disable_notification', 'true');
+  formData.append('caption', '[stash-viewer]'); // marker so bot skips duplicate processing
 
   if (mime === 'image/gif') {
     formData.append('animation', file, file.name || 'animation.gif');
@@ -4092,7 +4093,10 @@ async function viewerAnalyzeItem(item, settings) {
       console.log('[AI] TG getFile result: ok=%s, path=%s', fileData.ok, fileData.result?.file_path || 'none');
       if (fileData.ok && fileData.result?.file_path) {
         const ext = fileData.result.file_path.split('.').pop()?.toLowerCase();
-        const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'heic'];
+        let base64 = null;
+        let mimeType = null;
+
         if (IMAGE_EXTS.includes(ext)) {
           console.log('[AI] Fetching image as base64, ext=%s', ext);
           const imgBlob = await fetchTgFile(fileData.result.file_path);
@@ -4100,8 +4104,46 @@ async function viewerAnalyzeItem(item, settings) {
           const bytes = new Uint8Array(buffer);
           let binary = '';
           for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-          const base64 = btoa(binary);
-          const mimeType = ext === 'gif' ? 'image/gif' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+          base64 = btoa(binary);
+          mimeType = ext === 'gif' ? 'image/gif' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        } else if (ext === 'svg') {
+          // SVG: rasterize to PNG via Canvas API (same approach as bot's Resvg)
+          console.log('[AI] SVG detected, rasterizing via Canvas…');
+          try {
+            const svgBlob = await fetchTgFile(fileData.result.file_path);
+            const svgText = await svgBlob.text();
+            if (svgText.length > 50) {
+              const blob = new Blob([svgText], { type: 'image/svg+xml' });
+              const blobUrl = URL.createObjectURL(blob);
+              const img = new Image();
+              await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = blobUrl;
+              });
+              const canvas = document.createElement('canvas');
+              const w = Math.min(img.naturalWidth || 800, 800);
+              const h = img.naturalHeight ? Math.round(w * img.naturalHeight / img.naturalWidth) : 800;
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, w, h);
+              ctx.drawImage(img, 0, 0, w, h);
+              URL.revokeObjectURL(blobUrl);
+              const dataUrl = canvas.toDataURL('image/png');
+              base64 = dataUrl.split(',')[1];
+              mimeType = 'image/png';
+              console.log('[AI] SVG rasterized to PNG, base64 size=%dKB', Math.round(base64.length / 1024));
+            }
+          } catch (svgErr) {
+            console.warn('[AI] SVG rasterization failed:', svgErr.message);
+          }
+        } else {
+          console.log('[AI] File ext=%s is not a supported image, skipping image analysis', ext);
+        }
+
+        if (base64 && mimeType) {
           console.log('[AI] Image base64 ready, size=%dKB, sending to %s/%s', Math.round(base64.length / 1024), provider, model);
 
           if (provider === 'google') {
@@ -4147,8 +4189,6 @@ async function viewerAnalyzeItem(item, settings) {
               console.warn('[AI] Anthropic error:', errText.slice(0, 300));
             }
           }
-        } else {
-          console.log('[AI] File ext=%s is not an image, skipping image analysis', ext);
         }
       }
     } catch (e) {
@@ -4903,7 +4943,7 @@ async function saveNote() {
       await fetch(`https://api.telegram.org/bot${STATE.botToken}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: STATE.chatId, text: plainText, disable_notification: true })
+        body: JSON.stringify({ chat_id: STATE.chatId, text: '[stash-viewer]\n' + plainText, disable_notification: true })
       });
 
       const notionPageId = await createNotionPage({
