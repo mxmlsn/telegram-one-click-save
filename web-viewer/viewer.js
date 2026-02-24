@@ -182,6 +182,7 @@ async function init() {
     STATE.chatId = settings.chatId || '';
     STATE.customTags = settings.customTags || [];
     STATE.aiEnabled = !!(settings.aiEnabled && settings.aiApiKey);
+    console.log('[Init] chatId=%s, customTags=%d, aiEnabled=%s', STATE.chatId ? 'set' : 'empty', STATE.customTags.length, STATE.aiEnabled);
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
     startApp();
   } else {
@@ -627,6 +628,7 @@ async function compressImageIfNeeded(blob) {
 }
 
 async function uploadFileToTelegram(file, botToken, chatId) {
+  console.log('[Upload] file=%s size=%d type=%s', file.name, file.size, file.type);
   const MAX_FILE_SIZE = 50 * 1024 * 1024;
   if (file.size > MAX_FILE_SIZE) throw new Error('File too large (max 50MB)');
 
@@ -641,6 +643,7 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAnimation failed'); }
     const data = await res.json();
     const thumb = data.result?.animation?.thumbnail || data.result?.animation?.thumb;
+    console.log('[Upload] sendAnimation OK fileId=%s', thumb?.file_id ? thumb.file_id.slice(-20) : 'null');
     return { fileId: thumb?.file_id || null, type: 'gif' };
   }
 
@@ -651,7 +654,9 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendPhoto failed'); }
     const data = await res.json();
     const photos = data.result?.photo;
-    return { fileId: photos?.length > 0 ? photos[photos.length - 1].file_id : null, type: 'image' };
+    const photoFileId = photos?.length > 0 ? photos[photos.length - 1].file_id : null;
+    console.log('[Upload] sendPhoto OK fileId=%s', photoFileId ? photoFileId.slice(-20) : 'null');
+    return { fileId: photoFileId, type: 'image' };
   }
 
   // SVG and everything else → sendDocument
@@ -660,7 +665,9 @@ async function uploadFileToTelegram(file, botToken, chatId) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendDocument failed'); }
   const data = await res.json();
-  return { fileId: data.result?.document?.file_id || null, type: docType };
+  const resultFileId = data.result?.document?.file_id || null;
+  console.log('[Upload] sendDocument OK fileId=%s', resultFileId ? resultFileId.slice(-20) : 'null');
+  return { fileId: resultFileId, type: docType };
 }
 
 async function createNotionPage({ type, content, fileId, tagName, sourceUrl, aiData }) {
@@ -695,10 +702,12 @@ async function createNotionPage({ type, content, fileId, tagName, sourceUrl, aiD
     throw new Error('Notion save failed: ' + (err.message || res.status));
   }
   const page = await res.json();
+  console.log('[Notion] Page created id=%s', page.id?.slice(0, 8));
   return page.id || null;
 }
 
 function addCardToGrid(item) {
+  console.log('[Grid] addCard type=%s fileId=%s albumMedia=%d', item.type, item.fileId?.slice(-20) || 'none', item.albumMedia?.length || 0);
   STATE.items.unshift(item);
   const cardHtml = renderCard(item);
   const masonry = document.getElementById('masonry');
@@ -3902,6 +3911,200 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// ─── AI inline analysis (works in both extension and standalone) ──────────────
+
+const AI_PROMPT_IMAGE = `Analyze this photo/image and return ONLY valid JSON, no other text:
+{"content_type":null,"content_type_secondary":null,"title":"","description":"detailed description","materials":[],"color_palette":null,"color_subject":null,"color_top3":[],"text_on_image":"","price":"","author":"","tweet_text":""}
+
+Rules:
+- content_type: ONLY "product" (if purchasable item WITH visible price) or null. No other values for direct photos.
+- content_type_secondary: null for direct photos.
+- title: primary heading/title visible (under 80 chars). Empty if none.
+- description: 2-4 sentences in English describing composition, objects, mood.
+- materials: textures/materials visible. Empty array if none.
+- color_palette: overall dominant color. Allowed: red,violet,pink,yellow,green,blue,brown,white,black,bw. Null if unclear.
+- color_subject: main subject color (not background). Null if same as palette.
+- color_top3: top 1-3 colors by area. Don't pad.
+- text_on_image: ALL visible text verbatim. Empty if none.
+- price: product price with currency (only if single hero product). Empty otherwise.
+- author: empty. tweet_text: empty.
+- All fields must be present. No markdown.`;
+
+const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no other text:
+{"content_type":null,"content_type_secondary":null,"title":"","description":"detailed description","materials":[],"color_palette":null,"color_subject":null,"color_top3":[],"text_on_image":"","price":"","author":"","tweet_text":""}
+
+Rules:
+- content_type: "article","video","product","xpost","tool","pdf" or null.
+- content_type_secondary: different from primary or null.
+- title: primary heading (under 80 chars).
+- description: 2-4 sentences in English.
+- materials: textures visible. Empty array if none.
+- color_palette/color_subject/color_top3: allowed values: red,violet,pink,yellow,green,blue,brown,white,black,bw.
+- text_on_image: visible text verbatim.
+- price: only for single hero product with visible price.
+- author: @handle for xpost. tweet_text: tweet text for xpost.
+- All fields must be present. No markdown.`;
+
+async function viewerAnalyzeItem(item, settings) {
+  if (!settings.aiApiKey) return null;
+  const provider = settings.aiProvider || 'google';
+  const model = settings.aiModel || (provider === 'google' ? 'gemini-2.0-flash' : 'claude-haiku-4-5-20251001');
+  const isDirectImage = item.type === 'image' || item.type === 'gif' || item.type === 'video';
+  const prompt = isDirectImage ? AI_PROMPT_IMAGE : AI_PROMPT_LINK;
+
+  let responseText = null;
+
+  // Try to get image from Telegram fileId
+  if (item.fileId && STATE.botToken) {
+    try {
+      const fileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${item.fileId}`);
+      const fileData = await fileRes.json();
+      if (fileData.ok && fileData.result?.file_path) {
+        const ext = fileData.result.file_path.split('.').pop()?.toLowerCase();
+        const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        if (IMAGE_EXTS.includes(ext)) {
+          const imgUrl = `https://api.telegram.org/file/bot${STATE.botToken}/${fileData.result.file_path}`;
+          // Fetch image as base64
+          const imgRes = await fetch(imgUrl);
+          const imgBlob = await imgRes.blob();
+          const buffer = await imgBlob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          const base64 = btoa(binary);
+          const mimeType = ext === 'gif' ? 'image/gif' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+
+          if (provider === 'google') {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
+            const res = await bgFetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [
+                { inline_data: { mime_type: mimeType, data: base64 } },
+                { text: prompt }
+              ] }] })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+            }
+          } else {
+            const res = await bgFetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'x-api-key': settings.aiApiKey,
+                'anthropic-version': '2023-06-01',
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model, max_tokens: 300,
+                messages: [{ role: 'user', content: [
+                  { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+                  { type: 'text', text: prompt }
+                ] }]
+              })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              responseText = data.content?.[0]?.text || null;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AI] Image analysis failed, falling back to text:', e);
+    }
+  }
+
+  // Text fallback
+  if (!responseText) {
+    const context = [
+      item.sourceUrl ? `URL: ${item.sourceUrl}` : '',
+      item.content ? `Content: ${item.content.slice(0, 500)}` : '',
+      item.tagName ? `User tag: ${item.tagName}` : ''
+    ].filter(Boolean).join('\n');
+    const fullPrompt = `${AI_PROMPT_LINK}\n\nContent to analyze:\n${context}`;
+
+    if (provider === 'google') {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
+      const res = await bgFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      }
+    } else {
+      const res = await bgFetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': settings.aiApiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model, max_tokens: 300,
+          messages: [{ role: 'user', content: fullPrompt }]
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        responseText = data.content?.[0]?.text || null;
+      }
+    }
+  }
+
+  if (!responseText) return null;
+
+  try {
+    const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (isDirectImage && parsed.content_type !== 'product') parsed.content_type = null;
+    return parsed;
+  } catch (e) {
+    console.warn('[AI] Parse error:', e, responseText?.slice(0, 200));
+    return null;
+  }
+}
+
+async function patchNotionWithAI(pageId, aiResult, existingAiData) {
+  if (!pageId || !aiResult) return;
+  const properties = { 'ai_analyzed': { checkbox: true } };
+
+  properties['ai_type'] = aiResult.content_type
+    ? { select: { name: aiResult.content_type } }
+    : { select: null };
+  properties['ai_type_secondary'] = aiResult.content_type_secondary
+    ? { select: { name: aiResult.content_type_secondary } }
+    : { select: null };
+  if (aiResult.description) {
+    properties['ai_description'] = { rich_text: [{ text: { content: aiResult.description.slice(0, 2000) } }] };
+  }
+
+  const aiDataPayload = { ...(existingAiData || {}) };
+  if (aiResult.title) aiDataPayload.title = aiResult.title;
+  if (aiResult.materials?.length) aiDataPayload.materials = aiResult.materials;
+  if (aiResult.color_palette) aiDataPayload.color_palette = aiResult.color_palette;
+  if (aiResult.color_subject) aiDataPayload.color_subject = aiResult.color_subject;
+  if (aiResult.color_top3?.length) aiDataPayload.color_top3 = aiResult.color_top3;
+  if (aiResult.text_on_image) aiDataPayload.text_on_image = aiResult.text_on_image;
+  if (aiResult.price) aiDataPayload.price = aiResult.price;
+  if (aiResult.author) aiDataPayload.author = aiResult.author;
+  if (aiResult.tweet_text) aiDataPayload.tweet_text = aiResult.tweet_text;
+
+  if (Object.keys(aiDataPayload).length) {
+    properties['ai_data'] = { rich_text: [{ text: { content: JSON.stringify(aiDataPayload).slice(0, 2000) } }] };
+  }
+
+  try {
+    await notionPatch(pageId, { properties });
+  } catch (e) {
+    console.warn('[AI] Notion patch error:', e);
+  }
+}
+
 // ─── AI background processing ─────────────────────────────────────────────────
 async function runAiBackgroundProcessing() {
   const pending = STATE.items.filter(item => !item.ai_analyzed && item.id && item.type !== 'quote');
@@ -3911,57 +4114,64 @@ async function runAiBackgroundProcessing() {
     return;
   }
 
+  const settings = await getSettings();
+  if (!settings.aiEnabled || !settings.aiApiKey) {
+    console.log('[AI] Disabled or no API key, skipping');
+    return;
+  }
+
   const aiStatus = document.getElementById('ai-status');
   let done = 0;
   const BATCH = 3;
 
   for (let i = 0; i < pending.length; i += BATCH) {
     const batch = pending.slice(i, i + BATCH);
-    await Promise.all(batch.map(item => new Promise(resolve => {
-      // For albums: find the first image/gif fileId to send to AI (not document/pdf)
-      const albumImageEntry = (item.albumMedia || []).find(m =>
-        m.fileId && (m.mediaType === 'image' || m.mediaType === 'gif' || !m.mediaType)
-      );
-      const aiFileId = albumImageEntry ? albumImageEntry.fileId : item.fileId;
-      const aiType = albumImageEntry ? 'image' : item.type;
-      chrome.runtime.sendMessage({
-        type: 'AI_ANALYZE',
-        item: {
+    await Promise.all(batch.map(async item => {
+      try {
+        // For albums: find the first image/gif fileId to send to AI
+        const albumImageEntry = (item.albumMedia || []).find(m =>
+          m.fileId && (m.mediaType === 'image' || m.mediaType === 'gif' || !m.mediaType)
+        );
+        const aiFileId = albumImageEntry ? albumImageEntry.fileId : item.fileId;
+        const aiType = albumImageEntry ? 'image' : item.type;
+
+        const aiItem = {
           type: aiType,
           fileId: aiFileId,
           sourceUrl: item.sourceUrl,
           content: item.content,
           tagName: item.tag,
-          existingAiData: item.ai_data || {}
-        },
-        notionPageId: item.id
-      }, response => {
-        if (chrome.runtime.lastError) { resolve(); return; }
-        if (response?.ok && response.result) {
-          item.ai_type = response.result.content_type || item.ai_type;
-          item.ai_type_secondary = response.result.content_type_secondary || item.ai_type_secondary;
-          item.ai_description = response.result.description || item.ai_description;
-          const r = response.result;
-          // Merge AI results into existing ai_data (preserve mediaType, thumbnailFileId, etc.)
-          if (r.materials?.length) item.ai_data.materials = r.materials;
-          if (r.color_palette) item.ai_data.color_palette = r.color_palette;
-          if (r.color_subject) item.ai_data.color_subject = r.color_subject;
-          if (r.color_top3?.length) item.ai_data.color_top3 = r.color_top3;
-          if (r.text_on_image) item.ai_data.text_on_image = r.text_on_image;
-          if (r.price) item.ai_data.price = r.price;
-          if (r.author) item.ai_data.author = r.author;
-          if (r.tweet_text) item.ai_data.tweet_text = r.tweet_text;
-          if (r.title) item.ai_data.title = r.title;
+        };
+
+        const result = await viewerAnalyzeItem(aiItem, settings);
+        if (result) {
+          // Patch Notion
+          await patchNotionWithAI(item.id, result, item.ai_data || {});
+
+          // Update local state
+          item.ai_type = result.content_type || item.ai_type;
+          item.ai_type_secondary = result.content_type_secondary || item.ai_type_secondary;
+          item.ai_description = result.description || item.ai_description;
+          if (result.materials?.length) item.ai_data.materials = result.materials;
+          if (result.color_palette) item.ai_data.color_palette = result.color_palette;
+          if (result.color_subject) item.ai_data.color_subject = result.color_subject;
+          if (result.color_top3?.length) item.ai_data.color_top3 = result.color_top3;
+          if (result.text_on_image) item.ai_data.text_on_image = result.text_on_image;
+          if (result.price) item.ai_data.price = result.price;
+          if (result.author) item.ai_data.author = result.author;
+          if (result.tweet_text) item.ai_data.tweet_text = result.tweet_text;
+          if (result.title) item.ai_data.title = result.title;
           item.ai_analyzed = true;
-          // Re-query fresh (applyFilters may have replaced innerHTML while batch was in-flight)
+
           const freshCard = document.querySelector(`.card[data-id="${item.id}"]`);
           if (freshCard) freshCard.outerHTML = renderCard(item);
         }
-        done++;
-        aiStatus.textContent = `Analyzing ${done}/${pending.length}…`;
-        resolve();
-      });
-    })));
+      } catch (e) {
+        console.warn('[AI] Analysis error for item', item.id, e);
+      }
+      done++;
+      aiStatus.textContent = `Analyzing ${done}/${pending.length}…`;
+    }));
     if (i + BATCH < pending.length) await new Promise(r => setTimeout(r, 600));
   }
 
@@ -4048,21 +4258,27 @@ async function handleQuickSaveFiles(files) {
   let selectedTagName = null;
 
   if (tags.length > 0) {
+    console.log('[QuickSave] customTags=%d, showing tag toast', tags.length);
     selectedTagName = await showTagSelectionInViewer();
+    console.log('[QuickSave] selectedTag=%s', selectedTagName);
+  } else {
+    console.log('[QuickSave] no customTags, skipping tag toast');
   }
 
   const total = files.length;
   showToast(`Uploading ${total} file${total > 1 ? 's' : ''}…`);
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  if (total === 1) {
+    // Single file → one card
+    const file = files[0];
     try {
       const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
+      const aiData = { mediaType: result.type };
+      if (file.name) aiData.fileName = file.name;
 
       const notionPageId = await createNotionPage({
-        type: result.type,
-        fileId: result.fileId,
-        tagName: selectedTagName,
+        type: result.type, fileId: result.fileId,
+        tagName: selectedTagName, aiData,
       });
 
       let imgUrl = null;
@@ -4071,19 +4287,79 @@ async function handleQuickSaveFiles(files) {
         if (imgUrl) STATE.imageMap[result.fileId] = imgUrl;
       }
 
-      const item = {
+      addCardToGrid({
         id: notionPageId, url: 'viewer upload', type: result.type,
         tag: selectedTagName || '', content: '', fileId: result.fileId, sourceUrl: '',
         date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
-        ai_analyzed: false, ai_data: {}, fileIds: [],
+        ai_analyzed: false, ai_data: aiData, fileIds: [],
         _resolvedImg: imgUrl, videoFileId: '', pdfFileId: '', audioFileId: '',
-      };
-      addCardToGrid(item);
-      showToast(`Uploaded ${i + 1}/${total}: ${file.name}`);
+      });
+      showToast(`Uploaded: ${file.name}`);
     } catch (err) {
       console.error('[Upload] Failed:', file.name, err);
       showToast(`Failed: ${file.name} — ${err.message}`);
+    }
+  } else {
+    // Multiple files → album (one Notion page per file, shared mediaGroupId)
+    const mediaGroupId = `viewer_${Date.now()}`;
+    const uploadResults = [];
+    const notionPageIds = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        showToast(`Uploading ${i + 1}/${total}: ${file.name}`);
+        const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
+        result.fileName = file.name || '';
+        uploadResults.push(result);
+
+        const aiData = { mediaType: result.type, mediaGroupId };
+        if (file.name) aiData.fileName = file.name;
+
+        const notionPageId = await createNotionPage({
+          type: 'tgpost', fileId: result.fileId,
+          tagName: selectedTagName, aiData,
+        });
+        notionPageIds.push(notionPageId);
+      } catch (err) {
+        console.error('[Upload] Failed:', file.name, err);
+        showToast(`Failed: ${file.name} — ${err.message}`);
+      }
+    }
+
+    if (uploadResults.length > 0) {
+      // Build albumMedia for local rendering
+      const albumMedia = uploadResults.map(r => ({
+        fileId: r.fileId,
+        mediaType: r.type,
+        videoFileId: r.type === 'video' ? r.fileId : '',
+        pdfFileId: r.type === 'pdf' ? r.fileId : '',
+        audioFileId: '',
+        fileName: r.fileName || '',
+        storageUrl: '',
+      }));
+
+      // Resolve all fileIds
+      const allFileIds = uploadResults.map(r => r.fileId).filter(Boolean);
+      await Promise.all(allFileIds.map(async fid => {
+        const url = await resolveFileId(STATE.botToken, fid);
+        if (url) STATE.imageMap[fid] = url;
+      }));
+
+      const mainFileId = uploadResults[0]?.fileId || '';
+      const mainImgUrl = STATE.imageMap[mainFileId] || null;
+
+      addCardToGrid({
+        id: notionPageIds[0], url: 'viewer upload', type: 'tgpost',
+        tag: selectedTagName || '', content: '', fileId: mainFileId, sourceUrl: '',
+        date: new Date().toISOString(),
+        ai_type: null, ai_type_secondary: null, ai_description: '',
+        ai_analyzed: false, ai_data: { mediaType: uploadResults[0]?.type || 'image', mediaGroupId },
+        fileIds: allFileIds, albumMedia,
+        _resolvedImg: mainImgUrl, videoFileId: '', pdfFileId: '', audioFileId: '',
+      });
+      showToast(`Uploaded ${uploadResults.length} files as album`);
     }
   }
 
@@ -4096,11 +4372,18 @@ async function handleQuickSaveFiles(files) {
 // ─── Viewer Tag Toast ───────────────────────────────────────────────────────
 
 // Returns a Promise that resolves with selected tag name or null
-function showTagSelectionInViewer() {
-  return new Promise(resolve => {
-    const tags = STATE.customTags.filter(t => t.name && t.name.trim());
-    if (!tags.length) { resolve(null); return; }
+async function showTagSelectionInViewer() {
+  const tags = STATE.customTags.filter(t => t.name && t.name.trim());
+  console.log('[TagToast] customTags in STATE:', JSON.stringify(STATE.customTags));
+  console.log('[TagToast] filtered tags:', tags.length);
+  if (!tags.length) return null;
 
+  // Read timerDuration from settings (default 4 seconds)
+  const settings = await getSettings();
+  const timerDuration = (settings.timerDuration || 4) * 1000;
+  console.log('[TagToast] timerDuration=%dms', timerDuration);
+
+  return new Promise(resolve => {
     const existing = document.querySelector('.viewer-tag-toast');
     if (existing) existing.remove();
 
@@ -4111,11 +4394,12 @@ function showTagSelectionInViewer() {
     tags.forEach(tag => {
       const btn = document.createElement('button');
       btn.className = 'viewer-tag-btn';
-      btn.innerHTML = `<span class="note-tag-dot" style="background:${tag.color}"></span>${escapeHtml(tag.name)}`;
+      btn.innerHTML = `<span class="note-tag-dot" style="background:${tag.color || '#888'}"></span>${escapeHtml(tag.name)}`;
       btn.addEventListener('click', () => {
         if (resolved) return;
         resolved = true;
         toast.remove();
+        console.log('[TagToast] selected:', tag.name);
         resolve(tag.name);
       });
       toast.appendChild(btn);
@@ -4128,14 +4412,22 @@ function showTagSelectionInViewer() {
       if (resolved) return;
       resolved = true;
       toast.remove();
+      console.log('[TagToast] skipped');
       resolve(null);
     });
     toast.appendChild(skipBtn);
 
     document.body.appendChild(toast);
+    console.log('[TagToast] appended to body, visible=%s', !toast.classList.contains('hidden'));
+
     setTimeout(() => {
-      if (!resolved) { resolved = true; toast.remove(); resolve(null); }
-    }, 8000);
+      if (!resolved) {
+        resolved = true;
+        toast.remove();
+        console.log('[TagToast] auto-dismissed after %dms', timerDuration);
+        resolve(null);
+      }
+    }, timerDuration);
   });
 }
 
@@ -4317,42 +4609,69 @@ async function saveNote() {
       showToast('Note saved');
 
     } else {
-      // Text + files → upload all, then save as tgpost (so text is displayed)
+      // Text + files → upload all, create one Notion page per file (shared mediaGroupId)
       const uploadResults = [];
       for (const file of files) {
         showToast(`Uploading ${uploadResults.length + 1}/${files.length}…`);
         const result = await uploadFileToTelegram(file, STATE.botToken, STATE.chatId);
+        result.fileName = file.name || '';
         uploadResults.push(result);
       }
 
-      const mainFileId = uploadResults[0]?.fileId || '';
-      const aiData = {};
-      if (files.length > 1) {
-        aiData.mediaGroupId = `viewer_${Date.now()}`;
-      }
-      aiData.mediaType = uploadResults[0]?.type || 'image';
-
       // Always use tgpost when there's text + files so content is visible on card
       const itemType = plainText ? 'tgpost' : (files.length === 1 ? uploadResults[0].type : 'tgpost');
+      const mediaGroupId = files.length > 1 ? `viewer_${Date.now()}` : null;
 
-      const notionPageId = await createNotionPage({
-        type: itemType, content: plainText, fileId: mainFileId,
-        tagName: _noteEditorSelectedTag, aiData,
-      });
-
-      let imgUrl = null;
-      if (mainFileId) {
-        imgUrl = await resolveFileId(STATE.botToken, mainFileId);
-        if (imgUrl) STATE.imageMap[mainFileId] = imgUrl;
+      // Create one Notion page per file (same pattern as extension bot)
+      const notionPageIds = [];
+      for (let i = 0; i < uploadResults.length; i++) {
+        const r = uploadResults[i];
+        const aiData = { mediaType: r.type };
+        if (mediaGroupId) aiData.mediaGroupId = mediaGroupId;
+        if (r.fileName) aiData.fileName = r.fileName;
+        const notionPageId = await createNotionPage({
+          type: itemType,
+          content: i === 0 ? plainText : '', // caption only on first page
+          fileId: r.fileId,
+          tagName: _noteEditorSelectedTag,
+          aiData,
+        });
+        notionPageIds.push(notionPageId);
       }
 
+      // Build albumMedia for local rendering (same structure as mergeMediaGroups)
+      const albumMedia = uploadResults.map(r => ({
+        fileId: r.fileId,
+        mediaType: r.type,
+        videoFileId: r.type === 'video' ? r.fileId : '',
+        pdfFileId: r.type === 'pdf' ? r.fileId : '',
+        audioFileId: '',
+        fileName: r.fileName || '',
+        storageUrl: '',
+      }));
+
+      // Resolve all fileIds
+      const allFileIds = uploadResults.map(r => r.fileId).filter(Boolean);
+      const resolvePromises = allFileIds.map(async fid => {
+        const url = await resolveFileId(STATE.botToken, fid);
+        if (url) STATE.imageMap[fid] = url;
+      });
+      await Promise.all(resolvePromises);
+
+      const mainFileId = uploadResults[0]?.fileId || '';
+      const mainImgUrl = STATE.imageMap[mainFileId] || null;
+      const mainAiData = { mediaType: uploadResults[0]?.type || 'image' };
+      if (mediaGroupId) mainAiData.mediaGroupId = mediaGroupId;
+
       addCardToGrid({
-        id: notionPageId, url: 'viewer note', type: itemType,
+        id: notionPageIds[0], url: 'viewer note', type: itemType,
         tag: _noteEditorSelectedTag || '', content: plainText,
         fileId: mainFileId, sourceUrl: '', date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
-        ai_analyzed: false, ai_data: aiData,
-        fileIds: uploadResults.map(r => r.fileId), _resolvedImg: imgUrl,
+        ai_analyzed: false, ai_data: mainAiData,
+        fileIds: allFileIds,
+        albumMedia: files.length > 1 ? albumMedia : undefined,
+        _resolvedImg: mainImgUrl,
         videoFileId: '', pdfFileId: '', audioFileId: '',
       });
       showToast('Note with files saved');
