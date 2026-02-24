@@ -301,15 +301,6 @@ async function resolveRemainingImages(items, fileCache) {
     }
   }
 
-  // Log album fileIds for debugging GIF thumbnail resolution
-  for (const item of items) {
-    if (item.albumMedia?.some(m => m.mediaType === 'gif')) {
-      console.log('[ResolveGIF] id=%s fileId=...%s fileIds=[%s] albumMedia=%s',
-        item.id?.slice(0, 8), item.fileId?.slice(-16) || 'NONE',
-        (item.fileIds||[]).map(f => '...' + (f?.slice(-12)||'NONE')).join(','),
-        JSON.stringify((item.albumMedia||[]).map(m => ({type:m.mediaType, fid:'...'+((m.fileId||'').slice(-12)||'NONE'), vid:'...'+((m.videoFileId||'').slice(-12)||'NONE')}))));
-    }
-  }
   const toFetchIds = [];
   // Apply cached URLs first (validate URL has actual file_path, not just bot prefix)
   const validTgUrl = u => u && /\/bot[^/]+\/.+\/.+/.test(u);
@@ -554,19 +545,20 @@ function mergeMediaGroups(items) {
       // For large GIFs without thumbnail, clear displayFid (renderer shows fallback).
       if (mType === 'gif') {
         const gifThumbFid = item.ai_data?.thumbnailFileId || '';
-        console.log('[MergeGIF] id=%s fid=...%s thumbFid=...%s displayFid(before)=...%s aiData=%s',
-          item.id?.slice(0, 8), item.fileId?.slice(-16) || 'NONE', gifThumbFid?.slice(-16) || 'NONE',
-          displayFid?.slice(-16) || 'NONE', JSON.stringify(item.ai_data || {}).slice(0, 300));
         if (gifThumbFid) {
-          displayFid = gifThumbFid; // viewer-uploaded: use explicit thumbnail
+          displayFid = gifThumbFid; // viewer-uploaded: use explicit thumbnail (JPEG)
         }
-        // else: keep displayFid = item.fileId (bot-saved: fileId is already the thumbnail)
-        console.log('[MergeGIF] displayFid(after)=...%s', displayFid?.slice(-16) || 'NONE');
+        // else: keep displayFid = item.fileId (could be animation mp4 or bot-saved thumbnail)
+        // The renderer checks isGifAnimation to use <video> instead of <img> when needed
       }
       if (mType === 'document') displayFid = ''; // documents are never displayable as images
+      // For GIF: if displayFid is the animation itself (no separate thumbnail), mark it
+      // so renderer can use <video> instead of <img> (mp4 can't be shown as <img>)
+      const isGifAnimation = mType === 'gif' && displayFid && !item.ai_data?.thumbnailFileId;
       const mediaEntry = {
         fileId: displayFid,
         mediaType: mType,
+        isGifAnimation,
         // For GIF: animation fileId stored in Notion's File ID field (rawFileId before any swap)
         videoFileId: item.videoFileId || (mType === 'gif' ? (item.fileId || '') : ''),
         pdfFileId: item.pdfFileId || '',
@@ -2530,13 +2522,16 @@ function renderCard(item) {
         if (m.mediaType === 'video' || m.mediaType === 'gif') {
           const playFileId = m.videoFileId || m.fileId;
           const storageUrl = m.storageUrl || '';
-          if (m.mediaType === 'gif') console.log('[AlbumGIF] mi=%d m.fileId=...%s resolvedUrl=%s videoFid=...%s storageUrl=%s', mi, m.fileId?.slice(-16)||'NONE', resolvedUrl?.slice(0,80)||'NONE', m.videoFileId?.slice(-16)||'NONE', storageUrl||'NONE');
           // For items with storageUrl (>20MB): always link to channel, even if thumbnail available
           if (storageUrl) {
             const thumbHtml = resolvedUrl
               ? `<img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt="">`
               : `<div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`;
             return `<div class="tgpost-album-item is-video" data-action="open" data-url="${escapeHtml(storageUrl)}">${thumbHtml}<div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`;
+          }
+          // GIF with animation URL (no separate JPEG thumbnail): use <video> for inline playback
+          if (m.isGifAnimation && resolvedUrl && /\.mp4($|\?)/i.test(resolvedUrl)) {
+            return `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><video class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" autoplay loop muted playsinline></video></div>`;
           }
           return resolvedUrl
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
@@ -5097,6 +5092,7 @@ async function handleQuickSaveFiles(files) {
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
           mediaType: r.type,
+          isGifAnimation: r.type === 'gif' && !r.thumbnailFileId,
           videoFileId: r.videoFileId || r.animationFileId || '',
           pdfFileId: r.type === 'pdf' ? r.fileId : '',
           audioFileId: r.type === 'audio' ? r.fileId : '',
@@ -5439,6 +5435,7 @@ async function saveNote() {
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
           mediaType: r.type,
+          isGifAnimation: r.type === 'gif' && !r.thumbnailFileId,
           videoFileId: r.videoFileId || r.animationFileId || '',
           pdfFileId: r.type === 'pdf' ? r.fileId : '',
           audioFileId: r.type === 'audio' ? r.fileId : '',
