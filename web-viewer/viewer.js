@@ -194,7 +194,8 @@ async function init() {
     // Use defaults if customTags not in storage
     const rawTags = settings.customTags;
     STATE.customTags = (Array.isArray(rawTags) && rawTags.length > 0) ? rawTags : DEFAULT_CUSTOM_TAGS;
-    STATE.aiEnabled = !!(settings.aiEnabled && settings.aiApiKey);
+    // AI is enabled if apiKey exists (aiEnabled toggle is optional — having a key implies intent)
+    STATE.aiEnabled = !!settings.aiApiKey;
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
     console.log('[Init] chatId=%s, customTags=%d (fromStorage=%s), aiEnabled=%s, aiAutoInViewer=%s, aiApiKey=%s, aiProvider=%s',
       STATE.chatId ? 'set' : 'empty',
