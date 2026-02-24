@@ -4569,6 +4569,11 @@ async function handleQuickSaveFiles(files) {
       let imgUrl = null;
       if (result.fileId) {
         imgUrl = await resolveFileId(STATE.botToken, result.fileId);
+        // SVG: Telegram serves with wrong content-type → proxy to get blob URL
+        if (imgUrl && /\.svg$/i.test(file.name || '')) {
+          const blobUrl = await proxySvgFile(imgUrl);
+          if (blobUrl) imgUrl = blobUrl;
+        }
         if (imgUrl) STATE.imageMap[result.fileId] = imgUrl;
       }
       // Also resolve video/animation fileId if different
@@ -4643,6 +4648,14 @@ async function handleQuickSaveFiles(files) {
       await Promise.all([...allFileIds].map(async fid => {
         const url = await resolveFileId(STATE.botToken, fid);
         if (url) STATE.imageMap[fid] = url;
+      }));
+
+      // SVG: proxy through CORS to fix content-type for display
+      await Promise.all(uploadResults.map(async r => {
+        if (/\.svg$/i.test(r.fileName || '') && r.fileId && STATE.imageMap[r.fileId]) {
+          const blobUrl = await proxySvgFile(STATE.imageMap[r.fileId]);
+          if (blobUrl) STATE.imageMap[r.fileId] = blobUrl;
+        }
       }));
 
       const mainFileId = uploadResults[0]?.fileId || '';
@@ -4960,6 +4973,14 @@ async function saveNote() {
       await Promise.all([...allFileIds].map(async fid => {
         const url = await resolveFileId(STATE.botToken, fid);
         if (url) STATE.imageMap[fid] = url;
+      }));
+
+      // SVG: proxy through CORS to fix content-type for display
+      await Promise.all(uploadResults.map(async r => {
+        if (/\.svg$/i.test(r.fileName || '') && r.fileId && STATE.imageMap[r.fileId]) {
+          const blobUrl = await proxySvgFile(STATE.imageMap[r.fileId]);
+          if (blobUrl) STATE.imageMap[r.fileId] = blobUrl;
+        }
       }));
 
       const mainFileId = uploadResults[0]?.fileId || '';
