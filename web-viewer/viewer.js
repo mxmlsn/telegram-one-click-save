@@ -334,6 +334,8 @@ async function resolveRemainingImages(items, fileCache) {
       if (urls[idx]) {
         STATE.imageMap[fid] = urls[idx];
         fileCache[fid] = { url: urls[idx], ts: now };
+      } else {
+        console.warn('[resolveRemaining] FAILED to resolve fid=...%s', fid.slice(-20));
       }
     });
     // Patch cards that now have their main fileId resolved
@@ -598,6 +600,14 @@ function mergeMediaGroups(items) {
       }
     } else {
       result.push(item);
+    }
+  }
+  // Log album composition for debugging
+  for (const item of Object.values(groups)) {
+    if (item.albumMedia?.length > 0) {
+      console.log('[MergeGroups] album id=%s media=%d fileIds=%s',
+        item.id?.slice(0, 8), item.albumMedia.length,
+        item.albumMedia.map((m, i) => `[${i}:${m.mediaType} fid=...${m.fileId?.slice(-12) || 'NONE'}]`).join(' '));
     }
   }
   // Promote merged groups to tgpost so album rendering always triggers
@@ -2438,6 +2448,9 @@ function renderCard(item) {
       } else {
       const albumItems = albumMedia.map((m, mi) => {
         const resolvedUrl = STATE.imageMap[m.fileId] || '';
+        console.log('[AlbumRender] [%d] type=%s fid=...%s resolved=%s videoFid=...%s pdfFid=...%s fname=%s',
+          mi, m.mediaType, m.fileId?.slice(-20) || 'NONE', !!resolvedUrl,
+          m.videoFileId?.slice(-20) || '', m.pdfFileId?.slice(-20) || '', m.fileName || '');
         if (/\.svg$/i.test(m.fileName || '')) console.log('[SVG] RENDER album[%d] fid=%s fname=%s url=%s isBlob=%s', mi, m.fileId?.slice(-20), m.fileName, resolvedUrl.slice(0, 80), resolvedUrl.startsWith('blob:'));
         if (m.mediaType === 'pdf') {
           const pdfFid = m.pdfFileId || m.fileId;
