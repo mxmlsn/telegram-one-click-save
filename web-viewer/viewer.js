@@ -710,17 +710,17 @@ async function generatePdfThumbnail(pdfFile) {
 function getVideoMetadata(videoFile) {
   return new Promise((resolve) => {
     const video = document.createElement('video');
-    video.preload = 'metadata';
+    video.preload = 'auto';
     video.muted = true;
     const url = URL.createObjectURL(videoFile);
-    video.src = url;
+    let resolved = false;
+    const done = (meta) => { if (resolved) return; resolved = true; URL.revokeObjectURL(url); resolve(meta); };
     video.addEventListener('loadedmetadata', () => {
-      const meta = { width: video.videoWidth, height: video.videoHeight, duration: video.duration };
-      URL.revokeObjectURL(url);
-      resolve(meta);
+      done({ width: video.videoWidth, height: video.videoHeight, duration: video.duration });
     });
-    video.addEventListener('error', () => { URL.revokeObjectURL(url); resolve({}); });
-    setTimeout(() => { URL.revokeObjectURL(url); resolve({}); }, 5000);
+    video.addEventListener('error', () => done({}));
+    video.src = url;
+    setTimeout(() => { console.warn('[Upload] Video metadata timeout'); done({}); }, 10000);
   });
 }
 
