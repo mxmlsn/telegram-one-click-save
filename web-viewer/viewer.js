@@ -301,6 +301,15 @@ async function resolveRemainingImages(items, fileCache) {
     }
   }
 
+  // Log album fileIds for debugging GIF thumbnail resolution
+  for (const item of items) {
+    if (item.albumMedia?.some(m => m.mediaType === 'gif')) {
+      console.log('[ResolveGIF] id=%s fileId=...%s fileIds=[%s] albumMedia=%s',
+        item.id?.slice(0, 8), item.fileId?.slice(-16) || 'NONE',
+        (item.fileIds||[]).map(f => '...' + (f?.slice(-12)||'NONE')).join(','),
+        JSON.stringify((item.albumMedia||[]).map(m => ({type:m.mediaType, fid:'...'+((m.fileId||'').slice(-12)||'NONE'), vid:'...'+((m.videoFileId||'').slice(-12)||'NONE')}))));
+    }
+  }
   const toFetchIds = [];
   // Apply cached URLs first (validate URL has actual file_path, not just bot prefix)
   const validTgUrl = u => u && /\/bot[^/]+\/.+\/.+/.test(u);
@@ -545,10 +554,14 @@ function mergeMediaGroups(items) {
       // For large GIFs without thumbnail, clear displayFid (renderer shows fallback).
       if (mType === 'gif') {
         const gifThumbFid = item.ai_data?.thumbnailFileId || '';
+        console.log('[MergeGIF] id=%s fid=...%s thumbFid=...%s displayFid(before)=...%s aiData=%s',
+          item.id?.slice(0, 8), item.fileId?.slice(-16) || 'NONE', gifThumbFid?.slice(-16) || 'NONE',
+          displayFid?.slice(-16) || 'NONE', JSON.stringify(item.ai_data || {}).slice(0, 300));
         if (gifThumbFid) {
           displayFid = gifThumbFid; // viewer-uploaded: use explicit thumbnail
         }
         // else: keep displayFid = item.fileId (bot-saved: fileId is already the thumbnail)
+        console.log('[MergeGIF] displayFid(after)=...%s', displayFid?.slice(-16) || 'NONE');
       }
       if (mType === 'document') displayFid = ''; // documents are never displayable as images
       const mediaEntry = {
@@ -2517,6 +2530,7 @@ function renderCard(item) {
         if (m.mediaType === 'video' || m.mediaType === 'gif') {
           const playFileId = m.videoFileId || m.fileId;
           const storageUrl = m.storageUrl || '';
+          if (m.mediaType === 'gif') console.log('[AlbumGIF] mi=%d m.fileId=...%s resolvedUrl=%s videoFid=...%s storageUrl=%s', mi, m.fileId?.slice(-16)||'NONE', resolvedUrl?.slice(0,80)||'NONE', m.videoFileId?.slice(-16)||'NONE', storageUrl||'NONE');
           // For items with storageUrl (>20MB): always link to channel, even if thumbnail available
           if (storageUrl) {
             const thumbHtml = resolvedUrl
