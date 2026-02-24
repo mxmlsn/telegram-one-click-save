@@ -4831,11 +4831,11 @@ async function handleQuickSaveFiles(files) {
       const isAudio = result.type === 'audio';
       const displayFileId = (isPdf || isVideo || isAudio) && result.thumbnailFileId
         ? result.thumbnailFileId : result.fileId;
-      console.log('[Upload] display: type=%s isPdf=%s isVideo=%s isAudio=%s thumbFileId=%s displayFileId=%s mainFileId=%s',
-        result.type, isPdf, isVideo, isAudio,
+      console.log('[Upload] display: type=%s thumbFileId=%s displayFileId=%s notionFileId=%s',
+        result.type,
         result.thumbnailFileId?.slice(-20) || 'null',
         displayFileId?.slice(-20) || 'null',
-        result.fileId?.slice(-20) || 'null');
+        notionFileId?.slice(-20) || 'null');
 
       let imgUrl = null;
       if (displayFileId) {
@@ -4890,8 +4890,8 @@ async function handleQuickSaveFiles(files) {
         notionPageIds.push(notionPageId);
         uploadResults.push(result);
 
-        // Forward large files to storage channel
-        if (file.size > 20 * 1024 * 1024 && result.messageId && STATE.chatId) {
+        // Forward large files (>20MB) or unknown document types to storage channel
+        if ((file.size > 20 * 1024 * 1024 || result.type === 'document') && result.messageId && STATE.chatId) {
           forwardToStorageChannel(result.messageId, notionPageId, aiData);
         }
       } catch (err) {
@@ -5234,6 +5234,11 @@ async function saveNote() {
           aiData,
         });
         notionPageIds.push(notionPageId);
+
+        // Forward large files (>20MB) or unknown document types to storage channel
+        if ((files[i].size > 20 * 1024 * 1024 || r.type === 'document') && r.messageId && STATE.chatId) {
+          forwardToStorageChannel(r.messageId, notionPageId, aiData);
+        }
       }
 
       // Build albumMedia for local rendering (use thumbnail for display where available)
@@ -5283,14 +5288,15 @@ async function saveNote() {
       addCardToGrid({
         id: notionPageIds[0], url: 'viewer note', type: itemType,
         tag: _noteEditorSelectedTag || '', content: plainText,
-        fileId: mainFileId, sourceUrl: '', date: new Date().toISOString(),
+        fileId: mainDisplayId, sourceUrl: '', date: new Date().toISOString(),
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: mainAiData,
         fileIds: [...allFileIds],
         albumMedia: files.length > 1 ? albumMedia : undefined,
         _resolvedImg: mainImgUrl,
+        _localBlob: files[0], // keep original file for AI analysis
         videoFileId: uploadResults[0]?.videoFileId || '',
-        pdfFileId: '',
+        pdfFileId: uploadResults[0]?.type === 'pdf' ? (uploadResults[0].videoFileId || uploadResults[0].animationFileId || uploadResults[0].fileId) : '',
         audioFileId: uploadResults[0]?.type === 'audio' ? uploadResults[0].fileId : '',
       });
       showToast('Note with files saved');
