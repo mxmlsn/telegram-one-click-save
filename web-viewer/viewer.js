@@ -257,11 +257,46 @@ async function startApp() {
     // 5. Resolve remaining images in background, patch cards as they come
     const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId || i.fileIds?.length > 1);
     if (restItems.length > 0) {
-      resolveRemainingImages(restItems, fileCache);
+      await resolveRemainingImages(restItems, fileCache);
     } else {
       saveFileCache(fileCache);
     }
 
+    // 6. Repair corrupted ai_data (from previous truncation bug) — write salvaged data back to Notion
+    const repairedItems = STATE.items.filter(it => it.ai_data?._repaired);
+    const corruptedItems = STATE.items.filter(it => it.ai_data?._corrupted);
+    if (repairedItems.length || corruptedItems.length) {
+      console.log('[Repair] %d salvaged, %d unsalvageable items', repairedItems.length, corruptedItems.length);
+      // Write salvaged data back to Notion (fix permanently)
+      for (const item of repairedItems) {
+        try {
+          const cleaned = { ...item.ai_data };
+          delete cleaned._repaired;
+          await notionPatch(item.id, { properties: {
+            'ai_data': { rich_text: [{ text: { content: JSON.stringify(cleaned) } }] },
+            'ai_analyzed': { checkbox: false }  // re-analyze with fixed code
+          }});
+          item.ai_data = cleaned;
+          item.ai_analyzed = false;
+        } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
+      }
+      // Reset unsalvageable items
+      for (const item of corruptedItems) {
+        try {
+          await notionPatch(item.id, { properties: {
+            'ai_data': { rich_text: [{ text: { content: '{}' } }] },
+            'ai_analyzed': { checkbox: false }
+          }});
+          item.ai_data = {};
+          item.ai_analyzed = false;
+        } catch (e) { console.warn('[Repair] Failed for', item.id, e); }
+      }
+      if (repairedItems.length || corruptedItems.length) {
+        showToast(`Repaired ${repairedItems.length + corruptedItems.length} items with corrupted data`);
+      }
+    }
+
+    // 7. AI analysis — runs AFTER all images resolved to avoid race with card re-rendering
     if (STATE.aiEnabled && STATE.aiAutoInViewer) {
       runAiBackgroundProcessing();
     }
@@ -442,7 +477,27 @@ async function fetchNotion() {
 function parseItem(page) {
   const p = page.properties;
   let aiData = {};
-  try { aiData = JSON.parse(p['ai_data']?.rich_text?.[0]?.text?.content || '{}'); } catch {}
+  const rawAiDataStr = p['ai_data']?.rich_text?.[0]?.text?.content || '';
+  try { aiData = rawAiDataStr ? JSON.parse(rawAiDataStr) : {}; } catch {
+    // Corrupted JSON (likely truncated by previous ai_data patch).
+    // Try to salvage fields by closing the JSON at the last complete value.
+    console.warn('[parseItem] Corrupted ai_data for page %s, attempting salvage…', page.id?.slice(0, 8));
+    try {
+      // Find last complete key-value pair by looking for last ',"' or '":' boundary
+      let s = rawAiDataStr;
+      // Remove trailing incomplete value: backtrack to last complete comma-separated entry
+      const lastComma = s.lastIndexOf(',"');
+      if (lastComma > 0) {
+        s = s.slice(0, lastComma) + '}';
+        aiData = JSON.parse(s);
+        aiData._repaired = true;
+        console.log('[parseItem] Salvaged %d fields from corrupted ai_data', Object.keys(aiData).length);
+      }
+    } catch {
+      aiData = { _corrupted: true };
+      console.warn('[parseItem] Could not salvage ai_data for page %s', page.id?.slice(0, 8));
+    }
+  }
 
   const rawFileId = p['File ID']?.rich_text?.[0]?.text?.content || '';
   const type = p['Type']?.select?.name || 'link';
@@ -4209,7 +4264,35 @@ async function patchNotionWithAI(pageId, aiResult, existingAiData) {
   if (aiResult.tweet_text) aiDataPayload.tweet_text = aiResult.tweet_text;
 
   if (Object.keys(aiDataPayload).length) {
-    properties['ai_data'] = { rich_text: [{ text: { content: JSON.stringify(aiDataPayload).slice(0, 2000) } }] };
+    // Notion rich_text limit is 2000 chars. Truncate long text fields to fit,
+    // never blindly slice JSON (that corrupts the structure and breaks parsing).
+    const LIMIT = 2000;
+    let json = JSON.stringify(aiDataPayload);
+    if (json.length > LIMIT) {
+      // Progressively trim long text fields (least critical first)
+      const trimFields = ['text_on_image', 'tweet_text', 'title'];
+      for (const field of trimFields) {
+        if (!aiDataPayload[field]) continue;
+        const excess = json.length - LIMIT;
+        if (excess <= 0) break;
+        const maxLen = Math.max(0, aiDataPayload[field].length - excess - 50);
+        aiDataPayload[field] = maxLen > 0 ? aiDataPayload[field].slice(0, maxLen) + '…' : '';
+        json = JSON.stringify(aiDataPayload);
+      }
+    }
+    // If still over limit (shouldn't happen), drop all AI text fields rather than corrupt JSON
+    if (json.length > LIMIT) {
+      delete aiDataPayload.text_on_image;
+      delete aiDataPayload.tweet_text;
+      delete aiDataPayload.title;
+      delete aiDataPayload.description;
+      json = JSON.stringify(aiDataPayload);
+    }
+    if (json.length <= LIMIT) {
+      properties['ai_data'] = { rich_text: [{ text: { content: json } }] };
+    } else {
+      console.warn('[AI] ai_data too large (%d chars), skipping update to preserve existing data', json.length);
+    }
   }
 
   try {

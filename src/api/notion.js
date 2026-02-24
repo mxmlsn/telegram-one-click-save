@@ -78,9 +78,32 @@ export async function patchNotionWithAI(pageId, aiResult, settings, existingAiDa
   if (aiResult.tweet_text) aiDataPayload.tweet_text = aiResult.tweet_text;
 
   if (Object.keys(aiDataPayload).length) {
-    properties['ai_data'] = {
-      rich_text: [{ text: { content: JSON.stringify(aiDataPayload).slice(0, 2000) } }]
-    };
+    // Notion rich_text limit is 2000 chars. Truncate long text fields to fit,
+    // never blindly slice JSON (that corrupts the structure and breaks parsing).
+    const LIMIT = 2000;
+    let json = JSON.stringify(aiDataPayload);
+    if (json.length > LIMIT) {
+      const trimFields = ['text_on_image', 'tweet_text', 'title'];
+      for (const field of trimFields) {
+        if (!aiDataPayload[field]) continue;
+        const excess = json.length - LIMIT;
+        if (excess <= 0) break;
+        const maxLen = Math.max(0, aiDataPayload[field].length - excess - 50);
+        aiDataPayload[field] = maxLen > 0 ? aiDataPayload[field].slice(0, maxLen) + '…' : '';
+        json = JSON.stringify(aiDataPayload);
+      }
+    }
+    if (json.length > LIMIT) {
+      delete aiDataPayload.text_on_image;
+      delete aiDataPayload.tweet_text;
+      delete aiDataPayload.title;
+      json = JSON.stringify(aiDataPayload);
+    }
+    if (json.length <= LIMIT) {
+      properties['ai_data'] = {
+        rich_text: [{ text: { content: json } }]
+      };
+    }
   }
 
   try {
