@@ -342,9 +342,14 @@ async function resolveRemainingImages(items, fileCache) {
     );
     for (const it of resolved) it._resolvedImg = STATE.imageMap[it.fileId];
     // Also re-render album cards that got new album images resolved in this batch
+    // Note: album leader may have empty fileId (e.g. video without thumbnail), so don't require _resolvedImg
     const albumsToRepatch = items.filter(it =>
-      it._resolvedImg && (it.fileIds?.length > 1 || it.albumMedia?.length > 1) && batch.some(fid => it.fileIds.includes(fid))
+      (it.fileIds?.length > 1 || it.albumMedia?.length > 1) && batch.some(fid => it.fileIds.includes(fid))
     );
+    // Ensure album items have _resolvedImg set so patchCardImages doesn't skip them
+    for (const it of albumsToRepatch) {
+      if (!it._resolvedImg) it._resolvedImg = it.fileId ? (STATE.imageMap[it.fileId] || 'album') : 'album';
+    }
     // Proxy SVGs in this batch before patching cards (so <img> gets blob URL, not raw TG URL)
     const svgInBatch = [...new Set([...resolved, ...albumsToRepatch])].filter(it =>
       /\.svg$/i.test(it.ai_data?.fileName || '') ||
@@ -484,12 +489,13 @@ function parseItem(page) {
   const isPdfType = type === 'pdf' || aiData.mediaType === 'pdf';
   const isVideoNoteType = type === 'video_note' || aiData.mediaType === 'video_note';
   const isAudioType = type === 'audio' || aiData.mediaType === 'audio';
+  const isGifType = type === 'gif' || aiData.mediaType === 'gif';
   const hasThumb = !!aiData.thumbnailFileId;
 
-  // For video/PDF/video_note/audio: use thumbnail for display, keep original for playback
+  // For video/PDF/video_note/audio/gif: use thumbnail for display, keep original for playback
   // For images/documents: use full file (falls back to thumbnail in resolution pipeline)
   const isDocType = type === 'document';
-  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType) && hasThumb;
+  const needsThumbSwap = (isVideoType || isPdfType || isVideoNoteType || isAudioType || isGifType) && hasThumb;
   const displayFileId = needsThumbSwap ? aiData.thumbnailFileId : rawFileId;
   const videoFileId = ((isVideoType || isVideoNoteType) && hasThumb) ? rawFileId : ((isVideoType || isVideoNoteType) ? rawFileId : '');
   const pdfFileId = (isPdfType && hasThumb) ? rawFileId : (isPdfType ? rawFileId : '');
@@ -2453,16 +2459,18 @@ function renderCard(item) {
           const hasThumbnail = m.fileId && m.pdfFileId && m.fileId !== m.pdfFileId;
           const previewUrl = hasThumbnail ? resolvedUrl : '';
           const albumPdfArrowSvg = `<svg class="pdf-badge-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
-          const albumPdfArrow = aiData.storageUrl ? albumPdfArrowSvg : '';
+          const albumPdfArrow = m.storageUrl ? albumPdfArrowSvg : '';
           return previewUrl
             ? `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><img class="tgpost-album-img blur-preview" src="${escapeHtml(previewUrl)}" loading="lazy" alt=""><div class="pdf-badge"><span class="pdf-badge-text">pdf</span>${albumPdfArrow}</div></div>`
             : `<div class="tgpost-album-item is-pdf" data-action="open-file" data-file-id="${escapeHtml(pdfFid)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="pdf-badge" style="position:relative;top:auto;left:auto;transform:none"><span class="pdf-badge-text">pdf</span>${albumPdfArrow}</div></div></div>`;
         }
-        if (m.mediaType === 'video') {
+        if (m.mediaType === 'video' || m.mediaType === 'gif') {
           const playFileId = m.videoFileId || m.fileId;
+          const storageUrl = m.storageUrl || aiData.storageUrl || '';
+          const fallbackAction = storageUrl ? `data-action="open" data-url="${escapeHtml(storageUrl)}"` : (playFileId ? `data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"` : '');
           return resolvedUrl
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
-            : `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}"><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
+            : `<div class="tgpost-album-item is-video" ${fallbackAction}><div class="tgpost-album-img" style="background:#1a1a1a;display:flex;align-items:center;justify-content:center"><div class="tgpost-play-icon" style="position:relative;top:auto;left:auto;transform:none"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div></div>`;
         }
         if (m.mediaType === 'document') {
           const docFname = m.fileName || m.fileContent || '';
@@ -2720,6 +2728,23 @@ function renderCard(item) {
       ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(sourceUrl)}">${escapeHtml(gifDomain)}</button>`
       : '';
     const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
+    // Large GIF (>20MB): imgUrl is a thumbnail (JPEG), not the actual animation.
+    // Show as static image with link to TG channel (like large images).
+    const gifIsLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
+    const gifStorageUrl = aiData.storageUrl || '';
+    if (gifIsLarge && gifStorageUrl) {
+      const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+      const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+      return `<div class="card card-largefile" data-id="${item.id}" data-action="open" data-url="${escapeHtml(gifStorageUrl)}">
+        ${pendingDot}
+        <div class="largefile-preview">
+          <img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+        </div>
+        <div class="largefile-footer">
+          <span class="largefile-label">GIF · ${sizeMB} MB ${arrowSvg}</span>
+        </div>
+      </div>`;
+    }
     // Telegram stores animations as mp4 — use <video> instead of <img>.
     // All TG gif items come from animation.file_id and are always mp4.
     // Only treat as static gif if the URL itself is a .gif (external animated gif).
@@ -4905,10 +4930,10 @@ async function handleQuickSaveFiles(files) {
 
       // Forward to storage channel: >20MB files OR unknown document types (matches bot logic)
       const isLargeFile = file.size > 20 * 1024 * 1024;
-      const isUnknownDoc = result.type === 'document';
-      console.log('[Upload] fileSize=%d isLarge=%s isUnknownDoc=%s messageId=%s storageChannelId=%s',
-        file.size, isLargeFile, isUnknownDoc, result.messageId, STATE.storageChannelId || 'EMPTY');
-      if ((isLargeFile || isUnknownDoc) && result.messageId && STATE.chatId) {
+      const needsStorage = isLargeFile || result.type === 'document';
+      console.log('[Upload] fileSize=%d isLarge=%s needsStorage=%s messageId=%s storageChannelId=%s',
+        file.size, isLargeFile, needsStorage, result.messageId, STATE.storageChannelId || 'EMPTY');
+      if (needsStorage && result.messageId && STATE.chatId) {
         await forwardToStorageChannel(result.messageId, notionPageId, aiData);
       }
 
@@ -4993,7 +5018,7 @@ async function handleQuickSaveFiles(files) {
     if (uploadResults.length > 0) {
       // Build albumMedia for local rendering (use thumbnail for display where available)
       const albumMedia = uploadResults.map((r, ri) => {
-        const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio') && r.thumbnailFileId;
+        const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio' || r.type === 'gif') && r.thumbnailFileId;
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
           mediaType: r.type,
@@ -5335,7 +5360,7 @@ async function saveNote() {
 
       // Build albumMedia for local rendering (use thumbnail for display where available)
       const albumMedia = uploadResults.map((r, ri) => {
-        const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio') && r.thumbnailFileId;
+        const needsThumb = (r.type === 'pdf' || r.type === 'video' || r.type === 'audio' || r.type === 'gif') && r.thumbnailFileId;
         return {
           fileId: needsThumb ? r.thumbnailFileId : r.fileId,
           mediaType: r.type,
