@@ -4207,18 +4207,33 @@ async function viewerAnalyzeItem(item, settings) {
   let responseText = null;
 
   // PDF: send full file to AI (not as image)
-  if (isPdf && item.fileId && STATE.botToken) {
+  if (isPdf) {
     try {
-      console.log('[AI] PDF analysis, fetching file…');
-      const fileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${item.fileId}`);
-      const fileData = await fileRes.json();
-      if (fileData.ok && fileData.result?.file_path) {
-        const pdfBlob = await fetchTgFile(fileData.result.file_path);
-        const buffer = await pdfBlob.arrayBuffer();
+      let base64 = null;
+
+      // Prefer local blob (avoids TG getFile 20MB limit)
+      if (item._localBlob) {
+        console.log('[AI] PDF analysis, using local blob (%dKB)', Math.round(item._localBlob.size / 1024));
+        const buffer = await item._localBlob.arrayBuffer();
         const bytes = new Uint8Array(buffer);
         let binary = '';
         for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        const base64 = btoa(binary);
+        base64 = btoa(binary);
+      } else if (item.fileId && STATE.botToken) {
+        console.log('[AI] PDF analysis, fetching file via TG…');
+        const fileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${item.fileId}`);
+        const fileData = await fileRes.json();
+        if (fileData.ok && fileData.result?.file_path) {
+          const pdfBlob = await fetchTgFile(fileData.result.file_path);
+          const buffer = await pdfBlob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          base64 = btoa(binary);
+        }
+      }
+
+      if (base64) {
         console.log('[AI] PDF base64 ready, size=%dKB, sending to %s/%s', Math.round(base64.length / 1024), provider, model);
 
         if (provider === 'google') {
@@ -4639,9 +4654,11 @@ async function runAiBackgroundProcessing() {
         const aiType = albumImageEntry ? 'image' : item.type;
 
         // For PDF/video: AI needs the actual file, not the display thumbnail
+        // But for >20MB files, TG getFile won't work — use thumbnail instead
+        const isLarge = item.ai_data?.fileSize && item.ai_data.fileSize > 20 * 1024 * 1024;
         let realFileId = aiFileId;
-        if (item.type === 'pdf' && item.pdfFileId) realFileId = item.pdfFileId;
-        else if (item.type === 'video' && item.videoFileId) realFileId = item.videoFileId;
+        if (item.type === 'pdf' && item.pdfFileId && !isLarge) realFileId = item.pdfFileId;
+        else if (item.type === 'video' && item.videoFileId && !isLarge) realFileId = item.videoFileId;
 
         const aiItem = {
           type: aiType,
@@ -4649,6 +4666,7 @@ async function runAiBackgroundProcessing() {
           sourceUrl: item.sourceUrl,
           content: item.content,
           tagName: item.tag,
+          _localBlob: item._localBlob || null,
         };
 
         const result = await viewerAnalyzeItem(aiItem, settings);
@@ -4797,11 +4815,12 @@ async function handleQuickSaveFiles(files) {
         tagName: selectedTagName, aiData,
       });
 
-      // Forward large files (>20MB) to storage channel for later access
+      // Forward to storage channel: >20MB files OR unknown document types (matches bot logic)
       const isLargeFile = file.size > 20 * 1024 * 1024;
-      console.log('[Upload] fileSize=%d isLarge=%s messageId=%s storageChannelId=%s',
-        file.size, isLargeFile, result.messageId, STATE.storageChannelId || 'EMPTY');
-      if (isLargeFile && result.messageId && STATE.chatId) {
+      const isUnknownDoc = result.type === 'document';
+      console.log('[Upload] fileSize=%d isLarge=%s isUnknownDoc=%s messageId=%s storageChannelId=%s',
+        file.size, isLargeFile, isUnknownDoc, result.messageId, STATE.storageChannelId || 'EMPTY');
+      if ((isLargeFile || isUnknownDoc) && result.messageId && STATE.chatId) {
         forwardToStorageChannel(result.messageId, notionPageId, aiData);
       }
 
@@ -4836,6 +4855,7 @@ async function handleQuickSaveFiles(files) {
         ai_type: null, ai_type_secondary: null, ai_description: '',
         ai_analyzed: false, ai_data: aiData, fileIds: [],
         _resolvedImg: imgUrl,
+        _localBlob: file, // keep original file for AI analysis (avoids TG getFile 20MB limit)
         videoFileId: result.videoFileId || '',
         pdfFileId: isPdf ? notionFileId : '',
         audioFileId: isAudio ? result.fileId : '',
