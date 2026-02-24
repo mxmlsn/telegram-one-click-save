@@ -2764,7 +2764,8 @@ function renderCard(item) {
   }
 
   // ── GIF card ──
-  if (item.type === 'gif' && imgUrl) {
+  // Also match GIFs without imgUrl if storageUrl is available (large GIFs with failed resolution)
+  if (item.type === 'gif' && (imgUrl || aiData.storageUrl)) {
     const sourceUrl = item.sourceUrl || itemUrlAsLink || '';
     const gifDomain = getDomain(sourceUrl);
     const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
@@ -2776,16 +2777,20 @@ function renderCard(item) {
     // Show as static image with link to TG channel (like large images).
     const gifIsLarge = (aiData.fileSize || 0) > 20 * 1024 * 1024;
     const gifStorageUrl = aiData.storageUrl || '';
-    if (gifIsLarge && gifStorageUrl) {
-      const sizeMB = Math.round((aiData.fileSize || 0) / 1024 / 1024);
+    console.log('[GIF] render id=%s fileSize=%s isLarge=%s storageUrl=%s imgUrl=%s',
+      item.id?.slice(0, 8), aiData.fileSize, gifIsLarge, gifStorageUrl?.slice(0, 40) || 'NONE', imgUrl?.slice(0, 60) || 'NONE');
+    if (gifStorageUrl) {
+      const sizeMB = (aiData.fileSize || 0) > 1024 * 1024 ? Math.round((aiData.fileSize || 0) / 1024 / 1024) : 0;
+      const sizeLabel = sizeMB ? `GIF · ${sizeMB} MB` : 'GIF';
       const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7"/><path d="M7 7h10v10"/></svg>`;
+      const previewHtml = imgUrl
+        ? `<div class="largefile-preview"><img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>`
+        : `<div class="largefile-preview" style="background:#1a1a1a;min-height:80px;display:flex;align-items:center;justify-content:center"><span style="color:rgba(255,255,255,0.3);font-size:28px">GIF</span></div>`;
       return `<div class="card card-largefile" data-id="${item.id}" data-action="open" data-url="${escapeHtml(gifStorageUrl)}">
         ${pendingDot}
-        <div class="largefile-preview">
-          <img class="largefile-thumb" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
-        </div>
+        ${previewHtml}
         <div class="largefile-footer">
-          <span class="largefile-label">GIF · ${sizeMB} MB ${arrowSvg}</span>
+          <span class="largefile-label">${sizeLabel} ${arrowSvg}</span>
         </div>
       </div>`;
     }
