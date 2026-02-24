@@ -18,7 +18,7 @@ import { analyzeAndPatch } from './analyze.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization'
 };
 
@@ -65,14 +65,23 @@ export default {
 // ─── Tags endpoint (called by extension) ────────────────────────────────────
 
 async function handleTagsEndpoint(request, env) {
-  if (request.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS });
-  }
-
   try {
     const auth = request.headers.get('Authorization');
     if (auth !== `Bearer ${env.BOT_TOKEN}`) {
       return new Response('Unauthorized', { status: 401, headers: CORS_HEADERS });
+    }
+
+    // GET — read current tags config
+    if (request.method === 'GET') {
+      const config = await getTagsConfig(env);
+      return new Response(JSON.stringify(config || {}), {
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // POST — update tags config
+    if (request.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS });
     }
 
     const body = await request.json();

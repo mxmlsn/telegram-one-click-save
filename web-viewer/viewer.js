@@ -191,20 +191,29 @@ async function init() {
     STATE.notionDbId = settings.notionDbId;
     STATE.botToken = settings.botToken;
     STATE.chatId = settings.chatId || '';
-    // Use defaults if customTags not in storage
-    const rawTags = settings.customTags;
-    STATE.customTags = (Array.isArray(rawTags) && rawTags.length > 0) ? rawTags : DEFAULT_CUSTOM_TAGS;
+    // Fetch tags from bot KV (single source of truth, synced by extension)
+    let remoteTags = null;
+    try {
+      const tagsRes = await fetch('https://stash-telegram-bot.mxmlsn-co.workers.dev/api/tags', {
+        headers: { 'Authorization': `Bearer ${settings.botToken}` }
+      });
+      if (tagsRes.ok) {
+        const tagsConfig = await tagsRes.json();
+        if (Array.isArray(tagsConfig.customTags) && tagsConfig.customTags.length > 0) {
+          remoteTags = tagsConfig.customTags;
+        }
+      }
+    } catch (e) { console.warn('[Init] Failed to fetch tags from bot:', e.message); }
+    STATE.customTags = remoteTags || DEFAULT_CUSTOM_TAGS;
     // AI is enabled if apiKey exists (aiEnabled toggle is optional — having a key implies intent)
     STATE.aiEnabled = !!settings.aiApiKey;
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
-    console.log('[Init] chatId=%s, customTags=%d (fromStorage=%s), aiEnabled=%s, aiAutoInViewer=%s, aiApiKey=%s, aiProvider=%s',
+    console.log('[Init] chatId=%s, customTags=%d (remote=%s), aiEnabled=%s, aiAutoInViewer=%s',
       STATE.chatId ? 'set' : 'empty',
       STATE.customTags.length,
-      Array.isArray(rawTags) && rawTags.length > 0,
+      !!remoteTags,
       STATE.aiEnabled,
-      STATE.aiAutoInViewer,
-      settings.aiApiKey ? 'set' : 'MISSING',
-      settings.aiProvider || 'default'
+      STATE.aiAutoInViewer
     );
     startApp();
   } else {
