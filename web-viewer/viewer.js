@@ -86,6 +86,17 @@ function makeFileSheetHtml(color, ext, name) {
 }
 const TG_ICON_SVG = `<svg width="12" height="10" viewBox="0 0 12.3848 10.2636" fill="none" style="flex-shrink:0"><path fill-rule="evenodd" clip-rule="evenodd" d="M0.85139 4.41839L7.50196 1.55371C10.669 0.23644 11.327 0.00763 11.756 0.00008C11.8503-0.00158 12.0612 0.02179 12.1979 0.13266C12.3133 0.22627 12.345 0.35276 12.3602 0.44148C12.3754 0.53021 12.3943 0.73244 12.3793 0.89044C12.2076 2.69363 11.465 7.06966 11.0872 9.0893C10.9274 9.94392 10.6128 10.2305 10.3079 10.2585C9.64564 10.3194 9.14274 9.8208 8.50131 9.40036L5.95631 7.69083C4.83037 6.94889 5.56027 6.54108 6.20195 5.87463C6.36987 5.70015 9.28776 3.04613 9.34421 2.80537C9.35105 2.77526 9.35782 2.66305 9.29115 2.60375C9.22449 2.54445 9.12602 2.56497 9.05502 2.58087C8.95437 2.60372 7.35095 3.66352 4.24478 5.7603C3.78965 6.07284 3.37739 6.22512 3.00806 6.21714C2.60087 6.20834 1.81763 5.98692 1.23536 5.79763C0.521177 5.56549-0.0464449 5.44274 0.00300277 5.04849C0.0287301 4.84315 0.311526 4.63315 0.851367 4.41844Z" fill="white" fill-opacity="0.3"/></svg>`;
 
+// ─── Default customTags (same as extension DEFAULT_SETTINGS) ─────────────────
+const DEFAULT_CUSTOM_TAGS = [
+  { name: 'work', color: '#E64541', id: 'red' },
+  { name: 'study', color: '#FFDE42', id: 'yellow' },
+  { name: 'refs', color: '#4ED345', id: 'green' },
+  { name: 'project1', color: '#377CDE', id: 'blue' },
+  { name: '', color: '#BB4FFF', id: 'purple' },
+  { name: '', color: '#3D3D3B', id: 'black' },
+  { name: '', color: '#DEDEDE', id: 'white' }
+];
+
 // ─── State ────────────────────────────────────────────────────────────────────
 const STATE = {
   items: [],
@@ -180,10 +191,20 @@ async function init() {
     STATE.notionDbId = settings.notionDbId;
     STATE.botToken = settings.botToken;
     STATE.chatId = settings.chatId || '';
-    STATE.customTags = settings.customTags || [];
+    // Use defaults if customTags not in storage
+    const rawTags = settings.customTags;
+    STATE.customTags = (Array.isArray(rawTags) && rawTags.length > 0) ? rawTags : DEFAULT_CUSTOM_TAGS;
     STATE.aiEnabled = !!(settings.aiEnabled && settings.aiApiKey);
-    console.log('[Init] chatId=%s, customTags=%d, aiEnabled=%s', STATE.chatId ? 'set' : 'empty', STATE.customTags.length, STATE.aiEnabled);
     STATE.aiAutoInViewer = settings.aiAutoInViewer !== false;
+    console.log('[Init] chatId=%s, customTags=%d (fromStorage=%s), aiEnabled=%s, aiAutoInViewer=%s, aiApiKey=%s, aiProvider=%s',
+      STATE.chatId ? 'set' : 'empty',
+      STATE.customTags.length,
+      Array.isArray(rawTags) && rawTags.length > 0,
+      STATE.aiEnabled,
+      STATE.aiAutoInViewer,
+      settings.aiApiKey ? 'set' : 'MISSING',
+      settings.aiProvider || 'default'
+    );
     startApp();
   } else {
     openSettingsPanel();
@@ -3946,7 +3967,10 @@ Rules:
 - All fields must be present. No markdown.`;
 
 async function viewerAnalyzeItem(item, settings) {
-  if (!settings.aiApiKey) return null;
+  console.log('[AI] viewerAnalyzeItem called, type=%s, fileId=%s, apiKey=%s, provider=%s',
+    item.type, item.fileId ? item.fileId.slice(-15) : 'none',
+    settings.aiApiKey ? 'set' : 'MISSING', settings.aiProvider || 'google');
+  if (!settings.aiApiKey) { console.warn('[AI] No API key, skipping'); return null; }
   const provider = settings.aiProvider || 'google';
   const model = settings.aiModel || (provider === 'google' ? 'gemini-2.0-flash' : 'claude-haiku-4-5-20251001');
   const isDirectImage = item.type === 'image' || item.type === 'gif' || item.type === 'video';
@@ -3957,14 +3981,16 @@ async function viewerAnalyzeItem(item, settings) {
   // Try to get image from Telegram fileId
   if (item.fileId && STATE.botToken) {
     try {
+      console.log('[AI] Fetching file info from TG for fileId=...%s', item.fileId.slice(-15));
       const fileRes = await fetch(`https://api.telegram.org/bot${STATE.botToken}/getFile?file_id=${item.fileId}`);
       const fileData = await fileRes.json();
+      console.log('[AI] TG getFile result: ok=%s, path=%s', fileData.ok, fileData.result?.file_path || 'none');
       if (fileData.ok && fileData.result?.file_path) {
         const ext = fileData.result.file_path.split('.').pop()?.toLowerCase();
         const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         if (IMAGE_EXTS.includes(ext)) {
           const imgUrl = `https://api.telegram.org/file/bot${STATE.botToken}/${fileData.result.file_path}`;
-          // Fetch image as base64
+          console.log('[AI] Fetching image as base64, ext=%s', ext);
           const imgRes = await fetch(imgUrl);
           const imgBlob = await imgRes.blob();
           const buffer = await imgBlob.arrayBuffer();
@@ -3973,6 +3999,7 @@ async function viewerAnalyzeItem(item, settings) {
           for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
           const base64 = btoa(binary);
           const mimeType = ext === 'gif' ? 'image/gif' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+          console.log('[AI] Image base64 ready, size=%dKB, sending to %s/%s', Math.round(base64.length / 1024), provider, model);
 
           if (provider === 'google') {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
@@ -3984,9 +4011,13 @@ async function viewerAnalyzeItem(item, settings) {
                 { text: prompt }
               ] }] })
             });
+            console.log('[AI] Gemini response: ok=%s, status=%s', res.ok, res.status);
             if (res.ok) {
               const data = await res.json();
               responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+            } else {
+              const errText = await res.text();
+              console.warn('[AI] Gemini error:', errText.slice(0, 300));
             }
           } else {
             const res = await bgFetch('https://api.anthropic.com/v1/messages', {
@@ -4004,16 +4035,24 @@ async function viewerAnalyzeItem(item, settings) {
                 ] }]
               })
             });
+            console.log('[AI] Anthropic response: ok=%s, status=%s', res.ok, res.status);
             if (res.ok) {
               const data = await res.json();
               responseText = data.content?.[0]?.text || null;
+            } else {
+              const errText = await res.text();
+              console.warn('[AI] Anthropic error:', errText.slice(0, 300));
             }
           }
+        } else {
+          console.log('[AI] File ext=%s is not an image, skipping image analysis', ext);
         }
       }
     } catch (e) {
       console.warn('[AI] Image analysis failed, falling back to text:', e);
     }
+  } else {
+    console.log('[AI] No fileId or botToken, skipping image path');
   }
 
   // Text fallback
@@ -4023,7 +4062,14 @@ async function viewerAnalyzeItem(item, settings) {
       item.content ? `Content: ${item.content.slice(0, 500)}` : '',
       item.tagName ? `User tag: ${item.tagName}` : ''
     ].filter(Boolean).join('\n');
+
+    if (!context.trim()) {
+      console.log('[AI] No image and no text context, nothing to analyze');
+      return null;
+    }
+
     const fullPrompt = `${AI_PROMPT_LINK}\n\nContent to analyze:\n${context}`;
+    console.log('[AI] Text fallback, context length=%d, sending to %s/%s', context.length, provider, model);
 
     if (provider === 'google') {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.aiApiKey}`;
@@ -4032,9 +4078,13 @@ async function viewerAnalyzeItem(item, settings) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
       });
+      console.log('[AI] Gemini text response: ok=%s, status=%s', res.ok, res.status);
       if (res.ok) {
         const data = await res.json();
         responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      } else {
+        const errText = await res.text();
+        console.warn('[AI] Gemini text error:', errText.slice(0, 300));
       }
     } else {
       const res = await bgFetch('https://api.anthropic.com/v1/messages', {
@@ -4049,19 +4099,24 @@ async function viewerAnalyzeItem(item, settings) {
           messages: [{ role: 'user', content: fullPrompt }]
         })
       });
+      console.log('[AI] Anthropic text response: ok=%s, status=%s', res.ok, res.status);
       if (res.ok) {
         const data = await res.json();
         responseText = data.content?.[0]?.text || null;
+      } else {
+        const errText = await res.text();
+        console.warn('[AI] Anthropic text error:', errText.slice(0, 300));
       }
     }
   }
 
-  if (!responseText) return null;
+  if (!responseText) { console.warn('[AI] No response text from AI'); return null; }
 
   try {
     const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
     const parsed = JSON.parse(cleaned);
     if (isDirectImage && parsed.content_type !== 'product') parsed.content_type = null;
+    console.log('[AI] Parsed result: type=%s, desc=%s', parsed.content_type, (parsed.description || '').slice(0, 60));
     return parsed;
   } catch (e) {
     console.warn('[AI] Parse error:', e, responseText?.slice(0, 200));
@@ -4107,7 +4162,9 @@ async function patchNotionWithAI(pageId, aiResult, existingAiData) {
 
 // ─── AI background processing ─────────────────────────────────────────────────
 async function runAiBackgroundProcessing() {
+  console.log('[AI] runAiBackgroundProcessing called, STATE.aiEnabled=%s, STATE.aiAutoInViewer=%s', STATE.aiEnabled, STATE.aiAutoInViewer);
   const pending = STATE.items.filter(item => !item.ai_analyzed && item.id && item.type !== 'quote');
+  console.log('[AI] pending items: %d', pending.length);
   if (!pending.length) {
     document.getElementById('ai-status').textContent = '✓ All analyzed';
     setTimeout(() => { document.getElementById('ai-status').textContent = ''; }, 3000);
@@ -4115,6 +4172,8 @@ async function runAiBackgroundProcessing() {
   }
 
   const settings = await getSettings();
+  console.log('[AI] settings: aiEnabled=%s, aiApiKey=%s, aiProvider=%s, aiModel=%s',
+    settings.aiEnabled, settings.aiApiKey ? 'set' : 'MISSING', settings.aiProvider, settings.aiModel);
   if (!settings.aiEnabled || !settings.aiApiKey) {
     console.log('[AI] Disabled or no API key, skipping');
     return;
