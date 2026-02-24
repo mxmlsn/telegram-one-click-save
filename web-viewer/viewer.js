@@ -4200,10 +4200,10 @@ async function runAiBackgroundProcessing() {
   }
 
   const settings = await getSettings();
-  console.log('[AI] settings: aiEnabled=%s, aiApiKey=%s, aiProvider=%s, aiModel=%s',
-    settings.aiEnabled, settings.aiApiKey ? 'set' : 'MISSING', settings.aiProvider, settings.aiModel);
-  if (!settings.aiEnabled || !settings.aiApiKey) {
-    console.log('[AI] Disabled or no API key, skipping');
+  console.log('[AI] settings: aiApiKey=%s, aiProvider=%s, aiModel=%s',
+    settings.aiApiKey ? 'set' : 'MISSING', settings.aiProvider, settings.aiModel);
+  if (!settings.aiApiKey) {
+    console.log('[AI] No API key, skipping');
     return;
   }
 
