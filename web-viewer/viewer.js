@@ -4486,7 +4486,14 @@ const AI_PROMPT_LINK = `Analyze this saved link and return ONLY valid JSON, no o
 {"content_type":null,"content_type_secondary":null,"title":"","description":"detailed description","materials":[],"color_palette":null,"color_subject":null,"color_top3":[],"text_on_image":"","price":"","author":"","tweet_text":""}
 
 Rules:
-- content_type: "article","video","product","xpost","tool","pdf" or null.
+- content_type (pick best match, null if none clearly apply):
+  "article" = page whose main purpose is to be READ: news article, blog post, essay, tutorial, interview, documentation. Must be primarily text content — NOT a gallery, portfolio, or image-focused site.
+  "video" = page whose main content is a video (YouTube, Vimeo, TikTok, etc).
+  "product" = real e-commerce page: single product detail page OR shoppable storefront/catalog (Farfetch, SSENSE, Amazon, marketplace). Must have real prices AND buy/cart/checkout UI. NOT for editorial, art, magazine, portfolio, or gallery pages that merely contain product imagery or brand mentions.
+  "xpost" = a single social media post (Twitter/X post page, Instagram post, etc).
+  "tool" = web app, SaaS, interactive utility, or online tool.
+  "pdf" = PDF document viewer.
+  null = image gallery, portfolio, art site, magazine, aggregator, homepage, or anything that doesn't clearly fit the above.
 - content_type_secondary: different from primary or null.
 - title: primary heading (under 80 chars).
 - description: 2-4 sentences in English.

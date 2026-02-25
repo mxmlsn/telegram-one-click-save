@@ -429,6 +429,9 @@ async function loadSettings() {
   customTags = mergeCustomTags(settings.customTags || []);
   renderCustomTags();
 
+  // Sync tags from bot (overrides local if bot has newer config)
+  loadTagsFromBot();
+
   // Toggle quick tags settings visibility based on enableQuickTags
   toggleQuickTagsSettings(settings.enableQuickTags !== false);
 
@@ -957,6 +960,43 @@ async function syncTagsToBot() {
     });
   } catch (e) {
     console.warn('Tags sync to bot failed:', e);
+  }
+}
+
+async function loadTagsFromBot() {
+  try {
+    const settings = await chrome.storage.local.get({ botToken: '', isConnected: false });
+    if (!settings.botToken || !settings.isConnected) return;
+
+    const res = await fetch(`${BOT_WORKER_URL}/api/tags`, {
+      headers: { 'Authorization': `Bearer ${settings.botToken}` }
+    });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (!data.customTags || !Array.isArray(data.customTags)) return;
+
+    // Apply remote tags to local storage and UI
+    const toSave = { customTags: data.customTags };
+    if (data.emojiPack) toSave.emojiPack = data.emojiPack;
+    if (data.customEmoji) toSave.customEmoji = data.customEmoji;
+    if (typeof data.sendWithColor === 'boolean') toSave.sendWithColor = data.sendWithColor;
+
+    await chrome.storage.local.set(toSave);
+
+    customTags = mergeCustomTags(data.customTags);
+    renderCustomTags();
+
+    if (data.emojiPack) {
+      updateEmojiPreview(data.emojiPack);
+    }
+    if (typeof data.sendWithColor === 'boolean') {
+      sendWithColorInput.checked = data.sendWithColor;
+      toggleEmojiPackSettings(data.sendWithColor);
+    }
+    updateLivePreview();
+  } catch (e) {
+    console.warn('Tags load from bot failed:', e);
   }
 }
 
