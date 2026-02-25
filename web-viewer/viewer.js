@@ -292,7 +292,7 @@ async function resolveRemainingImages(items, fileCache) {
   const allFileIds = new Set();
   for (const item of items) {
     if (item.fileId) allFileIds.add(item.fileId);
-    if (item.fileIds?.length > 1) {
+    if (item.fileIds?.length >= 1) {
       for (const fid of item.fileIds) if (fid) allFileIds.add(fid);
     }
     const fname = item.ai_data?.fileName || '';
@@ -1185,7 +1185,7 @@ async function resolveImagesBatch(items, tgToken, cache) {
   const allFileIds = new Set();
   for (const item of items) {
     if (item.fileId) allFileIds.add(item.fileId);
-    if (item.fileIds?.length > 1) {
+    if (item.fileIds?.length >= 1) {
       for (const fid of item.fileIds) if (fid) allFileIds.add(fid);
     }
     // Pre-resolve thumbnails for HEIC items so placeholder size is instant
@@ -5225,6 +5225,17 @@ function setupNoteEditor() {
   addBtn.addEventListener('click', () => openNoteEditor([]));
   closeBtn.addEventListener('click', closeNoteEditor);
   saveBtn.addEventListener('click', saveNote);
+
+  // Attach files via button
+  const attachBtn = document.getElementById('note-editor-attach');
+  const fileInput = document.getElementById('note-editor-file-input');
+  if (attachBtn && fileInput) {
+    attachBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      [...fileInput.files].forEach(f => addFileToNoteEditor(f));
+      fileInput.value = '';
+    });
+  }
 
   // Drag files into editor
   editor.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; });
