@@ -374,11 +374,16 @@ async function saveToNotion(block, telegramResult, env) {
     ? (textIsUrl ? '' : rawTextContent.slice(0, 2000))
     : (displayTitle || '').slice(0, 2000);
 
+  // For Attachment blocks (video/pdf/file): use arenaUrl as Source URL so viewer
+  // treats them as TG-direct (not external video). The original CDN URL is ephemeral.
+  const isAttachment = block.class === 'Attachment';
+  const notionSourceUrl = isAttachment ? arenaUrl : (sourceUrl || arenaUrl);
+
   const properties = {
     'URL': { title: [{ text: { content: 'are.na' } }] },
     'Type': { select: { name: notionType } },
     'Date': { date: { start: block.connected_at || new Date().toISOString() } },
-    'Source URL': { url: sourceUrl || arenaUrl },
+    'Source URL': { url: notionSourceUrl },
     'Tag': { select: { name: 'arena' } }
   };
 
