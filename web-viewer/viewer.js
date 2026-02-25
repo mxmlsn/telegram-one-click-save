@@ -344,7 +344,7 @@ async function resolveRemainingImages(items, fileCache) {
     // Also re-render album cards that got new album images resolved in this batch
     // Note: album leader may have empty fileId (e.g. video without thumbnail), so don't require _resolvedImg
     const albumsToRepatch = items.filter(it =>
-      (it.fileIds?.length > 1 || it.albumMedia?.length > 1) && batch.some(fid => it.fileIds.includes(fid))
+      (it.fileIds?.length >= 1 || it.albumMedia?.length > 1) && batch.some(fid => it.fileIds.includes(fid))
     );
     // Ensure album items have _resolvedImg set so patchCardImages doesn't skip them
     for (const it of albumsToRepatch) {
