@@ -13,6 +13,30 @@ export default {
       await env.ARENA_SYNC_KV.delete('last_synced_at');
       return new Response('KV reset', { status: 200 });
     }
+    if (url.pathname.startsWith('/sync-block/')) {
+      const blockId = url.pathname.split('/').pop();
+      // Delete existing Notion page for this block first (avoid duplicates)
+      const arenaUrl = `https://www.are.na/block/${blockId}`;
+      const searchRes = await fetch(`https://api.notion.com/v1/databases/${env.NOTION_DB_ID}/query`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filter: { property: 'Source URL', url: { equals: arenaUrl } } })
+      });
+      const searchData = await searchRes.json();
+      for (const page of (searchData.results || [])) {
+        await fetch(`https://api.notion.com/v1/pages/${page.id}`, {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${env.NOTION_TOKEN}`, 'Notion-Version': '2022-06-28', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: true })
+        });
+      }
+      const blockRes = await fetch(`https://api.are.na/v2/blocks/${blockId}`, {
+        headers: { 'X-Auth-Token': env.ARENA_AUTH_TOKEN, 'X-App-Token': env.ARENA_APP_TOKEN }
+      });
+      const block = await blockRes.json();
+      await processBlock(block, env);
+      return new Response(`block ${blockId} processed`, { status: 200 });
+    }
     return new Response('arena-sync worker', { status: 200 });
   }
 };
@@ -87,6 +111,7 @@ async function sendToTelegram(block, env) {
   const caption = captionParts.join('\n');
 
   let fileId = null;
+  let thumbnailFileId = null;
   let notionType = 'link';
 
   if (blockClass === 'Image' && block.image?.original?.url) {
@@ -194,7 +219,7 @@ async function sendToTelegram(block, env) {
     const previewImageUrl = block.image?.original?.url;
 
     if (isVideo) {
-      // Send video file — get thumbnail fileId for viewer
+      // Send video file to get video fileId for playback
       const res = await fetch(`${base}/sendVideo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,8 +228,10 @@ async function sendToTelegram(block, env) {
       const data = await res.json();
       if (data.ok) {
         notionType = 'video';
+        const videoFid = data.result.video?.file_id;
         // video.thumbnail.file_id is AAMC type — not retrievable via getFile.
-        // Always use sendPhoto with Are.na preview image to get a valid AgACAgQ photo fileId for viewer.
+        // Use sendPhoto with Are.na preview image to get a valid AgACAgQ photo fileId as thumbnail.
+        // Store: fileId = video fileId (for playback), thumbnailFileId = photo fileId (for display).
         if (previewImageUrl) {
           const res2 = await fetch(`${base}/sendPhoto`, {
             method: 'POST',
@@ -212,10 +239,16 @@ async function sendToTelegram(block, env) {
             body: JSON.stringify({ chat_id: chatId, photo: previewImageUrl, caption })
           });
           const data2 = await res2.json();
-          if (data2.ok) fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
-          else console.warn(`[arena-sync] sendPhoto for video preview failed: ${data2.description}`);
+          if (data2.ok) {
+            const photoFid = data2.result.photo[data2.result.photo.length - 1].file_id;
+            fileId = videoFid; // video fileId for playback
+            thumbnailFileId = photoFid; // photo fileId for thumbnail display
+          } else {
+            console.warn(`[arena-sync] sendPhoto for video preview failed: ${data2.description}`);
+            fileId = videoFid;
+          }
         } else {
-          fileId = data.result.video?.thumbnail?.file_id; // AAMC fallback — may not resolve in viewer
+          fileId = videoFid;
         }
       } else {
         console.warn(`[arena-sync] sendVideo failed for ${block.id}: ${data.description}`);
@@ -334,11 +367,11 @@ async function sendToTelegram(block, env) {
     }
   }
 
-  return { fileId, notionType, displayTitle, sourceUrl, arenaUrl };
+  return { fileId, thumbnailFileId, notionType, displayTitle, sourceUrl, arenaUrl };
 }
 
 async function saveToNotion(block, telegramResult, env) {
-  const { fileId, notionType, displayTitle, sourceUrl, arenaUrl } = telegramResult;
+  const { fileId, thumbnailFileId, notionType, displayTitle, sourceUrl, arenaUrl } = telegramResult;
 
   // For text blocks, store actual text content (unless it's a URL — store nothing then).
   // For others, store displayTitle.
@@ -363,6 +396,7 @@ async function saveToNotion(block, telegramResult, env) {
 
   if (notionContent) properties['Content'] = { rich_text: [{ text: { content: notionContent } }] };
   if (fileId) properties['File ID'] = { rich_text: [{ text: { content: fileId } }] };
+  if (thumbnailFileId) properties['ai_data'] = { rich_text: [{ text: { content: JSON.stringify({ thumbnailFileId }) } }] };
 
   const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
