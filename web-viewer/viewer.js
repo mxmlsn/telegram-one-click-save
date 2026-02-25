@@ -1904,6 +1904,8 @@ const RULER_SVG = `<svg width="100%" viewBox="0 0 280 31" fill="none" xmlns="htt
 
 function renderCard(item) {
   let imgUrl = item._resolvedImg || (item.fileId ? STATE.imageMap[item.fileId] : null);
+  // Never use a PDF/document file URL as an image thumbnail
+  if (imgUrl && /\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z)($|\?)/i.test(imgUrl)) imgUrl = null;
   // For GIFs: prefer original animated URL over static Telegram thumbnail
   // Only use content as imgUrl if it's an actual URL (not a bare filename like "giphy.gif")
   if ((item.type === 'image' || item.type === 'gif') && item.content && item.content.startsWith('http')) {
@@ -2857,7 +2859,10 @@ function renderCard(item) {
     // 3. Otherwise imgUrl is a JPEG thumbnail → <img> (static preview, best we can do)
     const isMp4 = /\.mp4($|\?)/i.test(imgUrl);
     // Only use content as original GIF URL if it's an actual URL (not a bare filename like "giphy.gif")
-    const originalGifUrl = /\.gif($|\?)/i.test(item.content || '') && (item.content || '').startsWith('http') ? item.content : '';
+    const originalGifUrl = /\.gif($|\?)/i.test(item.content || '') && (item.content || '').startsWith('http') ? item.content
+      // Fallback: sourceUrl may contain the original animated GIF URL (e.g. from Are.na blocks)
+      : /\.gif($|\?)/i.test(item.sourceUrl || '') && (item.sourceUrl || '').startsWith('http') ? item.sourceUrl
+      : '';
     const displayUrl = isMp4 ? imgUrl : (originalGifUrl || imgUrl);
     const mediaEl = isMp4
       ? `<video class="card-img" src="${escapeHtml(displayUrl)}" autoplay loop muted playsinline></video>`
