@@ -1,0 +1,10 @@
+name = "arena-sync"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[[kv_namespaces]]
+binding = "ARENA_SYNC_KV"
+id = "PLACEHOLDER_KV_ID"
