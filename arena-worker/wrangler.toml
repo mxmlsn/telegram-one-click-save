@@ -7,4 +7,4 @@ crons = ["*/5 * * * *"]
 
 [[kv_namespaces]]
 binding = "ARENA_SYNC_KV"
-id = "PLACEHOLDER_KV_ID"
+id = "b9d46ea37f6e45688b5a4cca4c2a0635"
