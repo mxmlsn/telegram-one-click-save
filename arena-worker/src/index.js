@@ -13,32 +13,6 @@ export default {
       await env.ARENA_SYNC_KV.delete('last_synced_at');
       return new Response('KV reset', { status: 200 });
     }
-    if (url.pathname === '/debug-list') {
-      const slug = env.ARENA_CHANNEL_SLUG;
-      const res = await fetch(`https://api.are.na/v2/channels/${slug}/contents?per=20&sort=position&direction=desc`, {
-        headers: { 'X-Auth-Token': env.ARENA_AUTH_TOKEN, 'X-App-Token': env.ARENA_APP_TOKEN }
-      });
-      const data = await res.json();
-      const blocks = (data.contents || []).map(b => ({
-        id: b.id, class: b.class, title: (b.title || '').slice(0, 60),
-        ct: b.attachment?.content_type || '', att_url: b.attachment?.url?.slice(0, 60) || ''
-      }));
-      return new Response(JSON.stringify(blocks, null, 2), { headers: { 'Content-Type': 'application/json' } });
-    }
-    if (url.pathname.startsWith('/debug-block/')) {
-      const blockId = url.pathname.split('/').pop();
-      const res = await fetch(`https://api.are.na/v2/blocks/${blockId}`, {
-        headers: { 'X-Auth-Token': env.ARENA_AUTH_TOKEN, 'X-App-Token': env.ARENA_APP_TOKEN }
-      });
-      const data = await res.json();
-      const info = {
-        id: data.id, class: data.class, title: data.title,
-        attachment: data.attachment ? { url: data.attachment.url, content_type: data.attachment.content_type, file_size: data.attachment.file_size } : null,
-        source: data.source ? { url: data.source.url } : null,
-        image: data.image ? { filename: data.image.filename, content_type: data.image.content_type, original_url: data.image.original?.url } : null,
-      };
-      return new Response(JSON.stringify(info, null, 2), { headers: { 'Content-Type': 'application/json' } });
-    }
     return new Response('arena-sync worker', { status: 200 });
   }
 };
