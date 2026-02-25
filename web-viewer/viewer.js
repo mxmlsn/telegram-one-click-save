@@ -1905,7 +1905,8 @@ const RULER_SVG = `<svg width="100%" viewBox="0 0 280 31" fill="none" xmlns="htt
 function renderCard(item) {
   let imgUrl = item._resolvedImg || (item.fileId ? STATE.imageMap[item.fileId] : null);
   // For GIFs: prefer original animated URL over static Telegram thumbnail
-  if ((item.type === 'image' || item.type === 'gif') && item.content) {
+  // Only use content as imgUrl if it's an actual URL (not a bare filename like "giphy.gif")
+  if ((item.type === 'image' || item.type === 'gif') && item.content && item.content.startsWith('http')) {
     const ext = item.content.split('?')[0].split('#')[0].split('.').pop()?.toLowerCase();
     if (ext === 'gif') {
       imgUrl = item.content; // animated GIF URL takes priority

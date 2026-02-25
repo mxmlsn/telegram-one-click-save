@@ -96,32 +96,25 @@ async function sendToTelegram(block, env) {
                   (block.image?.filename || '').toLowerCase().endsWith('.gif');
 
     if (isGif) {
-      // For GIFs: try source_url (original giphy/tenor URL) first — cloudfront stores static version
+      // For GIFs: send animation to chat (for bot), then send photo to get a valid photo fileId for viewer
       const gifUrl = block.source?.url || imageUrl;
-      const res = await fetch(`${base}/sendAnimation`, {
+      await fetch(`${base}/sendAnimation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, animation: gifUrl, caption })
       });
-      const data = await res.json();
-      // animation.thumbnail.file_id is what viewer needs — it's a JPEG preview
-      const thumbFileId = data.ok ? data.result.animation?.thumbnail?.file_id : null;
-      if (data.ok && thumbFileId) {
-        fileId = thumbFileId;
+      // animation.thumbnail.file_id (AAMC type) is not retrievable via getFile — use sendPhoto instead
+      const res2 = await fetch(`${base}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption })
+      });
+      const data2 = await res2.json();
+      if (data2.ok) {
+        fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
         notionType = 'gif';
       } else {
-        // sendAnimation failed OR no thumbnail — fall back to sendPhoto (static image)
-        console.warn(`[arena-sync] sendAnimation no thumbnail for ${block.id} (${data.description}), falling back to sendPhoto`);
-        const res2 = await fetch(`${base}/sendPhoto`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption })
-        });
-        const data2 = await res2.json();
-        if (data2.ok) {
-          fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
-          notionType = 'image';
-        }
+        console.warn(`[arena-sync] sendPhoto for gif preview failed for ${block.id}: ${data2.description}`);
       }
     } else {
       // Try sendPhoto first
