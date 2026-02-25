@@ -2856,7 +2856,8 @@ function renderCard(item) {
     // 2. If item.content has original .gif URL (bot-saved) → use that as <img> (browsers animate GIFs)
     // 3. Otherwise imgUrl is a JPEG thumbnail → <img> (static preview, best we can do)
     const isMp4 = /\.mp4($|\?)/i.test(imgUrl);
-    const originalGifUrl = /\.gif($|\?)/i.test(item.content || '') ? item.content : '';
+    // Only use content as original GIF URL if it's an actual URL (not a bare filename like "giphy.gif")
+    const originalGifUrl = /\.gif($|\?)/i.test(item.content || '') && (item.content || '').startsWith('http') ? item.content : '';
     const displayUrl = isMp4 ? imgUrl : (originalGifUrl || imgUrl);
     const mediaEl = isMp4
       ? `<video class="card-img" src="${escapeHtml(displayUrl)}" autoplay loop muted playsinline></video>`
