@@ -581,6 +581,8 @@ function mergeMediaGroups(items) {
         item.albumMedia = [mediaEntry];
         item.fileIds = displayFid ? [displayFid] : [];
         item._groupPageIds = [item.id]; // track all Notion page IDs in this album
+        // For video with no thumbnail: resolve videoFileId so renderer can show inline video
+        if (mType === 'video' && !displayFid && mediaEntry.videoFileId) item.fileIds.push(mediaEntry.videoFileId);
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) item.fileIds.push(mediaEntry.coverFileId);
         // If first item is a document and its content is just the filename, clear it
@@ -597,6 +599,8 @@ function mergeMediaGroups(items) {
         if (displayFid) {
           groups[gid].fileIds.push(displayFid);
         }
+        // For video with no thumbnail: resolve videoFileId so renderer can show inline video
+        if (mType === 'video' && !displayFid && mediaEntry.videoFileId) groups[gid].fileIds.push(mediaEntry.videoFileId);
         // Add audio cover thumbnail for resolution
         if (mediaEntry.coverFileId) groups[gid].fileIds.push(mediaEntry.coverFileId);
         // Use content from whichever has it — but skip if content is just the filename
@@ -880,9 +884,11 @@ async function uploadFileToTelegram(file, botToken, chatId) {
       console.log('[Upload] Video metadata: %dx%d, %ds', meta.width, meta.height, Math.round(meta.duration || 0));
     } catch (e) { console.warn('[Upload] Video metadata extraction failed:', e.message); }
     // Generate thumbnail from first frame (ensures preview even for large videos)
+    let thumbBlobForFallback = null;
     try {
       const thumbBlob = await generateVideoThumbnail(file);
       if (thumbBlob) {
+        thumbBlobForFallback = thumbBlob;
         formData.append('thumbnail', thumbBlob, 'thumb.jpg');
         console.log('[Upload] Video thumbnail generated, size=%d', thumbBlob.size);
       }
@@ -893,6 +899,32 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     const vid = data.result?.video;
     r.videoFileId = vid?.file_id || null;
     r.thumbnailFileId = vid?.thumbnail?.file_id || vid?.thumb?.file_id || null;
+    // Telegram doesn't always return thumbnail.file_id for sendVideo.
+    // If we have the thumb blob, upload it as a photo to get a persistent file_id.
+    if (!r.thumbnailFileId && thumbBlobForFallback) {
+      try {
+        const thumbForm = new FormData();
+        thumbForm.append('chat_id', chatId);
+        thumbForm.append('photo', thumbBlobForFallback, 'thumb.jpg');
+        thumbForm.append('disable_notification', 'true');
+        const thumbRes = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: thumbForm });
+        if (thumbRes.ok) {
+          const thumbData = await thumbRes.json();
+          const thumbMsgId = thumbData.result?.message_id;
+          const photoSizes = thumbData.result?.photo || [];
+          r.thumbnailFileId = photoSizes[photoSizes.length - 1]?.file_id || null;
+          // Delete the temporary thumbnail message
+          if (thumbMsgId) {
+            fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chat_id: chatId, message_id: thumbMsgId })
+            }).catch(() => {});
+          }
+          console.log('[Upload] Video thumb uploaded via sendPhoto, thumbFileId=%s', r.thumbnailFileId?.slice(-20));
+        }
+      } catch (e) { console.warn('[Upload] Video thumb fallback upload failed:', e.message); }
+    }
     r.fileId = r.thumbnailFileId || r.videoFileId;
     r.type = 'video';
     r.messageId = data.result?.message_id || null;
@@ -2532,6 +2564,11 @@ function renderCard(item) {
           // GIF with animation URL (no separate JPEG thumbnail): use <video> for inline playback
           if (m.isGifAnimation && resolvedUrl && /\.mp4($|\?)/i.test(resolvedUrl)) {
             return `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><video class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" autoplay loop muted playsinline></video></div>`;
+          }
+          // Video without thumbnail: try to resolve videoFileId directly and show inline video
+          const videoUrl = !resolvedUrl && m.mediaType === 'video' ? (STATE.imageMap[playFileId] || '') : '';
+          if (videoUrl) {
+            return `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(videoUrl)}"><video class="tgpost-album-img" src="${escapeHtml(videoUrl)}" autoplay loop muted playsinline></video><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`;
           }
           return resolvedUrl
             ? `<div class="tgpost-album-item is-video" data-action="album-gallery" data-gallery-type="video" data-file-id="${escapeHtml(playFileId)}" data-thumb="${escapeHtml(resolvedUrl)}"><img class="tgpost-album-img" src="${escapeHtml(resolvedUrl)}" loading="lazy" alt=""><div class="tgpost-play-icon"><svg viewBox="0 0 24 24" fill="white"><path d="M7 5.5C7 4.4 8.26 3.74 9.19 4.34l10.5 6.5a1.75 1.75 0 0 1 0 3.02l-10.5 6.5C8.26 20.96 7 20.3 7 19.2V5.5z"/></svg></div></div>`
