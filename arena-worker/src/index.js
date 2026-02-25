@@ -69,13 +69,20 @@ async function sendToTelegram(block, env) {
   const base = `https://api.telegram.org/bot${botToken}`;
 
   const blockClass = block.class;
-  const title = block.title || block.generated_title || '';
   const sourceUrl = block.source?.url || '';
   const arenaUrl = `https://www.are.na/block/${block.id}`;
 
-  // Caption: title (if not just filename) + arena URL
+  // For Text blocks, content is the text itself — not title
+  // For other blocks, use title only if it's not a URL/filename/base64
+  const rawTitle = block.title || '';
+  const isUrlOrBase64 = rawTitle.startsWith('http') || rawTitle.startsWith('eyJ') || rawTitle.length > 200;
+  const displayTitle = blockClass === 'Text'
+    ? '' // text blocks use content, not title
+    : (isUrlOrBase64 ? (block.image?.filename || '') : rawTitle);
+
+  // Caption: displayTitle + arena URL
   const captionParts = [];
-  if (title && title !== block.image?.filename) captionParts.push(title);
+  if (displayTitle) captionParts.push(displayTitle);
   captionParts.push(`are.na/block/${block.id}`);
   const caption = captionParts.join('\n');
 
@@ -84,31 +91,65 @@ async function sendToTelegram(block, env) {
 
   if (blockClass === 'Image' && block.image?.original?.url) {
     const imageUrl = block.image.original.url;
-    // Try sendPhoto first
-    const res = await fetch(`${base}/sendPhoto`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      const photos = data.result.photo;
-      fileId = photos[photos.length - 1].file_id;
-      notionType = 'image';
-    } else {
-      console.warn(`[arena-sync] sendPhoto failed for ${block.id}: ${data.description}, trying sendDocument`);
-      // Fallback to sendDocument
-      const res2 = await fetch(`${base}/sendDocument`, {
+    const isGif = (block.title || '').toLowerCase().endsWith('.gif') ||
+                  (block.source?.url || '').toLowerCase().includes('.gif') ||
+                  (block.image?.filename || '').toLowerCase().endsWith('.gif');
+
+    if (isGif) {
+      // For GIFs: try source_url (original giphy/tenor URL) first — cloudfront stores static version
+      const gifUrl = block.source?.url || imageUrl;
+      const res = await fetch(`${base}/sendAnimation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, document: imageUrl, caption })
+        body: JSON.stringify({ chat_id: chatId, animation: gifUrl, caption })
       });
-      const data2 = await res2.json();
-      if (data2.ok) {
-        fileId = data2.result.document.file_id;
+      const data = await res.json();
+      // animation.thumbnail.file_id is what viewer needs — it's a JPEG preview
+      const thumbFileId = data.ok ? data.result.animation?.thumbnail?.file_id : null;
+      if (data.ok && thumbFileId) {
+        fileId = thumbFileId;
+        notionType = 'gif';
+      } else {
+        // sendAnimation failed OR no thumbnail — fall back to sendPhoto (static image)
+        console.warn(`[arena-sync] sendAnimation no thumbnail for ${block.id} (${data.description}), falling back to sendPhoto`);
+        const res2 = await fetch(`${base}/sendPhoto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption })
+        });
+        const data2 = await res2.json();
+        if (data2.ok) {
+          fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
+          notionType = 'image';
+        }
+      }
+    } else {
+      // Try sendPhoto first
+      const res = await fetch(`${base}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, photo: imageUrl, caption })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const photos = data.result.photo;
+        fileId = photos[photos.length - 1].file_id;
         notionType = 'image';
       } else {
-        console.error(`[arena-sync] sendDocument also failed: ${data2.description}`);
+        console.warn(`[arena-sync] sendPhoto failed for ${block.id}: ${data.description}, trying sendDocument`);
+        // Fallback to sendDocument
+        const res2 = await fetch(`${base}/sendDocument`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, document: imageUrl, caption })
+        });
+        const data2 = await res2.json();
+        if (data2.ok) {
+          fileId = data2.result.document.file_id;
+          notionType = 'image';
+        } else {
+          console.error(`[arena-sync] sendDocument also failed: ${data2.description}`);
+        }
       }
     }
   } else if (blockClass === 'Media' && block.attachment?.url) {
@@ -168,41 +209,85 @@ async function sendToTelegram(block, env) {
       console.warn(`[arena-sync] sendDocument failed: ${data.description}`);
     }
   } else if (blockClass === 'Text') {
-    const text = block.content || title || '(empty)';
-    // Escape HTML entities to avoid Telegram parse errors
-    const safeText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const msg = `<code>${safeText}</code>\n\n${arenaUrl}`;
-    const res = await fetch(`${base}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'HTML' })
-    });
-    const data = await res.json();
-    if (!data.ok) console.warn(`[arena-sync] sendMessage (Text) failed: ${data.description}`);
-    notionType = 'quote';
+    const text = block.content || block.title || '';
+    const isUrl = text.startsWith('http://') || text.startsWith('https://');
+    if (isUrl) {
+      // Are.na failed to load external resource, stored URL as text — treat as link
+      const msgParts = [text, arenaUrl].filter(Boolean);
+      const res = await fetch(`${base}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: msgParts.join('\n'), disable_web_page_preview: false })
+      });
+      const data = await res.json();
+      if (!data.ok) console.warn(`[arena-sync] sendMessage (Text-as-link) failed: ${data.description}`);
+      notionType = 'link';
+    } else {
+      // Escape HTML entities to avoid Telegram parse errors
+      const safeText = (text || '(empty)').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const msg = `<code>${safeText}</code>\n\n${arenaUrl}`;
+      const res = await fetch(`${base}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: msg, parse_mode: 'HTML' })
+      });
+      const data = await res.json();
+      if (!data.ok) console.warn(`[arena-sync] sendMessage (Text) failed: ${data.description}`);
+      notionType = 'quote';
+    }
   } else {
-    // Link block or fallback
-    const url = sourceUrl || arenaUrl;
-    const msgParts = [];
-    if (title) msgParts.push(title);
-    msgParts.push(url);
-    if (sourceUrl) msgParts.push(arenaUrl); // add arena link as reference
-    const msg = msgParts.join('\n');
-    const res = await fetch(`${base}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: msg, disable_web_page_preview: false })
-    });
-    const data = await res.json();
-    if (!data.ok) console.warn(`[arena-sync] sendMessage (Link) failed: ${data.description}`);
-    notionType = 'link';
+    // Link block or fallback — try to send preview image if available
+    const previewImageUrl = block.image?.original?.url;
+    if (previewImageUrl) {
+      const linkCaption = [displayTitle || block.title || '', sourceUrl || arenaUrl, arenaUrl].filter(Boolean).join('\n');
+      const res = await fetch(`${base}/sendPhoto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, photo: previewImageUrl, caption: linkCaption })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const photos = data.result.photo;
+        fileId = photos[photos.length - 1].file_id;
+        notionType = 'link';
+      } else {
+        // Fallback to text message
+        const url = sourceUrl || arenaUrl;
+        const msgParts = [displayTitle || block.title, url, arenaUrl].filter(Boolean);
+        await fetch(`${base}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, text: msgParts.join('\n'), disable_web_page_preview: false })
+        });
+        notionType = 'link';
+      }
+    } else {
+      const url = sourceUrl || arenaUrl;
+      const msgParts = [displayTitle || block.title, url, sourceUrl ? arenaUrl : ''].filter(Boolean);
+      const res = await fetch(`${base}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text: msgParts.join('\n'), disable_web_page_preview: false })
+      });
+      const data = await res.json();
+      if (!data.ok) console.warn(`[arena-sync] sendMessage (Link) failed: ${data.description}`);
+      notionType = 'link';
+    }
   }
 
-  return { fileId, notionType, title, sourceUrl, arenaUrl };
+  return { fileId, notionType, displayTitle, sourceUrl, arenaUrl };
 }
 
 async function saveToNotion(block, telegramResult, env) {
-  const { fileId, notionType, title, sourceUrl, arenaUrl } = telegramResult;
+  const { fileId, notionType, displayTitle, sourceUrl, arenaUrl } = telegramResult;
+
+  // For text blocks, store actual text content (unless it's a URL — store nothing then).
+  // For others, store displayTitle.
+  const rawTextContent = block.content || block.title || '';
+  const textIsUrl = rawTextContent.startsWith('http://') || rawTextContent.startsWith('https://');
+  const notionContent = block.class === 'Text'
+    ? (textIsUrl ? '' : rawTextContent.slice(0, 2000))
+    : (displayTitle || '').slice(0, 2000);
 
   const properties = {
     'URL': { title: [{ text: { content: 'are.na' } }] },
@@ -212,7 +297,7 @@ async function saveToNotion(block, telegramResult, env) {
     'Tag': { select: { name: 'arena' } }
   };
 
-  if (title) properties['Content'] = { rich_text: [{ text: { content: title.slice(0, 2000) } }] };
+  if (notionContent) properties['Content'] = { rich_text: [{ text: { content: notionContent } }] };
   if (fileId) properties['File ID'] = { rich_text: [{ text: { content: fileId } }] };
 
   const res = await fetch('https://api.notion.com/v1/pages', {

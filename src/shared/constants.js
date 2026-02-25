@@ -58,6 +58,10 @@ export const DEFAULT_SETTINGS = {
   notionEnabled: false,
   notionToken: '',
   notionDbId: '30b6081f-3dc6-8148-871f-dfb6944ac36e',
+  // Are.na integration
+  arenaEnabled: false,
+  arenaToken: '',
+  arenaChannelSlug: 'stash-saver',
   // AI Analysis
   aiEnabled: false,
   aiProvider: 'google',

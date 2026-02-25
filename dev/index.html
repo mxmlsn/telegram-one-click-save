@@ -500,6 +500,36 @@
             </div>
           </div>
         </section>
+
+        <!-- Section 6: Are.na -->
+        <section class="section section-arena">
+          <h3>Are.na</h3>
+          <p class="section-desc">Sync blocks from an Are.na channel to your stash automatically.</p>
+
+          <div class="field checkbox-field">
+            <label>
+              <label class="switch">
+                <input type="checkbox" id="arenaEnabled">
+                <span class="slider"></span>
+              </label>
+              Enable Are.na sync
+            </label>
+          </div>
+
+          <div id="arena-config" class="hidden">
+            <div class="field">
+              <label for="arenaToken">Auth Token</label>
+              <input type="password" id="arenaToken" placeholder="Are.na auth token" autocomplete="off">
+            </div>
+
+            <div class="field">
+              <label for="arenaChannelSlug">Channel Slug</label>
+              <input type="text" id="arenaChannelSlug" placeholder="stash-saver">
+            </div>
+
+            <p class="section-desc" style="margin-top:8px;font-size:11px;opacity:0.6;">Synced via Cloudflare Worker (cron every 5 min). Token is stored locally for reference only — actual worker uses Cloudflare secrets.</p>
+          </div>
+        </section>
       </div>
     </div>
   </div>

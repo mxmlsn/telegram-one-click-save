@@ -43,6 +43,22 @@ let customTags = [];
 // Load custom tags on page open
 document.addEventListener('DOMContentLoaded', loadSettings);
 
+// Are.na — one-time event listener wiring
+document.addEventListener('DOMContentLoaded', () => {
+  const arenaEnabledInput = document.getElementById('arenaEnabled');
+  const arenaConfigDiv = document.getElementById('arena-config');
+  const arenaTokenInput = document.getElementById('arenaToken');
+  const arenaChannelSlugInput = document.getElementById('arenaChannelSlug');
+
+  arenaEnabledInput?.addEventListener('change', e => {
+    saveSetting('arenaEnabled', e.target.checked);
+    arenaConfigDiv?.classList.toggle('hidden', !e.target.checked);
+  });
+
+  arenaTokenInput?.addEventListener('change', e => saveSetting('arenaToken', e.target.value));
+  arenaChannelSlugInput?.addEventListener('change', e => saveSetting('arenaChannelSlug', e.target.value));
+});
+
 // AI Analysis — one-time event listener wiring (must not be inside loadSettings)
 document.addEventListener('DOMContentLoaded', () => {
   const aiEnabledInput = document.getElementById('aiEnabled');
@@ -452,6 +468,19 @@ async function loadSettings() {
       showSavedIndicator();
     });
   }
+
+  // Are.na — apply saved values
+  const arenaEnabledInput = document.getElementById('arenaEnabled');
+  const arenaConfigDiv = document.getElementById('arena-config');
+  const arenaTokenInput = document.getElementById('arenaToken');
+  const arenaChannelSlugInput = document.getElementById('arenaChannelSlug');
+
+  if (arenaEnabledInput) {
+    arenaEnabledInput.checked = settings.arenaEnabled || false;
+    arenaConfigDiv?.classList.toggle('hidden', !settings.arenaEnabled);
+  }
+  if (arenaTokenInput) arenaTokenInput.value = settings.arenaToken || '';
+  if (arenaChannelSlugInput) arenaChannelSlugInput.value = settings.arenaChannelSlug || 'stash-saver';
 
   // AI Analysis — apply saved values
   const aiEnabledInput = document.getElementById('aiEnabled');
