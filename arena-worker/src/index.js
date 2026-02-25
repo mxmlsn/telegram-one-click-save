@@ -228,10 +228,10 @@ async function sendToTelegram(block, env) {
       });
       const data = await res.json();
       if (data.ok) {
-        fileId = data.result.video?.thumbnail?.file_id;
         notionType = 'video';
-        // If Telegram didn't generate a thumbnail but Are.na has a preview image, use sendPhoto to get a photo fileId
-        if (!fileId && previewImageUrl) {
+        // video.thumbnail.file_id is AAMC type — not retrievable via getFile.
+        // Always use sendPhoto with Are.na preview image to get a valid AgACAgQ photo fileId for viewer.
+        if (previewImageUrl) {
           const res2 = await fetch(`${base}/sendPhoto`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -239,7 +239,9 @@ async function sendToTelegram(block, env) {
           });
           const data2 = await res2.json();
           if (data2.ok) fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
-          else await res2.body?.cancel();
+          else console.warn(`[arena-sync] sendPhoto for video preview failed: ${data2.description}`);
+        } else {
+          fileId = data.result.video?.thumbnail?.file_id; // AAMC fallback — may not resolve in viewer
         }
       } else {
         console.warn(`[arena-sync] sendVideo failed for ${block.id}: ${data.description}`);
