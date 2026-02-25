@@ -2024,7 +2024,8 @@ function _renderCardInner(item) {
       // forwardUserUrl = profile link from ai_data; forwardFrom only shown if linkable
       const tgVideoUserUrl = aiData.forwardUserUrl || '';
       const tgVideoAuthor = aiData.channelTitle || aiData.forwardFrom || '';
-      const tgVideoBodyHtml = tgVideoText.trim()
+      // Are.na videos: hide filename caption visually (search still works via item.content)
+      const tgVideoBodyHtml = (tgVideoText.trim() && item.tag !== 'arena')
         ? `<div class="tgpost-body"><div class="quote-text">${escapeHtml(tgVideoText.length > 700 ? tgVideoText.slice(0, 700) : tgVideoText)}</div></div>`
         : '';
       const tgVideoLabelUrl = tgVideoUserUrl || item.sourceUrl || '';
