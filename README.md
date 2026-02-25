@@ -1,417 +1,211 @@
 # Stash · Visual Knowledge Base
 
-> Open-source alternative to MyMind — save anything from the web with AI auto-tagging, own your data.
-
-**🌐 Web Viewer:** [stash.mxml.sn](https://stash.mxml.sn) — work in progress, limited deployment
-
-[🇷🇺 Русский](#russian) • [🇬🇧 English](#english)
+[🇷🇺 Русский](#russian) · [🇬🇧 English](#english)
 
 ---
 
 <a name="russian"></a>
 
-## 🇷🇺 О проекте
+**Stash** — инструмент для личной коллекции контента. Сохраняй картинки, статьи, ссылки, PDF, GIF, видео, аудио через расширение браузера или прямо пересылая в Telegram-бота. Всё хранится в твоём Notion (метаданные) и Telegram (файлы). Viewer: [stash.mxml.sn](https://stash.mxml.sn).
 
-**Stash** — это личная визуальная база знаний с AI-тегированием. Сохраняй картинки, статьи, твиты и товары в один клик из браузера. AI автоматом распознаёт тип контента, извлекает цены, описания и цвета. Все данные хранятся в твоём Notion (или Telegram, или на своём сервере) — ты владеешь ими полностью.
+## Что умеет
 
-### Зачем ещё один сервис?
+### Chrome Extension
 
-**MyMind** крутой, но:
-- $72/год за подписку
-- данные на их серверах
-- нельзя кастомизировать
-- закроется сервис — потеряешь всё
+- правый клик на любой элемент → "Save to Telegram" → выбор тега в тосте
+- автоопределение контента: картинки, видео, GIF, ссылки, PDF, текст
+- AI-анализ при сохранении: тип контента, описание, цвета, цена товара (опционально)
+- метаданные пишутся в Notion
 
-**Stash даёт:**
-- ✅ бесплатно навсегда (bring your own backend)
-- ✅ владение данными (Notion/Telegram/локальный сервер)
-- ✅ open source — форкни и меняй что хочешь
-- ✅ AI на твоих условиях (используй Gemini бесплатно или Claude за копейки)
-- ✅ privacy by design — данные не проходят через мои серверы
+### Telegram Bot (Cloudflare Worker)
 
----
+- пересылай любое сообщение боту → автосохранение в Notion
+- поддерживаемые типы: фото, видео, GIF, документы, аудио, голосовые, видеокружки, ссылки, текст
+- после сохранения присылает кнопки с тегами — выбираешь прямо в Telegram
+- AI-анализ: OCR текста на изображениях, транскрипция голосовых
+- для ссылок делает скриншот страницы как превью
 
-## 🎯 Что работает сейчас
+### Web Viewer ([stash.mxml.sn](https://stash.mxml.sn))
 
-### ✅ Chrome Extension — quick save
+- masonry grid, разные карточки для разных типов контента
+- фильтры: по типу, тегу, цвету; полнотекстовый поиск
+- quick save: перетащи файл или ссылку → сохранится в Telegram + Notion
+- создание заметок с прикреплёнными файлами
+- mass select mode: выбрать несколько карточек → удалить
+- AI фоновая обработка новых элементов без метаданных
 
-- **context menu** — правый клик на любой элемент → "Send to Telegram"
-- **quick tags** — выбор категории в красивом тосте за 1 секунду
-- **smart detection** — автоопределение картинок/видео даже на Instagram
-- **formats** — картинки (сжатые/оригинал), текст, ссылки, PDF, GIF
-- **notion integration** — автосохранение метаданных в твою базу
-- **AI analysis** — автотегирование через Claude/Gemini (опционально)
+### Are.na Sync (Cloudflare Worker)
 
-### ✅ Web Viewer — personal MyMind
-
-**Live at:** [stash.mxml.sn](https://stash.mxml.sn)
-
-- **web-based** — доступ с любого устройства (компа/телефона/планшета)
-- **privacy-first** — credentials в localStorage браузера, ничего на сервере
-- **CORS proxy** — Cloudflare Worker пробрасывает запросы без хранения токенов
-- **dark masonry grid** — красивая сетка как в MyMind/Pinterest
-- **typed cards** — разные дизайны для изображений/статей/продуктов/твитов
-- **filters** — по типу контента, цвету, тегам
-- **search** — полнотекстовый поиск
-- **AI background processing** — автоматом анализирует несохранённые айтемы
-
-### ✅ AI Analysis (optional)
-
-- **type detection** — article/video/product/xpost/tool/pdf
-- **description** — краткое описание контента
-- **structured extraction:**
-  - цены для товаров
-  - текст твитов с автором
-  - заголовки статей
-  - доминантные цвета
-  - текст с изображений (OCR fallback)
-
-### ✅ Integrations
-
-- **Notion** — хранение метаданных в database (с AI-полями)
-- **Telegram** — бесплатное хранилище файлов (неограниченно)
-- **Anthropic/Google AI** — vision analysis (приносишь свой ключ)
+- синхронизирует блоки из Are.na-канала в Notion + Telegram по расписанию
 
 ---
 
-## 🏗 Архитектура
+## Установка
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Chrome Extension                                            │
-│ • правый клик → quick save                                  │
-│ • AI анализ при сохранении                                  │
-│ • прямые запросы к Notion/Telegram/AI API                   │
-│   (работает без CORS — привилегии extension)                │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-              Notion Database + Telegram Storage
-                            ↑
-┌─────────────────────────────────────────────────────────────┐
-│ Web Viewer (stash.mxml.sn)                                  │
-│ • HTML/CSS/JS на Cloudflare Pages                           │
-│ • credentials в localStorage браузера                        │
-│ • запросы к API через CORS proxy ↓                          │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│ Cloudflare Worker (CORS Proxy)                              │
-│ • принимает { service, token, path, data }                  │
-│ • НЕ хранит токены — просто проксирует                      │
-│ • добавляет CORS headers                                    │
-└─────────────────────────────────────────────────────────────┘
-```
+### 1. Расширение Chrome
 
-**Privacy:** токены хранятся только в твоём браузере (extension storage / localStorage). Worker видит их только во время запроса — не логирует и не сохраняет.
-
----
-
-## 🚀 Roadmap
-
-### 📅 Q2 2025 — Telegram Bot
-
-- [ ] отправка ссылок/картинок прямо в бота → автосохранение
-- [ ] пересылка постов из каналов
-- [ ] inline buttons "view all saved"
-- [ ] webhook на Cloudflare Worker (24/7 даже без компа)
-
-### 📅 Q3 2025 — Custom Storage Backends
-
-- [ ] adapter pattern для storage
-- [ ] local folder (~/stash) вместо Telegram
-- [ ] self-hosted server (Docker one-liner)
-- [ ] S3/Cloudflare R2 support
-- [ ] выбор бэкенда в настройках extension
-
-### 📅 Future
-
-- [ ] Telegram Mini App — viewer прямо в телеге
-- [ ] iOS share extension
-- [ ] Supabase/Airtable backend альтернативы
-- [ ] collaborative collections (shared tags)
-
----
-
-## 📦 Установка и настройка
-
-### 1. Установить Chrome Extension
-
-**Вариант A: готовый .zip (быстро)**
-
-1. Скачать [stash-extension-v2.0.zip](https://github.com/mxmlsn/telegram-one-click-save/raw/main/stash-extension-v2.0.zip)
-2. Распаковать архив
-3. Открыть `chrome://extensions`
-4. Включить **Developer mode** (переключатель справа вверху)
-5. **Load unpacked** → выбрать распакованную папку
-
-**Вариант B: из исходников**
-
+**Из исходников:**
 ```bash
 git clone https://github.com/mxmlsn/telegram-one-click-save
-cd telegram-one-click-save
-# Открыть chrome://extensions
-# Developer mode → Load unpacked → выбрать эту папку
+# chrome://extensions → Developer mode → Load unpacked → выбрать папку
 ```
 
-### 2. Создать Telegram бота (2 минуты)
+**Готовый zip:** [stash-extension-v2.0.zip](https://github.com/mxmlsn/telegram-one-click-save/raw/main/stash-extension-v2.0.zip) → распаковать → Load unpacked
 
-1. Открыть [@BotFather](https://t.me/BotFather) в Telegram
-2. Отправить `/newbot`
-3. Скопировать токен (выглядит как `123456:ABC-DEF...`)
+### 2. Telegram-бот (2 минуты)
 
-### 3. Создать Notion database (5 минут)
+1. [@BotFather](https://t.me/BotFather) → `/newbot` → скопировать токен
+2. Получить свой Chat ID (например через [@userinfobot](https://t.me/userinfobot))
 
-**Вариант A: использовать template (быстро)**
-- [Duplicate this template](https://notion.so/templates/stash) → в свой workspace
+### 3. Notion database
 
-**Вариант B: создать вручную**
 1. Создать новую Database в Notion
-2. Добавить properties:
+2. Properties:
    - `URL` (title)
-   - `Type` (select: image/link/text/gif/pdf)
-   - `Tag` (select: твои категории)
+   - `Type` (select)
+   - `Tag` (select)
    - `Date` (created time)
-   - `File ID` (text) — для Telegram файлов
+   - `File ID` (text)
    - `Source URL` (url)
-3. Settings → Connections → New integration → скопировать token
+   - `ai_data` (text) — для AI-полей
+3. Settings → Connections → создать integration → скопировать токен
 4. Share database с integration
-5. Скопировать Database ID из URL (30 символов после последнего слеша)
+5. Скопировать Database ID из URL
 
-### 4. Настроить extension
+### 4. Настройки расширения
 
-1. Кликнуть на иконку extension → Options
-2. Вставить Telegram Bot Token и Chat ID (свой Telegram ID)
-3. Вставить Notion Integration Token и Database ID
-4. (Опционально) Добавить AI API key:
-   - Google Gemini — бесплатно 1500 запросов/день → [aistudio.google.com](https://aistudio.google.com)
-   - Anthropic Claude — $0.25 за 1000 изображений → [console.anthropic.com](https://console.anthropic.com)
+Extension icon → Options:
+- Telegram Bot Token
+- Telegram Chat ID
+- Notion Integration Token
+- Notion Database ID
+- (опционально) Gemini API Key или Anthropic API Key
 
-### 5. Готово! 🎉
+### 5. Telegram Bot на Cloudflare Worker (опционально)
 
-**Extension:** правый клик на любом элементе → "Send to Telegram" → выбери тег → сохранено.
+```bash
+cd cloudflare-bot
+npm install
+npx wrangler deploy
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-worker>.workers.dev"
+```
 
-**Web Viewer:** открой [stash.mxml.sn](https://stash.mxml.sn) (или свой домен если настроил), введи те же credentials → просматривай сохранённое с любого устройства.
+### 6. Are.na Sync (опционально)
+
+```bash
+cd arena-worker
+npm install
+# Настроить wrangler.toml с ARENA_AUTH_TOKEN, ARENA_APP_TOKEN, ARENA_CHANNEL_SLUG
+npx wrangler deploy
+```
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Extension:** Vanilla JS, Chrome Manifest V3
-- **Web Viewer:** HTML/CSS/JS, masonry layout (CSS columns)
-- **CORS Proxy:** Cloudflare Worker (serverless)
-- **Hosting:** Cloudflare Pages (static site)
-- **AI:** Anthropic Claude API / Google Gemini API (vision models)
+- **Web Viewer:** HTML/CSS/JS (без фреймворков), Cloudflare Pages
+- **Workers:** Cloudflare Workers, KV storage
+- **AI:** Google Gemini API, Anthropic Claude API
 - **Storage:** Notion API, Telegram Bot API
 
 ---
 
-## 🤝 Contributing
+## License
 
-Проект в активной разработке. Pull requests welcome!
-
-**Нужна помощь с:**
-- iOS share extension
-- Android app
-- Улучшение AI промптов
-- Переводы (сейчас только RU/EN)
-
----
-
-## 📄 License
-
-MIT — делай что хочешь, crediting appreciated.
-
----
-
-## 💬 Community
-
-- **Issues** — баги и feature requests
-- **Discussions** — вопросы и идеи
-- **Telegram** — [@stash_community](https://t.me/stash_community) (скоро)
+MIT — [@mxmlsn](https://github.com/mxmlsn)
 
 ---
 
 <a name="english"></a>
 
-## 🇬🇧 About
+**Stash** is a personal content collection tool. Save images, articles, links, PDFs, GIFs, videos, audio via a browser extension or by forwarding to a Telegram bot. Everything is stored in your own Notion (metadata) and Telegram (files). Viewer: [stash.mxml.sn](https://stash.mxml.sn).
 
-**Stash** is a personal visual knowledge base with AI auto-tagging. Save images, articles, tweets, and products in one click from your browser. AI automatically detects content type, extracts prices, descriptions, and colors. All data stored in your Notion (or Telegram, or self-hosted server) — you own it completely.
+## What it does
 
-### Why another service?
+### Chrome Extension
 
-**MyMind** is great, but:
-- $72/year subscription
-- data on their servers
-- can't customize
-- service shuts down → you lose everything
+- Right-click any element → "Save to Telegram" → pick tag in toast
+- Auto-detects content type: images, video, GIF, links, PDF, text
+- Optional AI analysis on save: content type, description, colors, product price
+- Metadata auto-saved to Notion
 
-**Stash gives you:**
-- ✅ free forever (bring your own backend)
-- ✅ data ownership (Notion/Telegram/self-hosted)
-- ✅ open source — fork and customize
-- ✅ AI on your terms (use Gemini free or Claude for pennies)
-- ✅ privacy by design — data never touches my servers
+### Telegram Bot (Cloudflare Worker)
 
----
+- Forward any message to the bot → auto-saved to Notion
+- Supported: photos, video, GIFs, documents, audio, voice messages, video notes, links, text
+- Tag buttons sent after saving — pick directly in Telegram
+- AI: OCR text from images, voice transcription
+- Screenshots of links as previews
 
-## 🎯 What works now
+### Web Viewer ([stash.mxml.sn](https://stash.mxml.sn))
 
-### ✅ Chrome Extension — quick save
+- Masonry grid, typed cards per content type
+- Filters by type, tag, color; full-text search
+- Quick save: drag & drop file or link → saves to Telegram + Notion
+- Create notes with attachments
+- Mass select mode: select cards → delete
+- AI background processing for items without metadata
 
-- **context menu** — right-click anything → "Send to Telegram"
-- **quick tags** — pick category in beautiful toast (1 second)
-- **smart detection** — auto-finds images/videos even on Instagram
-- **formats** — images (compressed/original), text, links, PDF, GIF
-- **notion integration** — auto-save metadata to your database
-- **AI analysis** — auto-tagging via Claude/Gemini (optional)
+### Are.na Sync (Cloudflare Worker)
 
-### ✅ Viewer — personal MyMind
-
-- **dark masonry grid** — beautiful layout like MyMind/Pinterest
-- **typed cards** — different designs for images/articles/products/tweets
-- **filters** — by content type, color, tags
-- **search** — full-text search + OCR text from images
-- **AI background processing** — auto-analyzes unsaved items
-
-### ✅ AI Analysis (optional)
-
-- **type detection** — article/video/product/xpost/tool/pdf
-- **description** — brief content summary
-- **structured extraction:**
-  - prices for products
-  - tweet text with author
-  - article headlines
-  - dominant colors
-  - text from images (OCR fallback)
-
-### ✅ Integrations
-
-- **Notion** — metadata storage in database (with AI fields)
-- **Telegram** — free unlimited file storage
-- **Anthropic/Google AI** — vision analysis (bring your own key)
+- Syncs blocks from an Are.na channel into Notion + Telegram on a schedule
 
 ---
 
-## 🚀 Roadmap
+## Installation
 
-### 📅 Q2 2025 — Web Viewer
+### 1. Chrome Extension
 
-- [ ] public website instead of extension page
-- [ ] CORS proxy via Vercel/Cloudflare Workers
-- [ ] mobile browser access
-- [ ] credentials in localStorage (privacy-first)
-- [ ] single codebase for extension + web
-
-### 📅 Q2 2025 — Telegram Bot
-
-- [ ] send links/images directly to bot → auto-save
-- [ ] forward posts from channels
-- [ ] inline buttons "view all saved"
-- [ ] webhook on Cloudflare Worker (24/7 without PC)
-
-### 📅 Q3 2025 — Custom Storage Backends
-
-- [ ] adapter pattern for storage
-- [ ] local folder (~/stash) instead of Telegram
-- [ ] self-hosted server (Docker one-liner)
-- [ ] S3/Cloudflare R2 support
-- [ ] backend selection in extension settings
-
-### 📅 Future
-
-- [ ] Telegram Mini App — viewer inside Telegram
-- [ ] iOS share extension
-- [ ] Supabase/Airtable backend alternatives
-- [ ] collaborative collections (shared tags)
-
----
-
-## 📦 Installation & Setup
-
-### 1. Install extension (Chrome/Edge/Brave)
-
+**From source:**
 ```bash
 git clone https://github.com/mxmlsn/telegram-one-click-save
-# Open chrome://extensions
-# Developer mode → Load unpacked → select project folder
+# chrome://extensions → Developer mode → Load unpacked → select folder
 ```
 
-### 2. Create Telegram bot (2 minutes)
+**Ready-made zip:** [stash-extension-v2.0.zip](https://github.com/mxmlsn/telegram-one-click-save/raw/main/stash-extension-v2.0.zip) → unpack → Load unpacked
 
-1. Open [@BotFather](https://t.me/BotFather) in Telegram
-2. Send `/newbot`
-3. Copy token (looks like `123456:ABC-DEF...`)
+### 2. Telegram bot (2 minutes)
 
-### 3. Create Notion database (5 minutes)
+1. [@BotFather](https://t.me/BotFather) → `/newbot` → copy token
+2. Get your Chat ID (e.g. via [@userinfobot](https://t.me/userinfobot))
 
-**Option A: use template (fast)**
-- [Duplicate this template](https://notion.so/templates/stash) → to your workspace
+### 3. Notion database
 
-**Option B: create manually**
-1. Create new Database in Notion
-2. Add properties:
-   - `URL` (title)
-   - `Type` (select: image/link/text/gif/pdf)
-   - `Tag` (select: your categories)
-   - `Date` (created time)
-   - `File ID` (text) — for Telegram files
-   - `Source URL` (url)
-3. Settings → Connections → New integration → copy token
-4. Share database with integration
-5. Copy Database ID from URL (30 chars after last slash)
+1. Create a new Database in Notion
+2. Properties: `URL` (title), `Type` (select), `Tag` (select), `Date` (created time), `File ID` (text), `Source URL` (url), `ai_data` (text)
+3. Settings → Connections → create integration → copy token
+4. Share database with integration, copy Database ID from URL
 
-### 4. Configure extension
+### 4. Extension settings
 
-1. Click extension icon → Options
-2. Paste Telegram Bot Token and Chat ID (your Telegram ID)
-3. Paste Notion Integration Token and Database ID
-4. (Optional) Add AI API key:
-   - Google Gemini — free 1500 requests/day → [aistudio.google.com](https://aistudio.google.com)
-   - Anthropic Claude — $0.25 per 1000 images → [console.anthropic.com](https://console.anthropic.com)
+Extension icon → Options: Telegram Bot Token, Chat ID, Notion Integration Token, Notion Database ID, (optional) Gemini or Anthropic API Key
 
-### 5. Done! 🎉
+### 5. Telegram Bot on Cloudflare Worker (optional)
 
-Right-click any element → "Send to Telegram" → pick tag → saved.
+```bash
+cd cloudflare-bot && npm install && npx wrangler deploy
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<your-worker>.workers.dev"
+```
 
-Open viewer: right-click page → "Open Viewer".
+### 6. Are.na Sync (optional)
+
+```bash
+cd arena-worker && npm install
+# set ARENA_AUTH_TOKEN, ARENA_APP_TOKEN, ARENA_CHANNEL_SLUG in wrangler.toml
+npx wrangler deploy
+```
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Extension:** Vanilla JS, Chrome Manifest V3
-- **Web Viewer:** HTML/CSS/JS, masonry layout (CSS columns)
-- **CORS Proxy:** Cloudflare Worker (serverless)
-- **Hosting:** Cloudflare Pages (static site)
-- **AI:** Anthropic Claude API / Google Gemini API (vision models)
+- **Web Viewer:** HTML/CSS/JS (no frameworks), Cloudflare Pages
+- **Workers:** Cloudflare Workers, KV storage
+- **AI:** Google Gemini API, Anthropic Claude API
 - **Storage:** Notion API, Telegram Bot API
 
 ---
 
-## 🤝 Contributing
-
-Project in active development. Pull requests welcome!
-
-**Need help with:**
-- iOS share extension
-- Android app
-- AI prompt improvements
-- Translations (currently RU/EN only)
-
----
-
-## 📄 License
-
-MIT — do whatever you want, crediting appreciated.
-
----
-
-## 💬 Community
-
-- **Issues** — bugs and feature requests
-- **Discussions** — questions and ideas
-- **Telegram** — [@stash_community](https://t.me/stash_community) (coming soon)
-
----
-
-**Built with ❤️ by [@mxmlsn](https://github.com/mxmlsn)**
+MIT — [@mxmlsn](https://github.com/mxmlsn)
