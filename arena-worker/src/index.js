@@ -98,11 +98,12 @@ async function sendToTelegram(block, env) {
     if (isGif) {
       // For GIFs: send animation to chat (for bot), then send photo to get a valid photo fileId for viewer
       const gifUrl = block.source?.url || imageUrl;
-      await fetch(`${base}/sendAnimation`, {
+      const resAnim = await fetch(`${base}/sendAnimation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: chatId, animation: gifUrl, caption })
       });
+      await resAnim.json(); // must consume body to avoid stalled HTTP response in Cloudflare Workers
       // animation.thumbnail.file_id (AAMC type) is not retrievable via getFile — use sendPhoto instead
       const res2 = await fetch(`${base}/sendPhoto`, {
         method: 'POST',
