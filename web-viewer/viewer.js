@@ -3502,7 +3502,9 @@ async function _showLightboxItem() {
     if (resolved) item.url = resolved;
   }
 
-  const isVideo = item.video && item.url;
+  // GIF files stored as documents resolve to .gif URLs — treat as image, not video
+  const isGifFile = item.url && /\.gif($|\?)/i.test(item.url);
+  const isVideo = item.video && item.url && !isGifFile;
   img.classList.toggle('hidden', !!isVideo);
   video.classList.toggle('hidden', !isVideo);
 
