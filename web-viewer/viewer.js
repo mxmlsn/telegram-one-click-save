@@ -2380,8 +2380,8 @@ function _renderCardInner(item) {
     const storageUrl = aiData.storageUrl || '';
     const docSourceUrl = item.sourceUrl || '';
     const docOpenUrl = storageUrl || docSourceUrl;
-    const docAction = docOpenUrl ? 'open' : (item.fileId ? 'open-file' : '');
-    const docActionUrl = docOpenUrl || '';
+    const docAction = item.fileId ? 'open-file' : (docOpenUrl ? 'direct-download' : '');
+    const docActionUrl = item.fileId ? '' : (docOpenUrl || '');
     const sourceUrlAttr = item.sourceUrl ? ` data-source-url="${escapeHtml(item.sourceUrl)}"` : '';
     const fileSheetHtml = makeFileSheetHtml(iconColor, docExt.toLowerCase(), docBaseName);
     return `<div class="card card-document" data-id="${item.id}"${docAction ? ` data-action="${docAction}"` : ''}${docActionUrl ? ` data-url="${escapeHtml(docActionUrl)}"` : ''}${item.fileId ? ` data-file-id="${escapeHtml(item.fileId)}"` : ''}${sourceUrlAttr}>
@@ -2423,7 +2423,8 @@ function _renderCardInner(item) {
       const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
       const isSvgCard = imgUrl.split('?')[0].split('#')[0].toLowerCase().endsWith('.svg')
         || /\.svg$/i.test(aiData.fileName || '');
-      const svgClass = isSvgCard ? ' card-svg' : '';
+      const isPngCard = !isSvgCard && (/\.png($|\?)/i.test(imgUrl.split('#')[0]) || /\.png$/i.test(aiData.fileName || ''));
+      const svgClass = isSvgCard ? ' card-svg' : (isPngCard ? ' card-png' : '');
       return `<div class="card card-image${svgClass}" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
         ${pendingDot}
         <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
@@ -2948,7 +2949,8 @@ function _renderCardInner(item) {
     const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
     const isSvgCard = imgUrl.split('?')[0].split('#')[0].toLowerCase().endsWith('.svg')
       || /\.svg$/i.test(aiData.fileName || '');
-    const svgClass = isSvgCard ? ' card-svg' : '';
+    const isPngCard = !isSvgCard && (/\.png($|\?)/i.test(imgUrl.split('#')[0]) || /\.png$/i.test(aiData.fileName || ''));
+    const svgClass = isSvgCard ? ' card-svg' : (isPngCard ? ' card-png' : '');
     return `<div class="card card-image${svgClass}" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(sourceUrl)}">
       ${pendingDot}
       <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
@@ -3678,6 +3680,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // "direct-download" — download file directly via <a download> (for document cards with storageUrl/sourceUrl)
+    if (action === 'direct-download' && url && /^https?:\/\//i.test(url)) {
+      e.stopPropagation();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = url.split('?')[0].split('/').pop() || 'file';
+      a.click();
+      return;
+    }
+
     // "open" — direct navigation (links, videos, products, articles, domain btns, avatars)
     if (action === 'open' && url && /^https?:\/\//i.test(url)) {
       e.stopPropagation();
@@ -3814,11 +3826,28 @@ document.addEventListener('DOMContentLoaded', () => {
         // Resume autoplay
         _setVideoUnmuted(fileId);
         card.classList.remove('tgvideo-user-paused');
-        if (video && video.src) {
-          video.muted = true;
-          video.play().then(() => {
-            card.classList.add('tgvideo-playing');
-          }).catch(() => {});
+        if (video) {
+          if (video.src) {
+            video.muted = true;
+            video.play().then(() => {
+              card.classList.add('tgvideo-playing');
+            }).catch(() => {});
+          } else {
+            // Video not loaded yet (e.g. after page reload) — resolve and play
+            resolveFileId(STATE.botToken, fileId).then(url => {
+              if (!url) return;
+              _vnUrlCache[fileId] = url;
+              video.src = url;
+              video.muted = true;
+              _observeAutoplayVideo(card, video, 'sv:' + fileId.slice(-12));
+              _svAutoplayActive.add(card);
+              video.play().then(() => {
+                card.classList.add('tgvideo-playing');
+                const playIcon = card.querySelector('.tgpost-play-icon');
+                if (playIcon) playIcon.style.display = 'none';
+              }).catch(() => {});
+            });
+          }
         }
       } else {
         // Pause and remember
