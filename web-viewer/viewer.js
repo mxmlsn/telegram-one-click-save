@@ -2160,6 +2160,21 @@ function renderCard(item) {
     </div>`;
   }
 
+  // ── Are.na link with image: render as card-image with hover link ──
+  if (item.type === 'link' && item.tag === 'arena' && imgUrl && !LINK_AI_OVERRIDES.has(aiType)) {
+    const linkUrl = item.sourceUrl || item.url || '';
+    const downloadSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+    const domainBtn = (linkUrl && domain)
+      ? `<button class="img-domain-btn" data-action="open" data-url="${escapeHtml(linkUrl)}">${escapeHtml(domain)}</button>`
+      : '';
+    const downloadBtn = `<button class="img-download-btn" data-action="download" data-url="${escapeHtml(imgUrl)}">${downloadSvg}</button>`;
+    return `<div class="card card-image" data-id="${item.id}" data-action="lightbox" data-img="${escapeHtml(imgUrl)}" data-url="${escapeHtml(linkUrl)}">
+      ${pendingDot}
+      <img class="card-img" src="${escapeHtml(imgUrl)}" loading="lazy" alt="">
+      <div class="img-hover-bar">${domainBtn}${downloadBtn}</div>
+    </div>`;
+  }
+
   // ── Link (base type = link, and not article/product/xpost/tool) ──
   if (item.type === 'link' && !LINK_AI_OVERRIDES.has(aiType)) {
     const linkUrl = item.sourceUrl || item.url || '';
