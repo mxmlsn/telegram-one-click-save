@@ -877,7 +877,27 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     return r;
   }
 
+  // Helper: upload compressed preview via sendPhoto silent, get thumbnailFileId, delete the message
+  async function uploadPreviewSilent(blob) {
+    try {
+      const compressed = await compressImageIfNeeded(blob);
+      const pf = new FormData();
+      pf.append('chat_id', chatId);
+      pf.append('photo', compressed, 'preview.jpg');
+      pf.append('disable_notification', 'true');
+      const pr = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: pf });
+      if (!pr.ok) return null;
+      const pd = await pr.json();
+      const photos = pd.result?.photo;
+      const thumbId = photos?.length > 0 ? photos[photos.length - 1].file_id : null;
+      const msgId = pd.result?.message_id;
+      if (msgId) fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, message_id: msgId }) }).catch(() => {});
+      return thumbId;
+    } catch { return null; }
+  }
+
   // PNG → always sendDocument to preserve transparency (sendPhoto converts to JPEG, kills alpha)
+  // Upload compressed preview silent to get thumbnailFileId for viewer display
   if (mime === 'image/png') {
     formData.append('document', file, file.name || 'image.png');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
@@ -886,9 +906,11 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     const doc = data.result?.document;
     r.fileId = doc?.file_id || null;
     r.thumbnailFileId = doc?.thumbnail?.file_id || doc?.thumb?.file_id || null;
+    // TG rarely returns thumbnail for image documents — upload preview to get one
+    if (!r.thumbnailFileId) r.thumbnailFileId = await uploadPreviewSilent(file);
     r.type = 'image';
     r.messageId = data.result?.message_id || null;
-    console.log('[Upload] PNG sendDocument OK fileId=%s', r.fileId?.slice(-20));
+    console.log('[Upload] PNG sendDocument OK fileId=%s thumbId=%s', r.fileId?.slice(-20), r.thumbnailFileId?.slice(-20));
     return r;
   }
 
@@ -904,9 +926,11 @@ async function uploadFileToTelegram(file, botToken, chatId) {
       const doc = data.result?.document;
       r.fileId = doc?.file_id || null;
       r.thumbnailFileId = doc?.thumbnail?.file_id || doc?.thumb?.file_id || null;
+      // TG rarely returns thumbnail for image documents — upload preview to get one
+      if (!r.thumbnailFileId) r.thumbnailFileId = await uploadPreviewSilent(file);
       r.type = 'image';
       r.messageId = data.result?.message_id || null;
-      console.log('[Upload] JPG/WEBP sendDocument OK fileId=%s size=%d', r.fileId?.slice(-20), file.size);
+      console.log('[Upload] JPG/WEBP sendDocument OK fileId=%s thumbId=%s size=%d', r.fileId?.slice(-20), r.thumbnailFileId?.slice(-20), file.size);
       return r;
     }
     // > 50 MB: compress and send as photo (last resort)
