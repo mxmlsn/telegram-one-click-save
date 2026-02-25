@@ -842,7 +842,27 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     } catch (e) { console.warn('[Upload] GIF thumbnail generation failed:', e.message); }
     formData.append('animation', file, file.name || 'animation.gif');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendAnimation`, { method: 'POST', body: formData });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendAnimation failed'); }
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      if (e.description?.includes('too large') || e.error_code === 413 || file.size > 50 * 1024 * 1024) {
+        console.warn('[Upload] sendAnimation failed (%s), falling back to sendDocument', e.description);
+        const docForm = new FormData();
+        docForm.append('chat_id', chatId);
+        docForm.append('disable_notification', 'true');
+        docForm.append('caption', '[stash-viewer]');
+        docForm.append('document', file, file.name || 'animation.gif');
+        const docRes = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: docForm });
+        if (!docRes.ok) { const de = await docRes.json().catch(() => ({})); throw new Error(de.description || 'sendDocument fallback failed'); }
+        const docData = await docRes.json();
+        const doc = docData.result?.document;
+        r.fileId = doc?.file_id || null;
+        r.type = 'gif';
+        r.messageId = docData.result?.message_id || null;
+        console.log('[Upload] GIF sendDocument fallback OK fileId=%s', r.fileId?.slice(-20));
+        return r;
+      }
+      throw new Error(e.description || 'sendAnimation failed');
+    }
     const data = await res.json();
     const anim = data.result?.animation;
     // TG may treat very large GIFs as documents — check document field as fallback
@@ -857,7 +877,39 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     return r;
   }
 
-  if (['image/jpeg', 'image/png', 'image/webp'].includes(mime)) {
+  // PNG → always sendDocument to preserve transparency (sendPhoto converts to JPEG, kills alpha)
+  if (mime === 'image/png') {
+    formData.append('document', file, file.name || 'image.png');
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendDocument failed'); }
+    const data = await res.json();
+    const doc = data.result?.document;
+    r.fileId = doc?.file_id || null;
+    r.thumbnailFileId = doc?.thumbnail?.file_id || doc?.thumb?.file_id || null;
+    r.type = 'image';
+    r.messageId = data.result?.message_id || null;
+    console.log('[Upload] PNG sendDocument OK fileId=%s', r.fileId?.slice(-20));
+    return r;
+  }
+
+  // JPG/WEBP ≤ 50 MB → sendDocument (lossless, no recompression)
+  // JPG/WEBP > 50 MB → sendPhoto with compression (last resort, no other option)
+  if (['image/jpeg', 'image/webp'].includes(mime)) {
+    const DOCUMENT_LIMIT = 50 * 1024 * 1024;
+    if (file.size <= DOCUMENT_LIMIT) {
+      formData.append('document', file, file.name || 'image.jpg');
+      const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendDocument failed'); }
+      const data = await res.json();
+      const doc = data.result?.document;
+      r.fileId = doc?.file_id || null;
+      r.thumbnailFileId = doc?.thumbnail?.file_id || doc?.thumb?.file_id || null;
+      r.type = 'image';
+      r.messageId = data.result?.message_id || null;
+      console.log('[Upload] JPG/WEBP sendDocument OK fileId=%s size=%d', r.fileId?.slice(-20), file.size);
+      return r;
+    }
+    // > 50 MB: compress and send as photo (last resort)
     const compressed = await compressImageIfNeeded(file);
     formData.append('photo', compressed, file.name || 'photo.jpg');
     const res = await fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, { method: 'POST', body: formData });
@@ -867,7 +919,7 @@ async function uploadFileToTelegram(file, botToken, chatId) {
     r.fileId = photos?.length > 0 ? photos[photos.length - 1].file_id : null;
     r.type = 'image';
     r.messageId = data.result?.message_id || null;
-    console.log('[Upload] sendPhoto OK fileId=%s', r.fileId ? r.fileId.slice(-20) : 'null');
+    console.log('[Upload] JPG/WEBP >50MB sendPhoto OK fileId=%s', r.fileId?.slice(-20));
     return r;
   }
 
@@ -893,8 +945,28 @@ async function uploadFileToTelegram(file, botToken, chatId) {
         console.log('[Upload] Video thumbnail generated, size=%d', thumbBlob.size);
       }
     } catch (e) { console.warn('[Upload] Video thumbnail generation failed:', e.message); }
-    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
-    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.description || 'sendVideo failed'); }
+    let res = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      if (e.description?.includes('too large') || e.error_code === 413 || file.size > 50 * 1024 * 1024) {
+        console.warn('[Upload] sendVideo failed (%s), falling back to sendDocument', e.description);
+        const docForm = new FormData();
+        docForm.append('chat_id', chatId);
+        docForm.append('disable_notification', 'true');
+        docForm.append('caption', '[stash-viewer]');
+        docForm.append('document', file, file.name || 'video.mp4');
+        const docRes = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: docForm });
+        if (!docRes.ok) { const de = await docRes.json().catch(() => ({})); throw new Error(de.description || 'sendDocument fallback failed'); }
+        const docData = await docRes.json();
+        const doc = docData.result?.document;
+        r.fileId = doc?.file_id || null;
+        r.type = 'video';
+        r.messageId = docData.result?.message_id || null;
+        console.log('[Upload] Video sendDocument fallback OK fileId=%s', r.fileId?.slice(-20));
+        return r;
+      }
+      throw new Error(e.description || 'sendVideo failed');
+    }
     const data = await res.json();
     const vid = data.result?.video;
     r.videoFileId = vid?.file_id || null;
