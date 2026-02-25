@@ -1976,7 +1976,9 @@ function renderCard(item) {
     const thumbImgAttr = ytOnload;
 
     // Direct TG video (no YouTube/Vimeo) — render as card-tgvideo (full-width thumb + play icon)
-    const isTgDirectVideo = !ytMatch && !vimeoMatch && (item.fileId || item.videoFileId) && !/^https?:\/\//i.test(url);
+    // Also matches Are.na videos: url is are.na/block/... but fileId exists (thumbnail from sendVideo)
+    const isVideoHostUrl = ytMatch || vimeoMatch || /\b(instagram|tiktok|twitter|x\.com|facebook|twitch|dailymotion)\b/i.test(url);
+    const isTgDirectVideo = !isVideoHostUrl && (item.fileId || item.videoFileId) && (!/^https?:\/\//i.test(url) || /are\.na\/block\//i.test(url));
     if (isTgDirectVideo) {
       const isLargeFile = (aiData.fileSize || 0) > 20 * 1024 * 1024;
       const isSmallVideo = !isLargeFile && (aiData.fileSize || 0) > 0 && (aiData.fileSize || 0) <= 5 * 1024 * 1024;

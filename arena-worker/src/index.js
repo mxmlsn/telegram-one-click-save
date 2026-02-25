@@ -13,6 +13,32 @@ export default {
       await env.ARENA_SYNC_KV.delete('last_synced_at');
       return new Response('KV reset', { status: 200 });
     }
+    if (url.pathname === '/debug-list') {
+      const slug = env.ARENA_CHANNEL_SLUG;
+      const res = await fetch(`https://api.are.na/v2/channels/${slug}/contents?per=20&sort=position&direction=desc`, {
+        headers: { 'X-Auth-Token': env.ARENA_AUTH_TOKEN, 'X-App-Token': env.ARENA_APP_TOKEN }
+      });
+      const data = await res.json();
+      const blocks = (data.contents || []).map(b => ({
+        id: b.id, class: b.class, title: (b.title || '').slice(0, 60),
+        ct: b.attachment?.content_type || '', att_url: b.attachment?.url?.slice(0, 60) || ''
+      }));
+      return new Response(JSON.stringify(blocks, null, 2), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.pathname.startsWith('/debug-block/')) {
+      const blockId = url.pathname.split('/').pop();
+      const res = await fetch(`https://api.are.na/v2/blocks/${blockId}`, {
+        headers: { 'X-Auth-Token': env.ARENA_AUTH_TOKEN, 'X-App-Token': env.ARENA_APP_TOKEN }
+      });
+      const data = await res.json();
+      const info = {
+        id: data.id, class: data.class, title: data.title,
+        attachment: data.attachment ? { url: data.attachment.url, content_type: data.attachment.content_type, file_size: data.attachment.file_size } : null,
+        source: data.source ? { url: data.source.url } : null,
+        image: data.image ? { filename: data.image.filename, content_type: data.image.content_type, original_url: data.image.original?.url } : null,
+      };
+      return new Response(JSON.stringify(info, null, 2), { headers: { 'Content-Type': 'application/json' } });
+    }
     return new Response('arena-sync worker', { status: 200 });
   }
 };
@@ -190,17 +216,80 @@ async function sendToTelegram(block, env) {
   } else if (blockClass === 'Attachment' && block.attachment?.url) {
     const contentType = block.attachment.content_type || '';
     const isPdf = contentType.includes('pdf') || block.attachment.url?.endsWith('.pdf');
-    const res = await fetch(`${base}/sendDocument`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, document: block.attachment.url, caption })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      fileId = data.result.document?.file_id;
-      notionType = isPdf ? 'pdf' : 'link';
+    const isVideo = contentType.includes('video');
+    const previewImageUrl = block.image?.original?.url;
+
+    if (isVideo) {
+      // Send video file — get thumbnail fileId for viewer
+      const res = await fetch(`${base}/sendVideo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, video: block.attachment.url, caption })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        fileId = data.result.video?.thumbnail?.file_id;
+        notionType = 'video';
+        // If Telegram didn't generate a thumbnail but Are.na has a preview image, use sendPhoto to get a photo fileId
+        if (!fileId && previewImageUrl) {
+          const res2 = await fetch(`${base}/sendPhoto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, photo: previewImageUrl, caption })
+          });
+          const data2 = await res2.json();
+          if (data2.ok) fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
+          else await res2.body?.cancel();
+        }
+      } else {
+        console.warn(`[arena-sync] sendVideo failed for ${block.id}: ${data.description}`);
+        // Fallback: send as document
+        const res2 = await fetch(`${base}/sendDocument`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, document: block.attachment.url, caption })
+        });
+        const data2 = await res2.json();
+        if (data2.ok) { fileId = data2.result.document?.file_id; notionType = 'video'; }
+        else console.warn(`[arena-sync] sendDocument fallback also failed: ${data2.description}`);
+      }
+    } else if (isPdf) {
+      // Send PDF as document
+      const res = await fetch(`${base}/sendDocument`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, document: block.attachment.url, caption })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        notionType = 'pdf';
+        // PDF document fileId can't be used as thumbnail — use Are.na preview image instead
+        if (previewImageUrl) {
+          const res2 = await fetch(`${base}/sendPhoto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, photo: previewImageUrl, caption })
+          });
+          const data2 = await res2.json();
+          if (data2.ok) fileId = data2.result.photo[data2.result.photo.length - 1].file_id;
+          else console.warn(`[arena-sync] sendPhoto for pdf preview failed: ${data2.description}`);
+        }
+      } else {
+        console.warn(`[arena-sync] sendDocument (pdf) failed: ${data.description}`);
+      }
     } else {
-      console.warn(`[arena-sync] sendDocument failed: ${data.description}`);
+      const res = await fetch(`${base}/sendDocument`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, document: block.attachment.url, caption })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        fileId = data.result.document?.file_id;
+        notionType = 'link';
+      } else {
+        console.warn(`[arena-sync] sendDocument failed: ${data.description}`);
+      }
     }
   } else if (blockClass === 'Text') {
     const text = block.content || block.title || '';
