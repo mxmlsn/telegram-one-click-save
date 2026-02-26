@@ -1871,36 +1871,24 @@ function applyFilters() {
   let items = STATE.items;
 
   if (STATE.activeTypes.size > 0) {
-    const activeBase = [...STATE.activeTypes].filter(t => BASE_TYPES.has(t));
-    const activeAI = [...STATE.activeTypes].filter(t => AI_TYPES.has(t));
-
-    // Types that exist in both BASE and AI sets (e.g. 'pdf') — use OR logic
-    const dualTypes = activeBase.filter(t => activeAI.includes(t));
-    const pureBase = activeBase.filter(t => !dualTypes.includes(t));
-    const pureAI = activeAI.filter(t => !dualTypes.includes(t));
+    const active = [...STATE.activeTypes];
     const videoLinkRe = /(?:youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\/|vimeo\.com\/)/;
     items = items.filter(item => {
       // Notion still stores old 'text' records — treat as 'quote'
       const itemBaseType = item.type === 'text' ? 'quote' : item.type;
       // For tgpost items with mediaType, also match the media type filter
-      // (e.g. forwarded voice → type:'tgpost', mediaType:'voice' should match "voice" filter)
       let mediaType = item.ai_data?.mediaType || '';
       // Detect YouTube/Vimeo links as 'video' for filter matching
       if (!mediaType && videoLinkRe.test((item.sourceUrl || '') + ' ' + (item.content || ''))) {
         mediaType = 'video';
       }
-      // Dual type match: item's base type, ai_type, or mediaType matches a dual type
-      const dualMatch = dualTypes.length > 0 && (dualTypes.includes(itemBaseType) || dualTypes.includes(item.ai_type) || dualTypes.includes(item.ai_type_secondary) || dualTypes.includes(mediaType));
-      // If only dual types are selected (no pure base/AI), just use dual match
-      if (pureBase.length === 0 && pureAI.length === 0) {
-        return dualMatch;
-      }
-      // If dual matches, always include
-      if (dualMatch) return true;
-      // Otherwise check pure base/AI filters
-      const baseMatch = pureBase.length === 0 || pureBase.includes(itemBaseType) || pureBase.includes(mediaType);
-      const aiMatch = pureAI.length === 0 || pureAI.includes(item.ai_type) || pureAI.includes(item.ai_type_secondary) || pureAI.includes(mediaType);
-      return baseMatch && aiMatch;
+      // OR logic: item matches if ANY selected type matches base type, ai_type, ai_type_secondary, or mediaType
+      return active.some(t =>
+        t === itemBaseType ||
+        t === item.ai_type ||
+        t === item.ai_type_secondary ||
+        (mediaType && t === mediaType)
+      );
     });
   }
 
@@ -4357,18 +4345,48 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     ctxTargetItemId = card.dataset.id;
 
-    // Highlight current type
+    // Highlight current type and update submenu labels
     const item = STATE.items.find(i => i.id === ctxTargetItemId);
     if (item) {
+      const TYPE_LABELS = { article:'Article', video:'Video', product:'Product', xpost:'X Post', tool:'Tool', pdf:'PDF', link:'Link (plain)', image:'Image', gif:'GIF', quote:'Quote', text:'Quote' };
       document.querySelectorAll('.ctx-type-item').forEach(el => {
         const val = el.dataset.typeValue;
         const isCurrent = (val === 'link' && !item.ai_type) || (val === item.ai_type);
         el.classList.toggle('ctx-current', isCurrent);
       });
+      // Update Type trigger label to show current value
+      // Use rendered card class to determine effective display type (e.g. link item rendered as image)
+      const typeTrigger = document.getElementById('ctx-type-trigger');
+      const typeLabel = document.getElementById('ctx-type-label');
+      let currentTypeName;
+      if (item.ai_type) {
+        currentTypeName = TYPE_LABELS[item.ai_type] || item.ai_type;
+      } else {
+        // infer from rendered card class
+        const cardEl2 = document.querySelector(`.card[data-id="${ctxTargetItemId}"]`);
+        const CARD_CLASS_TO_LABEL = { 'card-image':'Image', 'card-gif':'GIF', 'card-video':'Video', 'card-pdf':'PDF', 'card-tool':'Tool', 'card-product':'Product', 'card-xpost':'X Post', 'card-article':'Article', 'card-link-new':'Link (plain)', 'card-quote-new':'Quote', 'card-tgpost':'Post', 'card-circle':'Circle', 'card-voice':'Voice', 'card-audio':'Audio' };
+        const matchedType = cardEl2 && Object.entries(CARD_CLASS_TO_LABEL).find(([cls]) => cardEl2.classList.contains(cls));
+        currentTypeName = matchedType ? matchedType[1] : (TYPE_LABELS[item.type] || 'Link (plain)');
+      }
+      typeLabel.textContent = 'Type  ·  ' + currentTypeName;
+      typeTrigger.classList.add('has-value');
+
       document.querySelectorAll('.ctx-sec-item').forEach(el => {
         const val = el.dataset.typeValue;
         el.classList.toggle('ctx-current', val === (item.ai_type_secondary || ''));
+        // disable secondary option that matches current primary
+        el.classList.toggle('ctx-disabled', !!val && val === item.ai_type);
       });
+      // Update Secondary trigger label
+      const secTrigger = document.getElementById('ctx-sec-trigger');
+      const secLabel = document.getElementById('ctx-sec-label');
+      if (item.ai_type_secondary) {
+        secLabel.textContent = 'Secondary  ·  ' + (TYPE_LABELS[item.ai_type_secondary] || item.ai_type_secondary);
+        secTrigger.classList.add('has-value');
+      } else {
+        secLabel.textContent = 'Secondary';
+        secTrigger.classList.remove('has-value');
+      }
     }
 
     // Show Rename only for PDF cards
@@ -4376,9 +4394,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (renameBtn) {
       const isPdf = card.classList.contains('card-pdf');
       renameBtn.style.display = isPdf ? '' : 'none';
-      renameBtn.previousElementSibling.style.display = isPdf ? '' : 'none'; // divider above rename
-      renameBtn.nextElementSibling.style.display = isPdf ? '' : 'none'; // divider below rename
+      renameBtn.previousElementSibling.style.display = isPdf ? '' : 'none';
+      renameBtn.nextElementSibling.style.display = isPdf ? '' : 'none';
     }
+
+    // Close any open submenus
+    document.querySelectorAll('.ctx-submenu-trigger.open').forEach(t => t.classList.remove('open'));
 
     // Position at cursor, clamp to viewport
     ctxMenu.classList.remove('hidden');
@@ -4390,8 +4411,27 @@ document.addEventListener('DOMContentLoaded', () => {
     ctxMenu.style.top = y + 'px';
   });
 
+  // Submenu open/close on hover and click
+  document.querySelectorAll('.ctx-submenu-trigger').forEach(trigger => {
+    trigger.addEventListener('mouseenter', () => {
+      document.querySelectorAll('.ctx-submenu-trigger.open').forEach(t => { if (t !== trigger) t.classList.remove('open'); });
+      trigger.classList.add('open');
+      // Flip submenu to left if it would overflow viewport
+      const sub = trigger.querySelector('.ctx-submenu');
+      if (sub) {
+        sub.classList.remove('flip-left');
+        const r = sub.getBoundingClientRect();
+        if (r.right > window.innerWidth - 8) sub.classList.add('flip-left');
+      }
+    });
+  });
+  ctxMenu.addEventListener('mouseleave', () => {
+    document.querySelectorAll('.ctx-submenu-trigger.open').forEach(t => t.classList.remove('open'));
+  });
+
   function closeCtxMenu() {
     ctxMenu.classList.add('hidden');
+    document.querySelectorAll('.ctx-submenu-trigger.open').forEach(t => t.classList.remove('open'));
     ctxTargetItemId = null;
   }
 
@@ -4458,7 +4498,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (action === 'set-type') {
       await changeItemType(targetId, btn.dataset.typeValue, null);
     } else if (action === 'set-secondary') {
-      await changeItemType(targetId, null, btn.dataset.typeValue);
+      const secVal = btn.dataset.typeValue;
+      const secItem = STATE.items.find(i => i.id === targetId);
+      // prevent secondary = primary (empty string = clear secondary, always allowed)
+      if (secVal && secItem && secVal === secItem.ai_type) return;
+      await changeItemType(targetId, null, secVal);
     }
   });
 

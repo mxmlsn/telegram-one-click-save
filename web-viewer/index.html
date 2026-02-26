@@ -2678,8 +2678,13 @@
       border-radius: 10px;
       padding: 4px 0;
       box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-      overflow: hidden;
+      overflow: visible;
     }
+    /* clip only the items that need rounded corners, not the submenus */
+    .ctx-menu-inner > .ctx-item:first-child,
+    .ctx-menu-inner > .ctx-submenu-trigger:first-child { border-radius: 9px 9px 0 0; }
+    .ctx-menu-inner > .ctx-item:last-child,
+    .ctx-menu-inner > .ctx-submenu-trigger:last-child { border-radius: 0 0 9px 9px; }
     .ctx-section-label {
       padding: 6px 14px 2px;
       font-size: 10px;
@@ -2721,6 +2726,61 @@
     .ctx-type-item.ctx-current::before,
     .ctx-sec-item.ctx-current::before {
       content: '\2022\00a0';
+    }
+
+    /* ── Ctx submenu ── */
+    .ctx-submenu-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ctx-submenu-trigger > span {
+      flex: 1;
+    }
+    .ctx-arrow {
+      width: 6px;
+      height: 10px;
+      opacity: 0.4;
+      flex-shrink: 0;
+      margin-left: 8px;
+      transition: opacity 0.1s;
+    }
+    .ctx-submenu-trigger:hover .ctx-arrow,
+    .ctx-submenu-trigger.open .ctx-arrow {
+      opacity: 0.9;
+    }
+    /* label shows current value when set */
+    .ctx-submenu-trigger.has-value > span {
+      color: var(--accent);
+    }
+    .ctx-submenu {
+      display: none;
+      position: absolute;
+      left: calc(100% + 4px);
+      top: -4px;
+      background: #1a1a1a;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      padding: 4px 0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      min-width: 160px;
+      z-index: 401;
+    }
+    .ctx-submenu-trigger.open .ctx-submenu {
+      display: block;
+    }
+    /* flip to left when near right edge */
+    .ctx-submenu.flip-left {
+      left: auto;
+      right: calc(100% + 4px);
+    }
+    /* disabled secondary option (same as primary) */
+    .ctx-sec-item.ctx-disabled {
+      opacity: 0.3;
+      pointer-events: none;
     }
 
     /* ── Link sub-filter pill ── */
@@ -3145,22 +3205,32 @@
 <!-- Custom context menu -->
 <div id="ctx-menu" class="hidden">
   <div class="ctx-menu-inner">
-    <div class="ctx-section-label">Type</div>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="article">Article</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="video">Video</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="product">Product</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="xpost">X Post</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="tool">Tool</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="pdf">PDF</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="link">Link (plain)</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="image">Image</button>
-    <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="gif">GIF</button>
-    <div class="ctx-divider"></div>
-    <div class="ctx-section-label">Secondary</div>
-    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="tool">+ Tool</button>
-    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="product">+ Product</button>
-    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="pdf">+ PDF</button>
-    <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="">Clear secondary</button>
+    <div class="ctx-item ctx-submenu-trigger" id="ctx-type-trigger">
+      <span id="ctx-type-label">Type</span>
+      <svg class="ctx-arrow" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="ctx-submenu" id="ctx-type-submenu">
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="article">Article</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="video">Video</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="product">Product</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="xpost">X Post</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="tool">Tool</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="pdf">PDF</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="link">Link (plain)</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="image">Image</button>
+        <button class="ctx-item ctx-type-item" data-ctx-action="set-type" data-type-value="gif">GIF</button>
+      </div>
+    </div>
+    <div class="ctx-item ctx-submenu-trigger" id="ctx-sec-trigger">
+      <span id="ctx-sec-label">Secondary</span>
+      <svg class="ctx-arrow" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="ctx-submenu" id="ctx-sec-submenu">
+        <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="tool">+ Tool</button>
+        <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="product">+ Product</button>
+        <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="pdf">+ PDF</button>
+        <div class="ctx-divider"></div>
+        <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="">Clear</button>
+      </div>
+    </div>
     <div class="ctx-divider"></div>
     <button class="ctx-item" id="ctx-rename-btn" data-ctx-action="rename">Rename</button>
     <div class="ctx-divider"></div>
