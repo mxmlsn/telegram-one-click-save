@@ -4349,27 +4349,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = STATE.items.find(i => i.id === ctxTargetItemId);
     if (item) {
       const TYPE_LABELS = { article:'Article', video:'Video', product:'Product', xpost:'X Post', tool:'Tool', pdf:'PDF', link:'Link (plain)', image:'Image', gif:'GIF', quote:'Quote', text:'Quote' };
-      document.querySelectorAll('.ctx-type-item').forEach(el => {
-        const val = el.dataset.typeValue;
-        const isCurrent = item.ai_type ? (val === item.ai_type) : (val === 'link' && item.type === 'link');
-        el.classList.toggle('ctx-current', isCurrent);
-      });
-      // Update Type trigger label to show current value
-      // Use rendered card class to determine effective display type (e.g. link item rendered as image)
+      const ITEM_TYPE_LABELS = { image:'Image', gif:'GIF', video:'Video', pdf:'PDF', tgpost:'Post', circle:'Circle', voice:'Voice', audio:'Audio', link:'Link', text:'Quote', quote:'Quote' };
       const typeTrigger = document.getElementById('ctx-type-trigger');
       const typeLabel = document.getElementById('ctx-type-label');
-      let currentTypeName;
-      if (item.ai_type) {
-        currentTypeName = TYPE_LABELS[item.ai_type] || item.ai_type;
+      const isLink = item.type === 'link';
+      if (isLink) {
+        // Only links can have their type reclassified via ai_type
+        typeTrigger.style.display = '';
+        document.querySelectorAll('.ctx-type-item').forEach(el => {
+          const val = el.dataset.typeValue;
+          const isCurrent = item.ai_type ? (val === item.ai_type) : (val === 'link');
+          el.classList.toggle('ctx-current', isCurrent);
+        });
+        const currentTypeName = item.ai_type ? (TYPE_LABELS[item.ai_type] || item.ai_type) : 'Link (plain)';
+        typeLabel.textContent = 'Type  ·  ' + currentTypeName;
+        typeTrigger.classList.toggle('has-value', !!item.ai_type);
       } else {
-        // infer from rendered card class
-        const cardEl2 = document.querySelector(`.card[data-id="${ctxTargetItemId}"]`);
-        const CARD_CLASS_TO_LABEL = { 'card-image':'Image', 'card-gif':'GIF', 'card-video':'Video', 'card-pdf':'PDF', 'card-tool':'Tool', 'card-product':'Product', 'card-xpost':'X Post', 'card-article':'Article', 'card-link-new':'Link (plain)', 'card-quote-new':'Quote', 'card-tgpost':'Post', 'card-circle':'Circle', 'card-voice':'Voice', 'card-audio':'Audio' };
-        const matchedType = cardEl2 && Object.entries(CARD_CLASS_TO_LABEL).find(([cls]) => cardEl2.classList.contains(cls));
-        currentTypeName = matchedType ? matchedType[1] : (TYPE_LABELS[item.type] || 'Link (plain)');
+        // Non-link items have immutable type — hide Type submenu, show plain label
+        typeTrigger.style.display = 'none';
       }
-      typeLabel.textContent = 'Type  ·  ' + currentTypeName;
-      typeTrigger.classList.add('has-value');
 
       document.querySelectorAll('.ctx-sec-item').forEach(el => {
         const val = el.dataset.typeValue;
