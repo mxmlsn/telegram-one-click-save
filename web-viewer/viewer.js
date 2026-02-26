@@ -4351,7 +4351,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const TYPE_LABELS = { article:'Article', video:'Video', product:'Product', xpost:'X Post', tool:'Tool', pdf:'PDF', link:'Link (plain)', image:'Image', gif:'GIF', quote:'Quote', text:'Quote' };
       document.querySelectorAll('.ctx-type-item').forEach(el => {
         const val = el.dataset.typeValue;
-        const isCurrent = (val === 'link' && !item.ai_type) || (val === item.ai_type);
+        const isCurrent = item.ai_type ? (val === item.ai_type) : (val === 'link' && item.type === 'link');
         el.classList.toggle('ctx-current', isCurrent);
       });
       // Update Type trigger label to show current value
