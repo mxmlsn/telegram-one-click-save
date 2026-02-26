@@ -2037,7 +2037,7 @@ function _renderCardInner(item) {
   const aiTypeSec = item.ai_type_secondary; // secondary AI type for hybrid cards
   const aiData = item.ai_data || {};
   const rawDomain = getDomain(item.sourceUrl || item.url);
-  const domain = (rawDomain === 'stash.mxml.sn') ? '' : rawDomain;
+  const domain = (rawDomain === 'stash.mxml.sn' || rawDomain === 'viewer note') ? '' : rawDomain;
   const itemUrlAsLink = /^https?:\/\//i.test(item.url) ? item.url : '';
   const url = item.sourceUrl || itemUrlAsLink || '';
   const isInstagramReel = /instagram\.com\/(reels?|reel)\//i.test(url);
