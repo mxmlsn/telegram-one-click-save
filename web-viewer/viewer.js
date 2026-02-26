@@ -5130,10 +5130,15 @@ async function runAiBackgroundProcessing() {
         let realFileId = aiFileId;
         if (item.type === 'pdf' && item.pdfFileId && !isLarge) realFileId = item.pdfFileId;
         else if (item.type === 'video' && item.videoFileId && !isLarge) realFileId = item.videoFileId;
+        // For large images (>20MB), TG getFile won't work — use thumbnailFileId for AI analysis
+        else if ((item.type === 'image' || item.type === 'gif') && isLarge && item.ai_data?.thumbnailFileId) {
+          realFileId = item.ai_data.thumbnailFileId;
+        }
 
         const aiItem = {
           type: aiType,
           fileId: realFileId,
+          thumbnailFileId: item.ai_data?.thumbnailFileId || null,
           sourceUrl: item.sourceUrl,
           content: item.content,
           tagName: item.tag,
