@@ -116,6 +116,15 @@
     .type-pill:hover { color: var(--text); }
     .type-pill.active { background: transparent; color: var(--accent); border: none; }
 
+    .filter-logic-btn {
+      background: transparent; border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;
+      color: rgba(255,255,255,0.35); font-size: 10px; font-weight: 600; letter-spacing: .04em;
+      padding: 2px 6px; cursor: pointer; line-height: 1.4; transition: color .15s, border-color .15s;
+      font-family: inherit;
+    }
+    .filter-logic-btn:hover { color: rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.3); }
+    .filter-logic-btn.and { color: var(--accent); border-color: var(--accent); }
+
     .toolbar-label {
       font-family: 'Anybody', sans-serif;
       font-size: 12px; font-weight: 400;
@@ -3110,6 +3119,9 @@
     <button class="type-pill" data-type="video_note">circle</button>
     <button class="type-pill" data-type="voice">voice</button>
     <button class="type-pill" data-type="audio">audio</button>
+    <button class="type-pill" data-type="document">file</button>
+    <div class="filter-divider"></div>
+    <button id="filter-logic-toggle" class="filter-logic-btn" title="Switch between OR / AND filter logic">OR</button>
     <div class="filter-divider"></div>
     <button class="type-pill" data-type="video">video</button>
     <button class="type-pill" data-type="product">product</button>
