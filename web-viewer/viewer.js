@@ -113,6 +113,7 @@ const STATE = {
   activeTypes: new Set(),
   activeColor: null,
   linkPlainOnly: false,
+  filterLogic: 'or',
   layout: 'adaptive',   // adaptive | 4col | 3col
   align: 'masonry',     // masonry | center
   gap: 10,
@@ -1722,6 +1723,16 @@ function setupToolbarEvents() {
     });
   });
 
+  const filterLogicBtn = document.getElementById('filter-logic-toggle');
+  if (filterLogicBtn) {
+    filterLogicBtn.addEventListener('click', () => {
+      STATE.filterLogic = STATE.filterLogic === 'or' ? 'and' : 'or';
+      filterLogicBtn.textContent = STATE.filterLogic.toUpperCase();
+      filterLogicBtn.classList.toggle('and', STATE.filterLogic === 'and');
+      applyFilters();
+    });
+  }
+
   const colorBtn = document.getElementById('color-filter-btn');
   const colorDropdown = document.getElementById('color-dropdown');
 
@@ -1863,7 +1874,7 @@ function applyGridMode() {
 // Filtering: if base type selected → match item.type
 //            if AI type selected → match item.ai_type
 //            AND logic across base vs AI axes: item must satisfy both if both axes have selection
-const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'video', 'video_note', 'voice', 'audio']);
+const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'video', 'video_note', 'voice', 'audio', 'document']);
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 
@@ -1882,13 +1893,22 @@ function applyFilters() {
       if (!mediaType && videoLinkRe.test((item.sourceUrl || '') + ' ' + (item.content || ''))) {
         mediaType = 'video';
       }
-      // OR logic: item matches if ANY selected type matches base type, ai_type, ai_type_secondary, or mediaType
-      return active.some(t =>
+      // tgpost with a sourceUrl and no media = treat as 'link' for filtering
+      if (!mediaType && item.type === 'tgpost' && item.sourceUrl) {
+        mediaType = 'link';
+      }
+      // Are.na link blocks with an image render as card-image → match 'image' filter
+      const isArenaImgLink = item.tag === 'arena' && item.type === 'link' && !!item.fileId;
+      const matchesType = t =>
         t === itemBaseType ||
         t === item.ai_type ||
         t === item.ai_type_secondary ||
-        (mediaType && t === mediaType)
-      );
+        (mediaType && t === mediaType) ||
+        (isArenaImgLink && t === 'image');
+      // OR: any selected type matches; AND: every selected type matches
+      return STATE.filterLogic === 'and'
+        ? active.every(matchesType)
+        : active.some(matchesType);
     });
   }
 
@@ -4349,8 +4369,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = STATE.items.find(i => i.id === ctxTargetItemId);
     if (item) {
       const TYPE_LABELS = { article:'Article', video:'Video', product:'Product', xpost:'X Post', tool:'Tool', pdf:'PDF', link:'Link (plain)', image:'Image', gif:'GIF', quote:'Quote', text:'Quote' };
-      const ITEM_TYPE_LABELS = { image:'Image', gif:'GIF', video:'Video', pdf:'PDF', tgpost:'Post', circle:'Circle', voice:'Voice', audio:'Audio', link:'Link', text:'Quote', quote:'Quote' };
-      const typeTrigger = document.getElementById('ctx-type-trigger');
+const typeTrigger = document.getElementById('ctx-type-trigger');
       const typeLabel = document.getElementById('ctx-type-label');
       const isLink = item.type === 'link';
       if (isLink) {
@@ -4372,8 +4391,8 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.ctx-sec-item').forEach(el => {
         const val = el.dataset.typeValue;
         el.classList.toggle('ctx-current', val === (item.ai_type_secondary || ''));
-        // disable secondary option that matches current primary
-        el.classList.toggle('ctx-disabled', !!val && val === item.ai_type);
+        // disable secondary option that matches primary ai_type or the item's own base type
+        el.classList.toggle('ctx-disabled', !!val && (val === item.ai_type || val === item.type));
       });
       // Update Secondary trigger label
       const secTrigger = document.getElementById('ctx-sec-trigger');
