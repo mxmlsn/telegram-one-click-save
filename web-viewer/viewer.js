@@ -234,6 +234,10 @@ function disconnect() {
 
 // ─── App start ────────────────────────────────────────────────────────────────
 const FIRST_BATCH_SIZE = 16;
+const NOTION_PAGE_SIZE = 100;
+const NOTION_MAX_PAGES = 20;
+const LATEST_ITEMS_CACHE_KEY = 'viewerLatestItemsCache';
+const LATEST_ITEMS_CACHE_LIMIT = 120;
 
 async function startApp() {
   document.getElementById('search-pill').classList.remove('hidden');
@@ -251,27 +255,51 @@ async function startApp() {
 
   try {
     // 1. Fetch all items from Notion
-    const pages = await fetchNotion();
-    STATE.items = mergeMediaGroups(pages.map(parseItem));
-
-    // 2. Load file URL cache
     const fileCache = await loadFileCache();
+    const cachedItems = await loadLatestItemsCache();
+    if (cachedItems.length) {
+      STATE.items = cachedItems;
+      applyCachedFileUrls(STATE.items, fileCache);
+      applyFilters();
+      document.getElementById('ai-status').textContent = 'Refreshing…';
+      patchHeicPlaceholderSizes();
+    }
+
+    const firstPage = await fetchNotionPage();
+    const rawPages = firstPage.results.slice();
+    STATE.items = mergeMediaGroups(rawPages.map(parseItem));
+    applyCachedFileUrls(STATE.items, fileCache);
+    applyFilters();
+    saveLatestItemsCache(STATE.items);
+    document.getElementById('ai-status').textContent = firstPage.hasMore ? 'Loading older…' : '';
+    patchHeicPlaceholderSizes();
 
     // 3. Resolve images for the first batch (newest items) — show ASAP
     const firstItems = STATE.items.slice(0, FIRST_BATCH_SIZE);
-    const firstMap = await resolveImagesBatch(firstItems, STATE.botToken, fileCache);
-    Object.assign(STATE.imageMap, firstMap);
+    const firstImagesPromise = resolveImagesBatch(firstItems, STATE.botToken, fileCache).then(firstMap => {
+      Object.assign(STATE.imageMap, firstMap);
+      patchCardImages(firstItems);
+      saveFileCache(fileCache);
+      patchHeicPlaceholderSizes();
+    });
 
     // 4. Render immediately — first 16 with images, rest without
-    applyFilters();
-    document.getElementById('ai-status').textContent = '';
-    patchHeicPlaceholderSizes();
+    const olderPagesPromise = firstPage.hasMore
+      ? loadRemainingNotionPages(firstPage.nextCursor, rawPages, fileCache)
+      : Promise.resolve();
 
     // 5. Resolve remaining images in background, patch cards as they come
-    const restItems = STATE.items.slice(FIRST_BATCH_SIZE).filter(i => i.fileId || i.fileIds?.length > 1);
-    const imagesDonePromise = restItems.length > 0
-      ? resolveRemainingImages(restItems, fileCache)
-      : Promise.resolve(saveFileCache(fileCache));
+    const imagesDonePromise = (async () => {
+      await firstImagesPromise;
+      await olderPagesPromise;
+      const restItems = STATE.items.filter(i => i.fileId || i.fileIds?.length > 1);
+      if (restItems.length > 0) await resolveRemainingImages(restItems, fileCache);
+      else saveFileCache(fileCache);
+      document.getElementById('ai-status').textContent = '';
+    })().catch(e => {
+      document.getElementById('ai-status').textContent = 'Partial load error: ' + e.message;
+      console.error('[Viewer] background load error:', e);
+    });
 
     // 6. Repair corrupted ai_data (from previous truncation bug) — write salvaged data back to Notion
     repairCorruptedAiData();
@@ -283,6 +311,79 @@ async function startApp() {
   } catch (e) {
     document.getElementById('ai-status').textContent = 'Error: ' + e.message;
     console.error('[Viewer] load error:', e);
+  }
+}
+
+function cloneItemsForRuntime(items) {
+  return (Array.isArray(items) ? items : []).map(item => ({
+    ...item,
+    _resolvedImg: null
+  }));
+}
+
+function loadLatestItemsCache() {
+  return new Promise(resolve => {
+    chrome.storage.local.get(LATEST_ITEMS_CACHE_KEY, data => {
+      const cached = data[LATEST_ITEMS_CACHE_KEY];
+      resolve(cloneItemsForRuntime(cached?.items || []));
+    });
+  });
+}
+
+function saveLatestItemsCache(items) {
+  const safeItems = cloneItemsForRuntime(items).slice(0, LATEST_ITEMS_CACHE_LIMIT);
+  chrome.storage.local.set({ [LATEST_ITEMS_CACHE_KEY]: {
+    ts: Date.now(),
+    items: safeItems
+  }});
+}
+
+function applyCachedFileUrls(items, fileCache) {
+  const now = Date.now();
+  const validTgUrl = u => u && /\/bot[^/]+\/.+\/.+/.test(u);
+  for (const item of items) {
+    const ids = new Set();
+    if (item.fileId) ids.add(item.fileId);
+    if (item.fileIds?.length) {
+      for (const fid of item.fileIds) if (fid) ids.add(fid);
+    }
+    if (item.albumMedia?.length) {
+      for (const media of item.albumMedia) {
+        if (media.fileId) ids.add(media.fileId);
+        if (media.coverFileId) ids.add(media.coverFileId);
+      }
+    }
+    if (item.ai_data?.thumbnailFileId) ids.add(item.ai_data.thumbnailFileId);
+    for (const fid of ids) {
+      const cached = fileCache[fid];
+      if (cached && (now - cached.ts < FILE_CACHE_TTL) && validTgUrl(cached.url)) {
+        STATE.imageMap[fid] = cached.url;
+      } else if (cached && !validTgUrl(cached.url)) {
+        delete fileCache[fid];
+      }
+    }
+    if (item.fileId && STATE.imageMap[item.fileId]) {
+      item._resolvedImg = STATE.imageMap[item.fileId];
+    } else if (item.ai_data?.thumbnailFileId && STATE.imageMap[item.ai_data.thumbnailFileId]) {
+      item._resolvedImg = STATE.imageMap[item.ai_data.thumbnailFileId];
+    }
+  }
+}
+
+async function loadRemainingNotionPages(cursor, rawPages, fileCache) {
+  let page = 1;
+  let nextCursor = cursor;
+  while (nextCursor && page < NOTION_MAX_PAGES) {
+    const data = await fetchNotionPage(nextCursor);
+    rawPages.push(...data.results);
+    STATE.items = mergeMediaGroups(rawPages.map(parseItem));
+    applyCachedFileUrls(STATE.items, fileCache);
+    applyFilters();
+    saveLatestItemsCache(STATE.items);
+    patchHeicPlaceholderSizes();
+    nextCursor = data.hasMore ? data.nextCursor : undefined;
+    page++;
+    document.getElementById('ai-status').textContent = nextCursor ? `Loading older… ${STATE.items.length}` : '';
   }
 }
 
@@ -396,7 +497,7 @@ async function resolveRemainingImages(items, fileCache) {
     it.albumMedia?.some(m => /\.heic$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
   );
   const heicItemsAll = [...new Set([...heicItems, ...heicAlbumItems])];
-  if (heicItemsAll.length > 0 && typeof heic2any !== 'undefined') {
+  if (heicItemsAll.length > 0) {
     Promise.all(heicItemsAll.map(async it => {
       // Convert standalone HEIC
       const fname = it.ai_data?.fileName || it.content || '';
@@ -430,32 +531,41 @@ async function resolveRemainingImages(items, fileCache) {
 }
 
 // ─── Notion fetch ─────────────────────────────────────────────────────────────
+async function fetchNotionPage(cursor) {
+  const body = { page_size: NOTION_PAGE_SIZE, sorts: [{ property: 'Date', direction: 'descending' }] };
+  if (cursor) body.start_cursor = cursor;
+  const res = await bgFetch(`https://api.notion.com/v1/databases/${STATE.notionDbId}/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${STATE.notionToken}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    let msg = 'Notion fetch failed';
+    try { const d = await res.json(); msg = d.message || msg; } catch {}
+    throw new Error(`${res.status}: ${msg}`);
+  }
+  const data = await res.json();
+  return {
+    results: data.results || [],
+    hasMore: !!data.has_more,
+    nextCursor: data.next_cursor || undefined
+  };
+}
+
 async function fetchNotion() {
   let results = [];
   let cursor;
   let page = 0;
   do {
-    const body = { page_size: 100, sorts: [{ property: 'Date', direction: 'descending' }] };
-    if (cursor) body.start_cursor = cursor;
-    const res = await bgFetch(`https://api.notion.com/v1/databases/${STATE.notionDbId}/query`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${STATE.notionToken}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      let msg = 'Notion fetch failed';
-      try { const d = await res.json(); msg = d.message || msg; } catch {}
-      throw new Error(`${res.status}: ${msg}`);
-    }
-    const data = await res.json();
+    const data = await fetchNotionPage(cursor);
     results = results.concat(data.results);
-    cursor = data.has_more ? data.next_cursor : undefined;
+    cursor = data.hasMore ? data.nextCursor : undefined;
     page++;
-  } while (cursor && page < 20);
+  } while (cursor && page < NOTION_MAX_PAGES);
   return results;
 }
 
@@ -1259,11 +1369,26 @@ async function proxySvgItems(items, mapObj) {
   patchCardImages(svgItems);
 }
 
+let _heic2anyPromise = null;
+
+function ensureHeic2Any() {
+  if (typeof heic2any !== 'undefined') return Promise.resolve(true);
+  if (_heic2anyPromise) return _heic2anyPromise;
+  _heic2anyPromise = new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    script.onload = () => resolve(typeof heic2any !== 'undefined');
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  return _heic2anyPromise;
+}
+
 async function maybeConvertHeic(url, fileName) {
   if (!url) return { url };
   const isHeic = /\.heic$/i.test(fileName || '') || /\.heic($|\?)/i.test(url);
   if (!isHeic) { return { url }; }
-  if (typeof heic2any === 'undefined') { console.warn('[HEIC] heic2any not loaded'); return { url }; }
+  if (!(await ensureHeic2Any())) { console.warn('[HEIC] heic2any not loaded'); return { url }; }
   console.log('[HEIC] converting:', fileName, url.slice(0, 80));
   try {
     const proxyUrl = 'https://stash-cors-proxy.mxmlsn-co.workers.dev';
@@ -1396,7 +1521,7 @@ async function resolveImagesBatch(items, tgToken, cache) {
     it.albumMedia?.some(m => /\.heic$/i.test(m.fileName || '') && STATE.imageMap[m.fileId])
   );
   const heicItemsAll = [...new Set([...heicBatchItems, ...heicAlbumItems])];
-  if (heicItemsAll.length > 0 && typeof heic2any !== 'undefined') {
+  if (heicItemsAll.length > 0) {
     Promise.all(heicItemsAll.map(async it => {
       // Convert standalone HEIC
       const fname = it.ai_data?.fileName || '';
@@ -5123,7 +5248,7 @@ async function runFullRepair() {
 
   // 5. Clear file cache to force fresh URL resolution
   status('Clearing cache…');
-  localStorage.removeItem('tg_file_cache');
+  chrome.storage.local.remove([FILE_CACHE_KEY, LATEST_ITEMS_CACHE_KEY]);
 
   // 6. Done
   const msg = fixed > 0
