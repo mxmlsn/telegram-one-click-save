@@ -274,24 +274,19 @@ async function startApp() {
     document.getElementById('ai-status').textContent = firstPage.hasMore ? 'Loading older…' : '';
     patchHeicPlaceholderSizes();
 
-    // 3. Resolve images for the first batch (newest items) — show ASAP
-    const firstItems = STATE.items.slice(0, FIRST_BATCH_SIZE);
-    const firstImagesPromise = resolveImagesBatch(firstItems, STATE.botToken, fileCache).then(firstMap => {
-      Object.assign(STATE.imageMap, firstMap);
-      patchCardImages(firstItems);
-      saveFileCache(fileCache);
-      patchHeicPlaceholderSizes();
-    });
+    const firstPageItems = STATE.items.slice();
+    const firstPageImagesPromise = resolveRemainingImages(
+      firstPageItems.filter(i => i.fileId || i.fileIds?.length > 1),
+      fileCache
+    );
 
-    // 4. Render immediately — first 16 with images, rest without
     const olderPagesPromise = firstPage.hasMore
       ? loadRemainingNotionPages(firstPage.nextCursor, rawPages, fileCache)
       : Promise.resolve();
 
     // 5. Resolve remaining images in background, patch cards as they come
     const imagesDonePromise = (async () => {
-      await firstImagesPromise;
-      await olderPagesPromise;
+      await Promise.allSettled([firstPageImagesPromise, olderPagesPromise]);
       const restItems = STATE.items.filter(i => i.fileId || i.fileIds?.length > 1);
       if (restItems.length > 0) await resolveRemainingImages(restItems, fileCache);
       else saveFileCache(fileCache);
