@@ -2427,28 +2427,17 @@ function _renderCardInner(item) {
     </div>`;
   }
 
-  // ── Article (AI-typed link with screenshot) — open book design ──
+  // ── Article (AI-typed link with screenshot) ──
   if (effectiveType === 'article' || aiType === 'article') {
     const articleUrl = item.sourceUrl || item.url || '';
     const faviconUrl = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64` : '';
-    const bookPages = imgUrl ? `<div class="article-book">
-        <div class="article-book-shadow article-book-shadow-1">
-          <div class="article-page article-page-left"><img src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
-          <div class="article-page article-page-right"><img src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
-        </div>
-        <div class="article-book-main">
-          <div class="article-page article-page-left"><img src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
-          <div class="article-page article-page-right"><img src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>
-        </div>
-      </div>` : '';
     return `<div class="card card-article" data-id="${item.id}" data-action="open" data-url="${escapeHtml(articleUrl)}">
-      <div class="article-bg"></div>
       ${pendingDot}
       <div class="article-header">
-        ${faviconUrl ? `<img class="article-favicon" src="${escapeHtml(faviconUrl)}" alt="">` : ''}
+        ${faviconUrl ? `<img class="article-favicon" src="${escapeHtml(faviconUrl)}" alt="" onerror="this.style.display='none'">` : ''}
         <span class="article-domain">${escapeHtml(domain)}</span>
       </div>
-      ${bookPages}
+      ${imgUrl ? `<div class="article-preview"><img class="article-screenshot" src="${escapeHtml(imgUrl)}" loading="lazy" alt=""></div>` : ''}
     </div>`;
   }
 

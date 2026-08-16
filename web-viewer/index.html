@@ -1942,7 +1942,7 @@
       overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
     }
 
-    /* ── Article card (open book) ── */
+    /* ── Article card ── */
     .card.card-article {
       border-radius: 20px;
       overflow: hidden;
@@ -1953,25 +1953,13 @@
       overflow: hidden;
       position: relative;
     }
-    .card-article .article-bg {
-      position: absolute;
-      inset: 0;
-      background: url('./savecloud.png') center/cover no-repeat;
-      transition: transform 0.2s ease;
-      z-index: 0;
-    }
-    .card-article:hover .article-bg {
-      transform: scale(1.04);
-    }
-    .card-article .article-header,
-    .card-article .article-book {
-      position: relative;
-      z-index: 1;
-    }
     .card-article .article-header {
       display: flex; align-items: center; justify-content: center;
       gap: 8px;
       padding: 14px 15px 15px;
+      background: url('./savecloud.png') center/cover no-repeat;
+      position: relative;
+      z-index: 1;
     }
     .card-article .article-favicon {
       width: 20px; height: 20px;
@@ -1986,85 +1974,22 @@
       overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
       min-width: 0;
     }
-    .card-article .article-book {
-      padding: 0 14px 14px;
-      position: relative;
-      margin-bottom: -60px;
-      transition: transform 0.2s ease;
-      transform-origin: center bottom;
-    }
-    .card-article:hover .article-book {
-      transform: perspective(600px) rotateX(-4deg);
-    }
-    /* Shared layout for main + shadow layers */
-    .card-article .article-book-main,
-    .card-article .article-book-shadow {
-      display: flex;
-      gap: -1px;
-      perspective: 800px;
-    }
-    .card-article .article-book-main {
-      position: relative;
-      z-index: 3;
-    }
-    /* Shadow layers — absolute, behind main */
-    .card-article .article-book-shadow {
-      position: absolute;
-      left: 14px;
-      right: 14px;
-      bottom: 14px;
-      pointer-events: none;
-    }
-    .card-article .article-book-shadow-1 {
-      z-index: 1;
-      transform: scaleX(1.04) translateY(7px);
-      filter: brightness(0.9);
-    }
-    .card-article .article-page {
-      flex: 1;
+    .card-article .article-preview {
       overflow: hidden;
       position: relative;
-    }
-    .card-article .article-page::after {
-      content: '';
-      position: absolute;
-      top: 0; bottom: 0;
-      width: 33%;
-      pointer-events: none;
-      z-index: 1;
-    }
-    .card-article .article-page-left {
-      transform: skewY(4deg);
-      transform-origin: right bottom;
-      border-radius: 50% 50% 0 4px / 12px 12px 0 4px;
-    }
-    .card-article .article-page-left::after {
-      right: 0;
-      background: linear-gradient(to left, rgba(0,0,0,0.15), rgba(0,0,0,0));
-    }
-    .card-article .article-page-right {
-      transform: skewY(-4deg);
-      transform-origin: left bottom;
-      border-radius: 50% 50% 4px 0 / 12px 12px 4px 0;
-    }
-    .card-article .article-page-right::after {
-      left: 0;
-      background: linear-gradient(to right, rgba(0,0,0,0.15), rgba(0,0,0,0));
-    }
-    .card-article .article-page img {
-      width: 230%;
       display: block;
     }
-    .card-article .article-page-left img {
-      object-fit: cover;
-      object-position: left top;
+    .card-article .article-screenshot {
+      width: calc(100% + 1.5%);
+      height: auto;
+      display: block;
+      transform: scale(1);
+      transform-origin: center center;
+      transition: transform 0.25s ease;
+      will-change: transform;
     }
-    .card-article .article-page-right img {
-      object-fit: cover;
-      object-position: right top;
-      margin-left: -130%;
-      position: relative;
-      left: 3%;
+    .card-article:hover .article-screenshot {
+      transform: scale(1.1);
     }
 
     /* ── Product card (new design) ── */
