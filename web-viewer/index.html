@@ -2493,7 +2493,10 @@
       z-index: 99;
       font-size: 11px;
       color: var(--text-muted);
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    #display-bar::-webkit-scrollbar { display: none; }
     #display-bar.hidden { display: none; }
 
     .db-group {
@@ -2513,6 +2516,30 @@
     .db-btn svg { display: block; }
     .db-btn:hover { border-color: rgba(255,255,255,0.18); color: var(--text); }
     .db-btn.active { background: rgba(255,255,255,0.12); color: var(--text); border-color: rgba(255,255,255,0.18); }
+    .db-btn:disabled { opacity: 0.3; cursor: default; }
+    .db-btn:disabled:hover { border-color: var(--border); color: var(--text-muted); }
+
+    .tag-filter-group { flex-shrink: 0; }
+    .tag-filter-options { display: flex; align-items: center; gap: 6px; }
+    .tag-filter-btn {
+      gap: 5px;
+      padding: 4px 8px;
+      font-family: 'Anybody', sans-serif;
+      font-size: 11px;
+      font-variation-settings: 'wdth' 100;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .tag-filter-btn.active {
+      background: rgba(255,255,255,0.12);
+      border-color: var(--tag-color, rgba(255,255,255,0.3));
+      color: var(--text);
+    }
+    .tag-filter-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .tag-filter-clear { flex-shrink: 0; }
 
     .db-divider { width: 1px; height: 16px; background: var(--border); }
 
@@ -3094,6 +3121,12 @@
     <div class="db-range-wrap">
       <input type="range" class="db-range" id="padding-range" min="0" max="120" value="14" title="Padding">
     </div>
+  </div>
+  <div class="db-divider" id="tag-filter-divider"></div>
+  <div class="db-group tag-filter-group" id="tag-filter-group">
+    <span class="db-label">tags</span>
+    <div class="tag-filter-options" id="tag-filter-options"></div>
+    <button class="db-btn tag-filter-clear" id="tag-filter-clear" type="button" title="Clear tag filters" aria-label="Clear tag filters" disabled><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
   </div>
 </div>
 

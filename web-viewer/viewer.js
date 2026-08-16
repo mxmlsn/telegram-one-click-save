@@ -112,6 +112,7 @@ const STATE = {
   search: '',
   activeTypes: new Set(),
   activeColor: null,
+  activeTags: new Set(),
   linkPlainOnly: false,
   filterLogic: 'or',
   layout: 'adaptive',   // adaptive | 4col | 3col
@@ -1906,6 +1907,64 @@ function setupDisplayBar() {
   padRange.value = STATE.padding;
   if (padVal) padVal.textContent = STATE.padding;
 
+  // Custom tag filters: OR within selected tags, combined with other filters.
+  const tagFilterGroup = document.getElementById('tag-filter-group');
+  const tagFilterDivider = document.getElementById('tag-filter-divider');
+  const tagFilterOptions = document.getElementById('tag-filter-options');
+  const tagFilterClear = document.getElementById('tag-filter-clear');
+  if (tagFilterGroup && tagFilterDivider && tagFilterOptions && tagFilterClear) {
+    const seenTagNames = new Set();
+    const filterTags = STATE.customTags.filter(tag => {
+      const name = tag?.name?.trim();
+      if (!name || seenTagNames.has(name)) return false;
+      seenTagNames.add(name);
+      return true;
+    });
+
+    tagFilterGroup.classList.toggle('hidden', filterTags.length === 0);
+    tagFilterDivider.classList.toggle('hidden', filterTags.length === 0);
+    tagFilterOptions.replaceChildren();
+
+    function updateTagFilterUI() {
+      tagFilterOptions.querySelectorAll('.tag-filter-btn').forEach(btn => {
+        const active = STATE.activeTags.has(btn.dataset.tag);
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
+      tagFilterClear.disabled = STATE.activeTags.size === 0;
+    }
+
+    filterTags.forEach(tag => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'db-btn tag-filter-btn';
+      btn.dataset.tag = tag.name.trim();
+      btn.title = `Filter by tag: ${tag.name.trim()}`;
+      btn.style.setProperty('--tag-color', tag.color || '#888');
+
+      const dot = document.createElement('span');
+      dot.className = 'tag-filter-dot';
+      dot.style.background = tag.color || '#888';
+      btn.append(dot, document.createTextNode(tag.name.trim()));
+      btn.addEventListener('click', () => {
+        const tagName = btn.dataset.tag;
+        if (STATE.activeTags.has(tagName)) STATE.activeTags.delete(tagName);
+        else STATE.activeTags.add(tagName);
+        updateTagFilterUI();
+        applyFilters();
+      });
+      tagFilterOptions.appendChild(btn);
+    });
+
+    tagFilterClear.addEventListener('click', () => {
+      if (STATE.activeTags.size === 0) return;
+      STATE.activeTags.clear();
+      updateTagFilterUI();
+      applyFilters();
+    });
+    updateTagFilterUI();
+  }
+
   // Layout buttons
   document.querySelectorAll('#display-bar [data-layout]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2072,6 +2131,10 @@ function applyFilters() {
       const cp = d.color_palette;
       return cp === target || alsoMatch.includes(cp);
     });
+  }
+
+  if (STATE.activeTags.size > 0) {
+    items = items.filter(item => STATE.activeTags.has(item.tag));
   }
 
   if (STATE.search) {
