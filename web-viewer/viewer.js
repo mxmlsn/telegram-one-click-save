@@ -3613,6 +3613,34 @@ async function changeItemType(pageId, newAiType, newSecondary) {
   if (cardEl) cardEl.outerHTML = renderCard(item);
 }
 
+async function changeItemTag(pageId, newTag) {
+  const item = STATE.items.find(i => i.id === pageId);
+  if (!item) return;
+
+  const previousTag = item.tag || '';
+  if (newTag === previousTag) return;
+
+  // Update immediately so tag filters and the grid reflect the selection.
+  item.tag = newTag;
+  applyFilters();
+
+  try {
+    const res = await notionPatch(pageId, {
+      properties: {
+        'Tag': newTag ? { select: { name: newTag } } : { select: null }
+      }
+    });
+    if (!res.ok) throw new Error(`Notion returned ${res.status}`);
+    saveLatestItemsCache(STATE.items);
+    showToast(newTag ? `Tag set: ${escapeHtml(newTag)}` : 'Tag cleared');
+  } catch (e) {
+    console.error('[Viewer] Tag change error:', e);
+    item.tag = previousTag;
+    applyFilters();
+    showToast('Failed to update tag');
+  }
+}
+
 async function toggleXpostCollapse(pageId) {
   const item = STATE.items.find(i => i.id === pageId);
   if (!item) return;
@@ -4530,6 +4558,63 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Custom context menu ──
   let ctxTargetItemId = null;
   const ctxMenu = document.getElementById('ctx-menu');
+  const ctxTagTrigger = document.getElementById('ctx-tag-trigger');
+  const ctxTagLabel = document.getElementById('ctx-tag-label');
+  const ctxTagSubmenu = document.getElementById('ctx-tag-submenu');
+
+  function updateContextTagMenu(item) {
+    if (!ctxTagTrigger || !ctxTagLabel || !ctxTagSubmenu) return;
+    const seenTagNames = new Set();
+    const tags = STATE.customTags.filter(tag => {
+      const name = tag?.name?.trim();
+      if (!name || seenTagNames.has(name)) return false;
+      seenTagNames.add(name);
+      return true;
+    });
+
+    ctxTagTrigger.style.display = tags.length ? '' : 'none';
+    if (!tags.length) return;
+
+    ctxTagLabel.textContent = item.tag ? `Tag  ·  ${item.tag}` : 'Tag';
+    ctxTagTrigger.classList.toggle('has-value', !!item.tag);
+    ctxTagSubmenu.replaceChildren();
+
+    tags.forEach(tag => {
+      const tagName = tag.name.trim();
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ctx-item ctx-tag-item';
+      btn.dataset.ctxAction = 'set-tag';
+      btn.dataset.tagValue = tagName;
+      btn.classList.toggle('ctx-current', tagName === item.tag);
+
+      const dot = document.createElement('span');
+      dot.className = 'ctx-tag-dot';
+      dot.style.background = tag.color || '#888';
+      const label = document.createElement('span');
+      label.textContent = tagName;
+      const check = document.createElement('span');
+      check.className = 'ctx-tag-check';
+      check.setAttribute('aria-hidden', 'true');
+      check.textContent = '✓';
+      btn.append(dot, label, check);
+      ctxTagSubmenu.appendChild(btn);
+    });
+
+    const divider = document.createElement('div');
+    divider.className = 'ctx-divider';
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.className = 'ctx-item ctx-tag-item';
+    clearBtn.dataset.ctxAction = 'set-tag';
+    clearBtn.dataset.tagValue = '';
+    clearBtn.textContent = 'Clear';
+    if (!item.tag) {
+      clearBtn.classList.add('ctx-disabled');
+      clearBtn.disabled = true;
+    }
+    ctxTagSubmenu.append(divider, clearBtn);
+  }
 
   masonry.addEventListener('contextmenu', e => {
     const card = e.target.closest('.card[data-id]');
@@ -4576,6 +4661,8 @@ const typeTrigger = document.getElementById('ctx-type-trigger');
         secLabel.textContent = 'Secondary';
         secTrigger.classList.remove('has-value');
       }
+
+      updateContextTagMenu(item);
     }
 
     // Show Rename only for PDF cards
@@ -4684,6 +4771,8 @@ const typeTrigger = document.getElementById('ctx-type-trigger');
 
     } else if (action === 'delete') {
       await deleteItem(targetId);
+    } else if (action === 'set-tag') {
+      await changeItemTag(targetId, btn.dataset.tagValue || '');
     } else if (action === 'set-type') {
       await changeItemType(targetId, btn.dataset.typeValue, null);
     } else if (action === 'set-secondary') {

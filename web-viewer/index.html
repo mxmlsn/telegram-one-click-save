@@ -2688,6 +2688,25 @@
     .ctx-sec-item.ctx-current::before {
       content: '\2022\00a0';
     }
+    .ctx-tag-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ctx-tag-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .ctx-tag-check {
+      margin-left: auto;
+      color: var(--accent);
+      opacity: 0;
+    }
+    .ctx-tag-item.ctx-current .ctx-tag-check { opacity: 1; }
+    .ctx-tag-item.ctx-current { background: rgba(255,255,255,0.06); }
+    .ctx-tag-item.ctx-disabled { opacity: 0.3; pointer-events: none; }
 
     /* ── Ctx submenu ── */
     .ctx-submenu-trigger {
@@ -3200,6 +3219,11 @@
         <div class="ctx-divider"></div>
         <button class="ctx-item ctx-sec-item" data-ctx-action="set-secondary" data-type-value="">Clear</button>
       </div>
+    </div>
+    <div class="ctx-item ctx-submenu-trigger" id="ctx-tag-trigger">
+      <span id="ctx-tag-label">Tag</span>
+      <svg class="ctx-arrow" viewBox="0 0 6 10" fill="none"><path d="M1 1l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="ctx-submenu" id="ctx-tag-submenu"></div>
     </div>
     <div class="ctx-divider"></div>
     <button class="ctx-item" id="ctx-rename-btn" data-ctx-action="rename">Rename</button>
