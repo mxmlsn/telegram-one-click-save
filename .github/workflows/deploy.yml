@@ -18,6 +18,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Version static assets
+        run: sed -i "s/__BUILD_SHA__/${GITHUB_SHA}/g" web-viewer/index.html
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:

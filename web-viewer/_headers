@@ -1,5 +1,0 @@
-/viewer.js
-  Cache-Control: public, max-age=0, must-revalidate
-
-/chrome-polyfill.js
-  Cache-Control: public, max-age=0, must-revalidate
