@@ -113,6 +113,8 @@ const STATE = {
   activeTypes: new Set(),
   activeColor: null,
   activeTags: new Set(),
+  untaggedReviewActive: false,
+  reviewTaggedIds: new Set(),
   linkPlainOnly: false,
   filterLogic: 'or',
   layout: 'adaptive',   // adaptive | 4col | 3col
@@ -1854,6 +1856,20 @@ function setupToolbarEvents() {
     });
   }
 
+  // Temporary review mode: keep newly tagged cards visible until page reload.
+  const untaggedReviewBtn = document.getElementById('untagged-review-btn');
+  if (untaggedReviewBtn) {
+    untaggedReviewBtn.addEventListener('click', () => {
+      STATE.untaggedReviewActive = !STATE.untaggedReviewActive;
+      untaggedReviewBtn.classList.toggle('active', STATE.untaggedReviewActive);
+      untaggedReviewBtn.setAttribute('aria-pressed', String(STATE.untaggedReviewActive));
+      untaggedReviewBtn.title = STATE.untaggedReviewActive
+        ? 'Show all cards'
+        : 'Show cards without a user tag';
+      applyFilters();
+    });
+  }
+
   const colorBtn = document.getElementById('color-filter-btn');
   const colorDropdown = document.getElementById('color-dropdown');
 
@@ -2057,8 +2073,18 @@ const BASE_TYPES = new Set(['image', 'gif', 'link', 'quote', 'pdf', 'tgpost', 'v
 const AI_TYPES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 const LINK_AI_OVERRIDES = new Set(['article', 'video', 'product', 'xpost', 'tool', 'pdf']);
 
+function hasCustomUserTag(item) {
+  const itemTag = item?.tag?.trim();
+  if (!itemTag) return false;
+  return STATE.customTags.some(tag => tag?.name?.trim() === itemTag);
+}
+
 function applyFilters() {
   let items = STATE.items;
+
+  if (STATE.untaggedReviewActive) {
+    items = items.filter(item => !hasCustomUserTag(item) || STATE.reviewTaggedIds.has(item.id));
+  }
 
   if (STATE.activeTypes.size > 0) {
     const active = [...STATE.activeTypes];
@@ -2192,12 +2218,19 @@ const RULER_SVG = `<svg width="100%" viewBox="0 0 280 31" fill="none" xmlns="htt
 function renderCard(item) {
   let html = _renderCardInner(item);
   const isSelected = STATE.selectedIds && STATE.selectedIds.has(item.id);
+  const showReviewCheck = STATE.untaggedReviewActive
+    && STATE.reviewTaggedIds.has(item.id)
+    && hasCustomUserTag(item);
   // Add 'selected' class to root card element if needed
   if (isSelected) {
     html = html.replace(/^(<div class="card )/, '$1selected ');
   }
   // Inject checkbox overlay as first child of root card div
   html = html.replace(/^(<div class="card [^>]+>)/, '$1<div class="card-checkbox"></div>');
+  if (showReviewCheck) {
+    const check = '<div class="card-review-tagged-check" title="User tag added" aria-label="User tag added"><svg viewBox="0 0 16 16" fill="none"><path d="M3.2 8.2 6.4 11.3 12.9 4.8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+    html = html.replace(/^(<div class="card [^>]+>)/, `$1${check}`);
+  }
   return html;
 }
 function _renderCardInner(item) {
@@ -3619,9 +3652,15 @@ async function changeItemTag(pageId, newTag) {
 
   const previousTag = item.tag || '';
   if (newTag === previousTag) return;
+  const wasReviewTagged = STATE.reviewTaggedIds.has(pageId);
 
   // Update immediately so tag filters and the grid reflect the selection.
   item.tag = newTag;
+  if (STATE.untaggedReviewActive && hasCustomUserTag(item)) {
+    STATE.reviewTaggedIds.add(pageId);
+  } else if (!hasCustomUserTag(item)) {
+    STATE.reviewTaggedIds.delete(pageId);
+  }
   applyFilters();
 
   try {
@@ -3636,6 +3675,8 @@ async function changeItemTag(pageId, newTag) {
   } catch (e) {
     console.error('[Viewer] Tag change error:', e);
     item.tag = previousTag;
+    if (wasReviewTagged) STATE.reviewTaggedIds.add(pageId);
+    else STATE.reviewTaggedIds.delete(pageId);
     applyFilters();
     showToast('Failed to update tag');
   }
