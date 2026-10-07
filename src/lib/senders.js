@@ -11,7 +11,8 @@ import { isGifUrl, isGifBlob, isSvgUrl, isSvgBlob, isPdfUrl, fetchImageBlob, det
 async function showToast(tabId, state, message) {
   if (!tabId) return;
   try {
-    await chrome.tabs.sendMessage(tabId, { action: 'showToast', state, message });
+    const zoomFactor = await chrome.tabs.getZoom(tabId).catch(() => 1);
+    await chrome.tabs.sendMessage(tabId, { action: 'showToast', state, message, zoomFactor });
   } catch (e) {
     // Normal on some pages (e.g. chrome:// pages)
   }
@@ -57,7 +58,8 @@ export async function sendImage(imageUrl, pageUrl, settings, tabId, selectedTag)
     const result = await sendPhoto(blob, caption, settings);
     fileId = result?.fileId || null;
   } else {
-    await sendDocument(blob, caption, settings, imageUrl);
+    const result = await sendDocument(blob, caption, settings, imageUrl);
+    fileId = result?.fileId || null;
   }
 
   const notionData = { type: isGif ? 'gif' : 'image', sourceUrl: pageUrl, fileId, tagName: selectedTag?.name };

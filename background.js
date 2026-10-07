@@ -27,25 +27,20 @@ chrome.storage.local.get({ iconColor: 'circle1' }, (result) => {
   updateIcon(result.iconColor);
 });
 
-// ─── Settings Cache ─────────────────────────────────────────────────────────
-
-let cachedSettings = null;
-
-chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
-  cachedSettings = { ...DEFAULT_SETTINGS, ...result };
-});
-
-chrome.storage.onChanged.addListener((changes) => {
-  if (cachedSettings) {
-    for (const key of Object.keys(changes)) {
-      cachedSettings[key] = changes[key].newValue;
-    }
-  }
-});
+// ─── Settings ───────────────────────────────────────────────────────────────
 
 async function getSettings() {
   const result = await chrome.storage.local.get(DEFAULT_SETTINGS);
   return { ...DEFAULT_SETTINGS, ...result };
+}
+
+async function getPageZoom(tabId) {
+  if (!tabId) return 1;
+  try {
+    return await chrome.tabs.getZoom(tabId);
+  } catch (e) {
+    return 1;
+  }
 }
 
 // ─── Toast Helper ───────────────────────────────────────────────────────────
@@ -53,7 +48,8 @@ async function getSettings() {
 async function showToast(tabId, state, message) {
   if (!tabId) return;
   try {
-    await chrome.tabs.sendMessage(tabId, { action: 'showToast', state, message });
+    const zoomFactor = await getPageZoom(tabId);
+    await chrome.tabs.sendMessage(tabId, { action: 'showToast', state, message, zoomFactor });
   } catch (e) {
     // Normal on some pages
   }
@@ -66,6 +62,7 @@ const cancelledRequests = new Set();
 
 async function showTagSelection(tabId, customTags) {
   const requestId = Date.now().toString() + Math.random().toString(36).substring(2, 11);
+  const zoomFactor = await getPageZoom(tabId);
 
   const tagPromise = new Promise((resolve) => {
     pendingRequests.set(requestId, { resolve });
@@ -81,7 +78,8 @@ async function showTagSelection(tabId, customTags) {
   chrome.tabs.sendMessage(tabId, {
     action: 'preShowToast',
     requestId: requestId,
-    customTags: customTags
+    customTags: customTags,
+    zoomFactor: zoomFactor
   }).catch(() => {
     const pending = pendingRequests.get(requestId);
     if (pending) {
@@ -98,7 +96,7 @@ async function showTagSelection(tabId, customTags) {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'sendToTelegram',
-    title: 'Send to Telegram',
+    title: 'Stash it',
     contexts: ['page', 'frame', 'link', 'image', 'selection']
   });
 });
@@ -106,24 +104,18 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== 'sendToTelegram') return;
 
-  // Show toast IMMEDIATELY using cached settings
-  const currentSettings = cachedSettings || DEFAULT_SETTINGS;
-  const cachedTags = currentSettings.customTags;
-  const quickTagsEnabled = currentSettings.enableQuickTags !== false;
-  const hasNonEmptyTags = cachedTags && cachedTags.some(t => t.name && t.name.trim());
+  // Always read storage before rendering. A Manifest V3 service worker can wake
+  // up for this click before any startup cache has finished initializing.
+  const settings = await getSettings();
 
-  // Start settings load in parallel
-  const settingsPromise = getSettings();
-
-  // Show tag selection toast immediately if enabled
   let tagSelectionPromise = null;
+  const quickTagsEnabled = settings.enableQuickTags !== false;
+  const hasNonEmptyTags = settings.customTags && settings.customTags.some(t => t.name && t.name.trim());
   if (quickTagsEnabled && hasNonEmptyTags) {
-    tagSelectionPromise = showTagSelection(tab.id, cachedTags);
+    tagSelectionPromise = showTagSelection(tab.id, settings.customTags);
   } else {
     showToast(tab.id, 'pending', 'Sending');
   }
-
-  const settings = await settingsPromise;
 
   if (!settings.botToken || !settings.chatId) {
     chrome.runtime.openOptionsPage();
@@ -162,6 +154,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     console.error('[TG Saver] Error in content handling flow:', err);
     showToast(tab.id, 'error', 'Error: ' + err.message);
   }
+});
+
+chrome.tabs.onZoomChange.addListener(({ tabId, newZoomFactor }) => {
+  chrome.tabs.sendMessage(tabId, {
+    action: 'pageZoomChanged',
+    zoomFactor: newZoomFactor
+  }).catch(() => {
+    // Normal on tabs where the content script cannot run.
+  });
 });
 
 // ─── Toolbar Icon Click ─────────────────────────────────────────────────────

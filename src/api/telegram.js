@@ -122,9 +122,50 @@ export async function sendPhotoSilent(blob, settings) {
   }
 }
 
+const IMAGE_EXTENSION_BY_MIME = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/avif': 'avif',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/jxl': 'jxl',
+  'image/svg+xml': 'svg',
+  'image/bmp': 'bmp',
+  'image/tiff': 'tiff',
+  'image/x-icon': 'ico',
+  'image/vnd.microsoft.icon': 'ico'
+};
+
+// Image CDNs (notably pbs.twimg.com) often put the real format in
+// ?format=jpg instead of using a file extension in the path.
+export function getImageExtension(originalUrl, blob) {
+  const mime = (blob?.type || '').split(';')[0].trim().toLowerCase();
+  if (IMAGE_EXTENSION_BY_MIME[mime]) return IMAGE_EXTENSION_BY_MIME[mime];
+
+  try {
+    const parsed = new URL(originalUrl);
+    const queryFormat = (parsed.searchParams.get('format') || parsed.searchParams.get('fm') || '').toLowerCase();
+    if (/^(jpe?g|png|gif|webp|avif|heic|heif|jxl|svg|bmp|ico|tiff?)$/.test(queryFormat)) {
+      return queryFormat === 'jpeg' ? 'jpg' : queryFormat;
+    }
+
+    const pathExt = parsed.pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase();
+    if (pathExt && /^(jpe?g|png|gif|webp|avif|heic|heif|jxl|svg|bmp|ico|tiff?)$/.test(pathExt)) {
+      return pathExt === 'jpeg' ? 'jpg' : pathExt;
+    }
+  } catch {
+    // Fall through to a safe default for non-URL inputs.
+  }
+
+  return 'jpg';
+}
+
 // Send document (uncompressed)
 export async function sendDocument(blob, caption, settings, originalUrl) {
-  const ext = originalUrl.split('.').pop()?.split('?')[0] || 'png';
+  const ext = getImageExtension(originalUrl, blob);
   const filename = `image.${ext}`;
 
   const formData = new FormData();
@@ -143,7 +184,9 @@ export async function sendDocument(blob, caption, settings, originalUrl) {
     throw new Error(error.description || 'Telegram API error');
   }
 
-  return response.json();
+  const result = await response.json();
+  const fileId = result.result?.document?.file_id || null;
+  return { ...result, fileId };
 }
 
 // Send document silently (no notification) — for sending original file alongside preview

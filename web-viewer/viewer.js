@@ -3827,21 +3827,115 @@ async function toggleTgpostSection(pageId, section) {
 }
 
 // ─── Download helper ─────────────────────────────────────────────────────────
-function downloadImage(url) {
-  const ext = (url.match(/\.(jpe?g|png|gif|webp|svg)/i) || [])[1] || 'jpg';
-  fetch(url)
-    .then(r => r.blob())
-    .then(blob => {
-      // For blob URLs (e.g. proxied SVGs), detect type from blob instead of URL
-      const actualExt = (blob.type === 'image/svg+xml') ? 'svg' : ext;
-      const name = 'image_' + Date.now() + '.' + actualExt;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    })
-    .catch(() => window.open(url, '_blank'));
+const DOWNLOAD_EXT_BY_MIME = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/avif': 'avif',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'image/jxl': 'jxl',
+  'image/svg+xml': 'svg',
+  'image/bmp': 'bmp',
+  'image/tiff': 'tiff',
+  'image/x-icon': 'ico',
+  'image/vnd.microsoft.icon': 'ico'
+};
+
+async function sniffImageExtension(blob) {
+  if (!blob?.size) return null;
+
+  const bytes = new Uint8Array(await blob.slice(0, 32).arrayBuffer());
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpg';
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) return 'gif';
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+      && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return 'webp';
+  if (bytes[0] === 0x42 && bytes[1] === 0x4d) return 'bmp';
+  if ((bytes[0] === 0x49 && bytes[1] === 0x49 && bytes[2] === 0x2a && bytes[3] === 0x00)
+      || (bytes[0] === 0x4d && bytes[1] === 0x4d && bytes[2] === 0x00 && bytes[3] === 0x2a)) return 'tiff';
+  if (bytes[0] === 0x00 && bytes[1] === 0x00 && bytes[2] === 0x01 && bytes[3] === 0x00) return 'ico';
+
+  // ISO BMFF formats store the brand after the "ftyp" marker.
+  if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+    const brand = String.fromCharCode(...bytes.slice(8, 12)).toLowerCase();
+    if (brand === 'avif' || brand === 'avis') return 'avif';
+    if (['heic', 'heix', 'hevc', 'hevx'].includes(brand)) return 'heic';
+    if (brand === 'mif1' || brand === 'msf1') return 'heif';
+  }
+
+  const textStart = await blob.slice(0, 512).text();
+  if (/^\s*(?:<\?xml[^>]*>\s*)?<svg[\s>]/i.test(textStart.replace(/^\uFEFF/, ''))) return 'svg';
+  return null;
+}
+
+function getDownloadedImageExtension(url, blob, sniffedExt) {
+  const mime = (blob?.type || '').split(';')[0].trim().toLowerCase();
+  if (DOWNLOAD_EXT_BY_MIME[mime]) return DOWNLOAD_EXT_BY_MIME[mime];
+  if (sniffedExt) return sniffedExt;
+
+  try {
+    const parsed = new URL(url);
+    const queryFormat = (parsed.searchParams.get('format') || parsed.searchParams.get('fm') || '').toLowerCase();
+    if (/^(jpe?g|png|gif|webp|avif|heic|heif|jxl|svg|bmp|ico|tiff?)$/.test(queryFormat)) {
+      return queryFormat === 'jpeg' ? 'jpg' : queryFormat;
+    }
+    const pathExt = parsed.pathname.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase();
+    if (pathExt && /^(jpe?g|png|gif|webp|avif|heic|heif|jxl|svg|bmp|ico|tiff?)$/.test(pathExt)) {
+      return pathExt === 'jpeg' ? 'jpg' : pathExt;
+    }
+  } catch {
+    // blob: URLs and malformed external URLs are handled by MIME/default.
+  }
+
+  return 'jpg';
+}
+
+async function fetchImageForDownload(url) {
+  // Telegram file downloads need the existing binary proxy in the standalone
+  // viewer. Direct fetch remains faster inside the extension.
+  const tgMatch = url.match(/^https:\/\/api\.telegram\.org\/file\/bot[^/]+\/(.+)$/);
+  if (tgMatch) return fetchTgFile(tgMatch[1]);
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Image download failed: ${response.status}`);
+  return response.blob();
+}
+
+async function downloadImage(url) {
+  if (!url) return;
+
+  try {
+    const blob = await fetchImageForDownload(url);
+    const mime = (blob.type || '').toLowerCase();
+    if (!blob.size || (mime && !mime.startsWith('image/') && mime !== 'application/octet-stream')) {
+      throw new Error(`The server returned ${mime || 'an empty response'} instead of an image`);
+    }
+
+    const sniffedExt = await sniffImageExtension(blob);
+    if ((!mime || mime === 'application/octet-stream') && !sniffedExt) {
+      throw new Error('The downloaded data is not a recognized image');
+    }
+    const ext = getDownloadedImageExtension(url, blob, sniffedExt);
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `image_${Date.now()}.${ext}`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    // Revoking immediately after click can race the browser download and
+    // produce a zero-byte/broken file, especially in Safari/WebKit.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch (error) {
+    console.error('[Viewer] Image download failed:', error);
+    showToast('Download failed — opening the original image');
+    window.open(url, '_blank');
+  }
 }
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────

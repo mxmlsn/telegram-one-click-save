@@ -95,10 +95,12 @@ export async function fetchImageBlob(imageUrl, tabId) {
     if (!response.ok) throw new Error('Failed to fetch image');
 
     const blob = await response.blob();
-    const type = blob.type || response.headers.get('content-type') || '';
+    const type = (blob.type || response.headers.get('content-type') || '').toLowerCase();
 
-    // Telegram sendPhoto can't process HTML error pages or XML
-    if (type.includes('html') || (type.includes('xml') && !type.includes('svg'))) {
+    // Do not store a CDN/login/error response with an image filename. X and
+    // several other CDNs can return a 200 HTML/JSON response when the media
+    // request is rejected.
+    if (type && !type.startsWith('image/') && !type.includes('octet-stream')) {
       throw new Error('Unsupported image format: ' + type);
     }
 

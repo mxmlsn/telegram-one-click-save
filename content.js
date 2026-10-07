@@ -8,15 +8,9 @@ document.addEventListener('contextmenu', (e) => {
 let cachedContentSettings = null;
 
 chrome.storage.local.get({
-  customTags: [
-    { name: 'work', color: '#E64541', id: 'red' },
-    { name: 'study', color: '#FFDE42', id: 'yellow' },
-    { name: 'refs', color: '#4ED345', id: 'green' },
-    { name: 'project1', color: '#377CDE', id: 'blue' },
-    { name: '', color: '#BB4FFF', id: 'purple' },
-    { name: '', color: '#3D3D3B', id: 'black' },
-    { name: '', color: '#DEDEDE', id: 'white' }
-  ],
+  // The background always passes the authoritative tags. Keeping this fallback
+  // empty prevents legacy sample tags from ever flashing during initialization.
+  customTags: [],
   enableQuickTags: true,
   timerDuration: 4,
   toastStyle: 'normal',
@@ -55,6 +49,35 @@ window.__TG_ToastState = window.__TG_ToastState || {
 
 const ToastState = window.__TG_ToastState;
 
+let currentPageZoom = 1;
+
+function setPageZoom(zoomFactor) {
+  const parsedZoom = Number(zoomFactor);
+  if (Number.isFinite(parsedZoom) && parsedZoom > 0) {
+    currentPageZoom = parsedZoom;
+  }
+
+  const scale = 1 / currentPageZoom;
+  const offset = `${20 / currentPageZoom}px`;
+  document.querySelectorAll('.tg-saver-popup-root').forEach((element) => {
+    element.style.setProperty('--tg-saver-popup-scale', scale);
+    element.style.setProperty('--tg-saver-popup-offset', offset);
+  });
+
+  const tooltip = document.getElementById('tg-saver-tag-tooltip');
+  if (tooltip) {
+    tooltip.style.transform = `translateY(-50%) scale(${scale})`;
+    tooltip.style.transformOrigin = 'right center';
+  }
+}
+
+function markPopupRoot(element) {
+  element.classList.add('tg-saver-popup-root');
+  const scale = 1 / currentPageZoom;
+  element.style.setProperty('--tg-saver-popup-scale', scale);
+  element.style.setProperty('--tg-saver-popup-offset', `${20 / currentPageZoom}px`);
+}
+
 // ─── Message Listener ───────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -73,13 +96,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'showToast') {
+    setPageZoom(message.zoomFactor);
     showSimpleToast(message.state, message.message);
   } else if (message.action === 'showTagSelection') {
+    setPageZoom(message.zoomFactor);
     showTagSelectionToast(message.customTags || cachedContentSettings?.customTags, message.requestId);
     sendResponse({ received: true });
     return true;
   } else if (message.action === 'preShowToast') {
+    setPageZoom(message.zoomFactor);
     preShowTagSelection(message.requestId, message.customTags);
+    sendResponse({ received: true });
+    return true;
+  } else if (message.action === 'pageZoomChanged') {
+    setPageZoom(message.zoomFactor);
     sendResponse({ received: true });
     return true;
   }
@@ -99,6 +129,7 @@ function showSimpleToast(state, message) {
     toast = document.createElement('div');
     toast.id = 'tg-saver-toast';
     toast.className = 'tg-saver-toast' + lightClass;
+    markPopupRoot(toast);
     toast.innerHTML = `<span class="tg-saver-text">${message}</span>`;
     document.body.appendChild(toast);
 
@@ -128,6 +159,7 @@ function showSimpleToast(state, message) {
         toast = document.createElement('div');
         toast.id = 'tg-saver-toast';
         toast.className = 'tg-saver-toast' + lightClass;
+        markPopupRoot(toast);
         document.body.appendChild(toast);
       }
 
@@ -304,6 +336,7 @@ function showTagSelectionToast(customTags, requestId) {
     const wrapper = document.createElement('div');
     wrapper.className = 'tg-saver-minimalist-wrapper' + lightClass;
     wrapper.id = 'tg-saver-toast-wrapper';
+    markPopupRoot(wrapper);
 
     toast.innerHTML = `
       <div class="tg-saver-toast-content">
@@ -321,6 +354,7 @@ function showTagSelectionToast(customTags, requestId) {
     wrapper.dataset.requestId = requestId;
     document.body.appendChild(wrapper);
   } else {
+    markPopupRoot(toast);
     toast.innerHTML = `
       <div class="tg-saver-toast-content">
         <div class="tg-saver-toast-header">
@@ -442,6 +476,8 @@ function setupMinimalistTooltips(toast) {
         opacity: 0;
         transition: opacity 0.12s ease-out;
       `;
+      tooltip.style.transform = `translateY(-50%) scale(${1 / currentPageZoom})`;
+      tooltip.style.transformOrigin = 'right center';
       document.body.appendChild(tooltip);
     }
 
@@ -450,8 +486,7 @@ function setupMinimalistTooltips(toast) {
     const btnRect = btn.getBoundingClientRect();
 
     tooltip.style.top = (btnRect.top + btnRect.height / 2) + 'px';
-    tooltip.style.right = (window.innerWidth - toastRect.left + 10) + 'px';
-    tooltip.style.transform = 'translateY(-50%)';
+    tooltip.style.right = (window.innerWidth - toastRect.left + (10 / currentPageZoom)) + 'px';
 
     requestAnimationFrame(() => { tooltip.style.opacity = '1'; });
   });
